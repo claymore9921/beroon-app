@@ -102,4 +102,315 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
-/* This file is for your main application CSS */
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/PeydaWebFaNum-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/PeydaWebFaNum-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/PeydaWebFaNum-SemiBold.woff") format("woff");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Peyda";
+  src: url("/fonts/PeydaWebFaNum-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --beroon-primary: #14b8a6;
+  --beroon-primary-dark: #0f9f92;
+  --beroon-mint: #ccf1ee;
+  --beroon-surface: #f1f5f9;
+  --beroon-ink: #111827;
+  --beroon-muted: #64748b;
+  --beroon-line: rgba(20, 184, 166, 0.28);
+  --beroon-card-shadow: 0 14px 38px rgba(17, 24, 39, 0.08);
+  --beroon-soft-shadow: 0 8px 22px rgba(17, 24, 39, 0.07);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  direction: rtl;
+  color-scheme: light;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(20, 184, 166, 0.16), transparent 34rem),
+    var(--beroon-surface);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(204, 241, 238, 0.38), rgba(241, 245, 249, 0.8) 34%),
+    var(--beroon-surface);
+  color: var(--beroon-ink);
+  font-family: "Peyda", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+body main.min-h-screen,
+body > div.min-h-screen,
+body [class*="bg-zinc-950"] {
+  background:
+    radial-gradient(circle at 50% 0, rgba(20, 184, 166, 0.18), transparent 21rem),
+    var(--beroon-surface) !important;
+}
+
+main > .mx-auto,
+main > section.mx-auto,
+main > div.mx-auto,
+body > div > .mx-auto {
+  position: relative;
+  max-width: 430px !important;
+  background:
+    linear-gradient(180deg, rgba(204, 241, 238, 0.62), rgba(255, 255, 255, 0.88) 7.5rem),
+    #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.04), 0 18px 60px rgba(17, 24, 39, 0.13);
+}
+
+main > .mx-auto::before,
+main > section.mx-auto::before,
+main > div.mx-auto::before,
+body > div > .mx-auto::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 8.5rem;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.5), transparent 5rem),
+    linear-gradient(135deg, rgba(20, 184, 166, 0.92), rgba(204, 241, 238, 0.5));
+  opacity: 0.9;
+  mask-image: linear-gradient(#000, transparent 92%);
+}
+
+main > .mx-auto > *,
+main > section.mx-auto > *,
+main > div.mx-auto > *,
+body > div > .mx-auto > * {
+  position: relative;
+  z-index: 1;
+}
+
+h1,
+h2,
+h3,
+.font-bold {
+  color: var(--beroon-ink);
+}
+
+h1 {
+  line-height: 1.45;
+}
+
+p,
+dt,
+dd,
+span,
+label,
+input,
+select,
+textarea,
+button,
+a {
+  letter-spacing: 0;
+}
+
+header,
+nav {
+  border-color: rgba(20, 184, 166, 0.16) !important;
+}
+
+.rounded-lg,
+.rounded-md {
+  border-radius: 14px !important;
+}
+
+.border-zinc-200,
+.border-zinc-300 {
+  border-color: rgba(20, 184, 166, 0.18) !important;
+}
+
+.bg-white,
+.bg-zinc-50,
+.bg-stone-50 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+article,
+section.rounded-lg,
+form.rounded-lg,
+.shadow-sm {
+  box-shadow: var(--beroon-soft-shadow);
+}
+
+article[class*="border"],
+section[class*="border"],
+form[class*="border"] {
+  border-color: rgba(20, 184, 166, 0.18) !important;
+}
+
+.btn {
+  min-height: 2.75rem;
+  border: 1px solid rgba(20, 184, 166, 0.24) !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: var(--beroon-ink) !important;
+  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.06);
+  font-weight: 700;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(20, 184, 166, 0.42) !important;
+  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.1);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary,
+.btn-neutral {
+  border-color: transparent !important;
+  background: linear-gradient(180deg, #22c7b8, var(--beroon-primary)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 13px 28px rgba(20, 184, 166, 0.34);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.54) !important;
+  box-shadow: none;
+  color: var(--beroon-ink) !important;
+}
+
+.btn-disabled,
+.btn:disabled,
+button:disabled {
+  background: #e2e8f0 !important;
+  color: #94a3b8 !important;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.input,
+.select,
+.textarea,
+input[type="search"],
+input[type="date"],
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+input[type="datetime-local"],
+textarea,
+select {
+  border: 1px solid rgba(17, 24, 39, 0.1) !important;
+  border-radius: 12px !important;
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  color: var(--beroon-ink) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 20px rgba(17, 24, 39, 0.04);
+  font-family: "Peyda", ui-sans-serif, system-ui, sans-serif;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--beroon-primary) !important;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14) !important;
+  outline: none !important;
+}
+
+.label-text,
+.text-zinc-500,
+.text-zinc-600,
+.text-zinc-700 {
+  color: var(--beroon-muted) !important;
+}
+
+.text-orange-700,
+.text-orange-600,
+.text-emerald-700,
+.text-amber-700,
+.text-sky-700 {
+  color: var(--beroon-primary-dark) !important;
+}
+
+.bg-emerald-100,
+.bg-amber-100,
+.bg-sky-100,
+.bg-zinc-100,
+.bg-zinc-200 {
+  background-color: rgba(204, 241, 238, 0.7) !important;
+}
+
+.bg-zinc-900,
+.bg-amber-600 {
+  background-color: var(--beroon-primary) !important;
+}
+
+.border-amber-200 {
+  border-color: rgba(20, 184, 166, 0.32) !important;
+}
+
+.bg-amber-50 {
+  background:
+    linear-gradient(180deg, rgba(204, 241, 238, 0.92), rgba(255, 255, 255, 0.82)) !important;
+}
+
+.text-amber-950,
+.text-amber-900,
+.text-amber-800 {
+  color: var(--beroon-ink) !important;
+}
+
+.alert,
+[role="alert"] {
+  border-radius: 14px !important;
+  border-color: rgba(20, 184, 166, 0.26) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: var(--beroon-ink) !important;
+  box-shadow: var(--beroon-card-shadow);
+}
+
+@media (min-width: 431px) {
+  main > .mx-auto,
+  main > section.mx-auto,
+  main > div.mx-auto,
+  body > div > .mx-auto {
+    min-height: calc(100vh - 24px) !important;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    border-radius: 28px;
+    overflow: hidden;
+  }
+}
