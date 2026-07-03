@@ -130,10 +130,7 @@ defmodule BeroonWeb.PageController do
     case Reports.create_morning_inspection_with_items(attrs, checklist_item_ids, checked_item_ids) do
       {:ok, _inspection} ->
         conn
-        |> put_flash(
-          :info,
-          "چک‌لیست پلاک #{scooter.plate} ثبت شد. دستگاه بعدی را اسکن کنید."
-        )
+        |> put_flash(:info, "چک‌لیست پلاک #{scooter.plate} ثبت شد. دستگاه بعدی را اسکن کنید.")
         |> redirect(to: ~p"/manager/morning")
 
       {:error, changeset} ->
@@ -209,6 +206,7 @@ defmodule BeroonWeb.PageController do
     date = Date.utc_today()
 
     render(conn, :admin_reports,
+      scooter_counts: admin_scooter_counts(),
       location_alerts: Reports.list_open_location_alerts_for_date(date)
     )
   end
@@ -363,6 +361,17 @@ defmodule BeroonWeb.PageController do
 
     %{
       all: Enum.sum(Map.values(by_status)),
+      active: Map.get(by_status, "active", 0),
+      needs_service: Map.get(by_status, "needs_service", 0),
+      waiting_for_part: Map.get(by_status, "waiting_for_part", 0),
+      out_of_service: Map.get(by_status, "out_of_service", 0)
+    }
+  end
+
+  defp admin_scooter_counts do
+    by_status = Fleet.count_scooters_by_status()
+
+    %{
       active: Map.get(by_status, "active", 0),
       needs_service: Map.get(by_status, "needs_service", 0),
       waiting_for_part: Map.get(by_status, "waiting_for_part", 0),

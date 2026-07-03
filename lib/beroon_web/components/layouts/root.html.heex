@@ -31,7 +31,6 @@
   <body>
     <% current_role = assigns[:current_user_role] %>
     <% show_menu = current_role in ["admin", "branch_manager"] %>
-    <% header_branch_name = assigns[:current_branch_name] || "شعبه نامشخص" %>
 
     <header class="beroon-app-header">
       <div class={[
@@ -39,7 +38,7 @@
         current_role == "branch_manager" && "beroon-header-inner-manager"
       ]}>
         <div class="beroon-header-side beroon-header-menu-side">
-          <details :if={show_menu} class="beroon-mobile-menu">
+          <details :if={show_menu && current_role != "branch_manager"} class="beroon-mobile-menu">
             <summary aria-label="باز کردن منو">
               <.icon name="hero-bars-3" class="size-6" />
             </summary>
@@ -81,9 +80,9 @@
               </div>
 
               <div :if={current_role == "branch_manager"} class="beroon-menu-list">
-                <.link navigate={~p"/manager"}><.icon name="hero-home" />داشبورد</.link>
+                <.link navigate={~p"/manager"}><.icon name="hero-home" />خانه</.link>
                 <.link navigate={~p"/manager/morning"}>
-                  <.icon name="hero-clipboard-document-check" />چک‌لیست صبح
+                  <.icon name="hero-clipboard-document-check" />چک صبح
                 </.link>
                 <.link navigate={~p"/manager/evening"}>
                   <.icon name="hero-qr-code" />آمار شب
@@ -117,9 +116,14 @@
         </a>
 
         <div class="beroon-header-side beroon-header-title-side">
-          <p :if={current_role == "branch_manager"} class="beroon-header-branch-name">
-            {header_branch_name}
-          </p>
+          <div
+            :if={current_role == "branch_manager"}
+            class="beroon-header-bell"
+            aria-label="اعلان‌ها"
+          >
+            <.icon name="hero-bell" class="size-7" />
+            <span></span>
+          </div>
           <p :if={current_role == "admin"} class="beroon-header-branch-name">
             ادمین
           </p>

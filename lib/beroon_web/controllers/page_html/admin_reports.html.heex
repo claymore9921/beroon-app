@@ -1,64 +1,101 @@
 <Layouts.flash_group flash={@flash} />
-<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
-  <div class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
-    <div>
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <.link navigate={~p"/"} class="text-sm text-orange-700">داشبورد</.link>
-          <h1 class="mt-1 text-2xl font-bold">گزارش ادمین</h1>
-        </div>
-        <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
+<main class="manager-dashboard-shell min-h-screen text-zinc-950" dir="rtl">
+  <section class="manager-dashboard mx-auto min-h-screen w-full max-w-md px-4 pb-24 pt-6">
+    <section class="manager-hero">
+      <div class="manager-date-actions">
+        <p>{Beroon.Calendar.persian_date(Date.utc_today())}</p>
+        <.link href={~p"/logout"} method="delete" class="manager-logout">
+          <.icon name="hero-arrow-left-on-rectangle" /> خروج
+        </.link>
       </div>
 
-      <div class="mt-4 grid grid-cols-2 gap-2">
-        <.link navigate={~p"/checklist_items"} class="btn min-h-12">چک‌لیست</.link>
-        <.link navigate={~p"/admin/checklists"} class="btn min-h-12">
-          گزارش چک‌لیست شعبه‌ها
-        </.link>
-        <.link navigate={~p"/admin/evening-reports"} class="btn min-h-12">
-          گزارش آمارگیری شعبه‌ها
-        </.link>
-        <.link navigate={~p"/admin/location-alerts"} class="btn min-h-12">
-          گزارش جابجایی دستگاه‌ها
-        </.link>
-        <.link navigate={~p"/admin/managers"} class="btn min-h-12">
-          تایید مدیران شعبه
-        </.link>
-        <.link navigate={~p"/device_types"} class="btn min-h-12">نوع دستگاه</.link>
-        <.link navigate={~p"/branches"} class="btn min-h-12">شعبه‌ها</.link>
-        <.link navigate={~p"/scooters"} class="btn min-h-12">دستگاه‌ها</.link>
+      <div class="manager-greeting">
+        <p>برون</p>
+        <h1>گزارش ادمین</h1>
+        <span>نمای کلی وضعیت دستگاه‌ها</span>
       </div>
-    </div>
+    </section>
+
+    <section class="manager-status-grid">
+      <.link navigate={~p"/scooters?q=active"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-bolt" />
+        </div>
+        <div class="manager-card-body">
+          <h2>دستگاه‌های فعال</h2>
+          <strong>{@scooter_counts.active}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/scooters?q=needs_service"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-exclamation-triangle" />
+        </div>
+        <div class="manager-card-body">
+          <h2>دستگاه‌های تعمیری</h2>
+          <strong>{@scooter_counts.needs_service}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/scooters?q=waiting_for_part"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-wrench-screwdriver" />
+        </div>
+        <div class="manager-card-body">
+          <h2>نیازمند قطعه</h2>
+          <strong>{@scooter_counts.waiting_for_part}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/scooters?q=out_of_service"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-no-symbol" />
+        </div>
+        <div class="manager-card-body">
+          <h2>از مدار خارج شده</h2>
+          <strong>{@scooter_counts.out_of_service}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+    </section>
+
+    <section class="mt-5 grid grid-cols-2 gap-2">
+      <.link navigate={~p"/checklist_items"} class="btn min-h-12">چک‌لیست</.link>
+      <.link navigate={~p"/admin/checklists"} class="btn min-h-12">
+        گزارش چک‌لیست شعبه‌ها
+      </.link>
+      <.link navigate={~p"/admin/evening-reports"} class="btn min-h-12">
+        گزارش آمارگیری شعبه‌ها
+      </.link>
+      <.link navigate={~p"/admin/location-alerts"} class="btn min-h-12">
+        گزارش جابجایی دستگاه‌ها
+      </.link>
+      <.link navigate={~p"/admin/managers"} class="btn min-h-12">
+        تایید مدیران شعبه
+      </.link>
+      <.link navigate={~p"/device_types"} class="btn min-h-12">نوع دستگاه</.link>
+      <.link navigate={~p"/branches"} class="btn min-h-12">شعبه‌ها</.link>
+      <.link navigate={~p"/scooters"} class="btn min-h-12">دستگاه‌ها</.link>
+    </section>
 
     <section
       :if={@location_alerts != []}
-      class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950"
+      class="manager-alert-card"
+      aria-label="هشدار جابجایی دستگاه"
     >
-      <h2 class="font-bold">هشدار جابجایی دستگاه</h2>
-      <div class="mt-3 grid gap-2">
-        <article :for={alert <- @location_alerts} class="rounded-md bg-white/70 p-3 text-sm">
-          <p class="font-bold">پلاک {alert.plate}</p>
-          <p class="mt-1">
-            این دستگاه متعلق به شعبه {alert.home_branch_name} است، اما در آمار شعبه {alert.detected_branch_name} اسکن شده.
-          </p>
-          <p class="mt-1 text-amber-800">
-            {Enum.join(
-              Enum.reject(
-                [
-                  alert.device_type_identifier,
-                  alert.device_type_category,
-                  alert.device_type_name
-                ],
-                &is_nil/1
-              ),
-              " - "
-            )}
-          </p>
-          <p class="mt-1 text-amber-800">
-            بارکد {alert.barcode} · ساعت {Calendar.strftime(alert.detected_at, "%H:%M")}
-          </p>
-        </article>
-      </div>
+      <h2>هشدار جابجایی دستگاه</h2>
+      <article :for={alert <- @location_alerts}>
+        <p class="font-bold">پلاک {alert.plate}</p>
+        <p>
+          این دستگاه متعلق به شعبه {alert.home_branch_name} است، اما در آمار شعبه {alert.detected_branch_name} اسکن شده.
+        </p>
+        <span>
+          بارکد {alert.barcode} · ساعت {Calendar.strftime(alert.detected_at, "%H:%M")}
+        </span>
+      </article>
     </section>
-  </div>
+  </section>
 </main>
