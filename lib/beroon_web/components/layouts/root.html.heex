@@ -23,12 +23,111 @@
           setTheme(localStorage.getItem("phx:theme") || "system");
         }
         window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
+
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
       })();
     </script>
   </head>
   <body>
+    <% current_role = assigns[:current_user_role] %>
+    <% show_menu = current_role in ["admin", "branch_manager"] %>
+    <% header_branch_name = assigns[:current_branch_name] || "شعبه نامشخص" %>
+
+    <header class="beroon-app-header">
+      <div class={[
+        "beroon-header-inner",
+        current_role == "branch_manager" && "beroon-header-inner-manager"
+      ]}>
+        <div class="beroon-header-side beroon-header-menu-side">
+          <details :if={show_menu} class="beroon-mobile-menu">
+            <summary aria-label="باز کردن منو">
+              <.icon name="hero-bars-3" class="size-6" />
+            </summary>
+            <nav class="beroon-menu-panel" aria-label="منوی اصلی">
+              <div class="beroon-menu-head">
+                <img src={~p"/images/logo.svg"} alt="برون" />
+                <div>
+                  <p>برون</p>
+                  <span>
+                    {if current_role == "admin", do: "پنل ادمین", else: "پنل مدیر شعبه"}
+                  </span>
+                </div>
+              </div>
+
+              <div :if={current_role == "admin"} class="beroon-menu-list">
+                <.link navigate={~p"/admin/reports"}><.icon name="hero-home" />داشبورد</.link>
+                <.link navigate={~p"/checklist_items"}>
+                  <.icon name="hero-clipboard-document-check" />چک‌لیست‌ها
+                </.link>
+                <.link navigate={~p"/admin/checklists"}>
+                  <.icon name="hero-document-chart-bar" />گزارش چک‌لیست
+                </.link>
+                <.link navigate={~p"/admin/evening-reports"}>
+                  <.icon name="hero-chart-bar-square" />گزارش آمارگیری
+                </.link>
+                <.link navigate={~p"/admin/location-alerts"}>
+                  <.icon name="hero-map-pin" />گزارش جابجایی
+                </.link>
+                <.link navigate={~p"/admin/managers"}>
+                  <.icon name="hero-user-plus" />تایید مدیران
+                </.link>
+                <.link navigate={~p"/scooters"}><.icon name="hero-qr-code" />دستگاه‌ها</.link>
+                <.link navigate={~p"/device_types"}>
+                  <.icon name="hero-squares-2x2" />نوع دستگاه
+                </.link>
+                <.link navigate={~p"/branches"}>
+                  <.icon name="hero-building-storefront" />شعبه‌ها
+                </.link>
+              </div>
+
+              <div :if={current_role == "branch_manager"} class="beroon-menu-list">
+                <.link navigate={~p"/manager"}><.icon name="hero-home" />داشبورد</.link>
+                <.link navigate={~p"/manager/morning"}>
+                  <.icon name="hero-clipboard-document-check" />چک‌لیست صبح
+                </.link>
+                <.link navigate={~p"/manager/evening"}>
+                  <.icon name="hero-qr-code" />آمار شب
+                </.link>
+                <.link navigate={~p"/manager/scooters"}>
+                  <.icon name="hero-squares-2x2" />همه دستگاه‌ها
+                </.link>
+                <.link navigate={~p"/manager/scooters/active"}>
+                  <.icon name="hero-check-circle" />فعال
+                </.link>
+                <.link navigate={~p"/manager/scooters/needs_service"}>
+                  <.icon name="hero-wrench-screwdriver" />نیازمند تعمیر
+                </.link>
+                <.link navigate={~p"/manager/scooters/waiting_for_part"}>
+                  <.icon name="hero-clock" />در انتظار قطعه
+                </.link>
+                <.link navigate={~p"/manager/scooters/out_of_service"}>
+                  <.icon name="hero-no-symbol" />از مدار خارج
+                </.link>
+              </div>
+
+              <.link href={~p"/logout"} method="delete" class="beroon-menu-logout">
+                <.icon name="hero-arrow-right-on-rectangle" />خروج
+              </.link>
+            </nav>
+          </details>
+        </div>
+
+        <a href="/" class="beroon-header-logo" aria-label="برون">
+          <img src={~p"/images/logo.svg"} alt="برون" />
+        </a>
+
+        <div class="beroon-header-side beroon-header-title-side">
+          <p :if={current_role == "branch_manager"} class="beroon-header-branch-name">
+            {header_branch_name}
+          </p>
+          <p :if={current_role == "admin"} class="beroon-header-branch-name">
+            ادمین
+          </p>
+          <span :if={!show_menu} class="beroon-header-dot" />
+        </div>
+      </div>
+    </header>
+
     {@inner_content}
   </body>
 </html>

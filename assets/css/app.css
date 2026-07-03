@@ -170,6 +170,265 @@ body {
   letter-spacing: 0;
 }
 
+.beroon-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 10px 12px 12px;
+  background:
+    radial-gradient(circle at 50% -30%, rgba(20, 184, 166, 0.48), transparent 12rem),
+    linear-gradient(135deg, #111827 0%, #12383b 54%, #0f766e 100%);
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.2);
+}
+
+.beroon-app-header::after {
+  content: "";
+  position: absolute;
+  inset: auto 18px 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(204, 241, 238, 0.64), transparent);
+}
+
+.beroon-header-inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+.beroon-header-side {
+  display: flex;
+  min-width: 48px;
+  align-items: center;
+}
+
+.beroon-header-menu-side {
+  justify-content: flex-start;
+}
+
+.beroon-header-inner-manager {
+  grid-template-columns: 118px minmax(46px, 1fr) minmax(88px, 1fr);
+  direction: ltr;
+}
+
+.beroon-header-inner-manager .beroon-header-logo {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.beroon-header-inner-manager .beroon-header-menu-side {
+  grid-column: 2;
+  justify-content: center;
+  justify-self: center;
+}
+
+.beroon-header-inner-manager .beroon-header-title-side {
+  grid-column: 3;
+  justify-content: flex-end;
+  justify-self: end;
+  direction: rtl;
+}
+
+.beroon-header-side:last-child {
+  justify-content: flex-end;
+}
+
+.beroon-header-title-side {
+  min-width: 0;
+}
+
+.beroon-header-branch-name {
+  max-width: 132px;
+  margin: 0;
+  overflow: hidden;
+  color: #ffffff !important;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.beroon-header-logo {
+  display: grid;
+  width: 118px;
+  height: 74px;
+  place-items: center;
+}
+
+.beroon-header-logo img {
+  width: 118px;
+  height: 82px;
+  object-fit: contain;
+}
+
+.beroon-header-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #14b8a6;
+  box-shadow: 0 0 0 5px rgba(20, 184, 166, 0.15), 0 0 20px rgba(20, 184, 166, 0.8);
+}
+
+.beroon-mobile-menu {
+  position: relative;
+}
+
+.beroon-mobile-menu summary {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  cursor: pointer;
+  list-style: none;
+  place-items: center;
+  border: 1px solid rgba(204, 241, 238, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.beroon-mobile-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.beroon-mobile-menu summary:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.beroon-mobile-menu[open] summary {
+  background: #14b8a6;
+}
+
+.beroon-menu-panel {
+  position: absolute;
+  top: 58px;
+  right: 0;
+  width: min(82vw, 330px);
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(204, 241, 238, 0.22);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.97), rgba(15, 58, 61, 0.96)),
+    #111827;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px);
+}
+
+.beroon-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 14px;
+  border-bottom: 1px solid rgba(204, 241, 238, 0.13);
+}
+
+.beroon-menu-head img {
+  width: 82px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.beroon-menu-head p {
+  margin: 0;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.beroon-menu-head span {
+  display: block;
+  margin-top: 2px;
+  color: rgba(204, 241, 238, 0.78);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.beroon-menu-list {
+  display: grid;
+  gap: 7px;
+  padding: 12px 0;
+}
+
+.beroon-menu-list a,
+.beroon-menu-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(204, 241, 238, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.065);
+  color: #f8fafc !important;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.beroon-menu-list a:hover,
+.beroon-menu-logout:hover {
+  transform: translateX(-2px);
+  border-color: rgba(20, 184, 166, 0.48);
+  background: rgba(20, 184, 166, 0.18);
+}
+
+.beroon-menu-list svg,
+.beroon-menu-logout svg {
+  width: 20px;
+  height: 20px;
+  color: #5eead4;
+}
+
+.beroon-menu-logout {
+  width: 100%;
+  justify-content: center;
+  border-color: rgba(20, 184, 166, 0.38);
+  background: linear-gradient(180deg, #19c5b6, #14b8a6);
+  box-shadow: 0 14px 30px rgba(20, 184, 166, 0.22);
+}
+
+.manager-device-card {
+  display: flex;
+  min-height: 92px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--beroon-soft-shadow);
+  color: var(--beroon-ink);
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.manager-device-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(20, 184, 166, 0.45);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.1);
+}
+
+.manager-device-card span {
+  color: var(--beroon-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.manager-device-card strong {
+  color: var(--beroon-primary-dark);
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+}
+
 body main.min-h-screen,
 body > div.min-h-screen,
 body [class*="bg-zinc-950"] {
@@ -303,6 +562,13 @@ form[class*="border"] {
   background: linear-gradient(180deg, #22c7b8, var(--beroon-primary)) !important;
   color: #ffffff !important;
   box-shadow: 0 13px 28px rgba(20, 184, 166, 0.34);
+}
+
+.btn-evening {
+  border-color: transparent !important;
+  background: linear-gradient(180deg, #0f766e, #115e59) !important;
+  color: #ffffff !important;
+  box-shadow: 0 13px 28px rgba(17, 94, 89, 0.32);
 }
 
 .btn-ghost {

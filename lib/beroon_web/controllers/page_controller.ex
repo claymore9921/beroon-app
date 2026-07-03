@@ -26,6 +26,7 @@ defmodule BeroonWeb.PageController do
         branch: branch,
         manager_name: manager_name(branch),
         location_alerts: branch_location_alerts(branch),
+        scooter_counts: manager_scooter_counts(branch.id),
         persian_today: Beroon.Calendar.persian_date(today),
         morning_submitted:
           Reports.morning_submitted_today?(conn.assigns.current_user_phone, today),
@@ -129,7 +130,10 @@ defmodule BeroonWeb.PageController do
     case Reports.create_morning_inspection_with_items(attrs, checklist_item_ids, checked_item_ids) do
       {:ok, _inspection} ->
         conn
-        |> put_flash(:info, "چک‌لیست پلاک #{scooter.plate} ثبت شد. دستگاه بعدی را اسکن کنید.")
+        |> put_flash(
+          :info,
+          "چک‌لیست پلاک #{scooter.plate} ثبت شد. دستگاه بعدی را اسکن کنید."
+        )
         |> redirect(to: ~p"/manager/morning")
 
       {:error, changeset} ->
@@ -204,7 +208,19 @@ defmodule BeroonWeb.PageController do
   def admin_reports(conn, _params) do
     date = Date.utc_today()
 
-    render(conn, :admin_reports, location_alerts: Reports.list_location_alerts_for_date(date))
+    render(conn, :admin_reports,
+      location_alerts: Reports.list_open_location_alerts_for_date(date)
+    )
+  end
+
+  def admin_location_alerts(conn, params) do
+    date = parse_date(params["date"])
+
+    render(conn, :admin_location_alerts,
+      date: date,
+      alert_dates: Reports.list_location_alert_dates(),
+      alerts: Reports.list_location_alerts_for_date(date)
+    )
   end
 
   def admin_evening_report_branches(conn, _params) do
@@ -342,9 +358,28 @@ defmodule BeroonWeb.PageController do
   defp branch_location_alerts(branch),
     do: Reports.list_open_location_alerts_for_home_branch(branch.id)
 
+  defp manager_scooter_counts(branch_id) do
+    by_status = Fleet.count_scooters_for_branch_by_status(branch_id)
+
+    %{
+      all: Enum.sum(Map.values(by_status)),
+      active: Map.get(by_status, "active", 0),
+      needs_service: Map.get(by_status, "needs_service", 0),
+      waiting_for_part: Map.get(by_status, "waiting_for_part", 0),
+      out_of_service: Map.get(by_status, "out_of_service", 0)
+    }
+  end
+
   defp manager_scooters_title("active"), do: "دستگاه‌های فعال"
-  defp manager_scooters_title("needs_service"), do: "دستگاه‌های نیازمند تعمیر"
-  defp manager_scooters_title("waiting_for_part"), do: "دستگاه‌های در انتظار قطعه"
-  defp manager_scooters_title("out_of_service"), do: "دستگاه‌های از مدار خارج شده"
+
+  defp manager_scooters_title("needs_service"),
+    do: "دستگاه‌های نیازمند تعمیر"
+
+  defp manager_scooters_title("waiting_for_part"),
+    do: "دستگاه‌های در انتظار قطعه"
+
+  defp manager_scooters_title("out_of_service"),
+    do: "دستگاه‌های از مدار خارج شده"
+
   defp manager_scooters_title(_status), do: "لیست دستگاه‌های شعبه من"
 end

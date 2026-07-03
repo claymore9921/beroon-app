@@ -9,9 +9,6 @@
         </div>
         <div class="shrink-0 text-left">
           <p class="text-sm font-bold text-zinc-700">{@persian_today}</p>
-          <p class="mt-1 max-w-32 truncate text-sm font-bold text-zinc-700">
-            {if @branch, do: @branch.name, else: "شعبه نامشخص"}
-          </p>
           <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm mt-2">خروج</.link>
         </div>
       </div>
@@ -25,7 +22,11 @@
         </.link>
         <.link
           navigate={if @evening_submitted, do: ~p"/manager", else: ~p"/manager/evening"}
-          class={["btn min-h-14", @evening_submitted && "btn-disabled"]}
+          class={[
+            "btn min-h-14",
+            !@evening_submitted && "btn-evening",
+            @evening_submitted && "btn-disabled"
+          ]}
         >
           آمار شب
         </.link>
@@ -69,7 +70,7 @@
         <p class={[
           "mt-2 text-lg font-bold",
           @morning_submitted && "text-emerald-700",
-          !@morning_submitted && "text-orange-700"
+          !@morning_submitted && "text-red-600"
         ]}>
           {if @morning_submitted, do: "ثبت شده", else: "ثبت نشده"}
         </p>
@@ -79,37 +80,33 @@
         <p class={[
           "mt-2 text-lg font-bold",
           @evening_submitted && "text-emerald-700",
-          !@evening_submitted && "text-orange-700"
+          !@evening_submitted && "text-red-600"
         ]}>
           {if @evening_submitted, do: "ثبت شده", else: "ثبت نشده"}
         </p>
       </div>
     </div>
 
-    <section class="grid gap-2">
-      <.link navigate={~p"/manager/scooters"} class="btn min-h-13 w-full justify-start">
-        لیست دستگاه‌های شعبه من
+    <section class="grid grid-cols-2 gap-3">
+      <.link navigate={~p"/manager/scooters"} class="manager-device-card">
+        <span>لیست دستگاه‌های شعبه من</span>
+        <strong>{@scooter_counts.all}</strong>
       </.link>
-      <.link navigate={~p"/manager/scooters/active"} class="btn min-h-13 w-full justify-start">
-        دستگاه‌های فعال
+      <.link navigate={~p"/manager/scooters/active"} class="manager-device-card">
+        <span>دستگاه‌های فعال</span>
+        <strong>{@scooter_counts.active}</strong>
       </.link>
-      <.link
-        navigate={~p"/manager/scooters/needs_service"}
-        class="btn min-h-13 w-full justify-start"
-      >
-        دستگاه‌های نیازمند تعمیر
+      <.link navigate={~p"/manager/scooters/needs_service"} class="manager-device-card">
+        <span>نیازمند تعمیر</span>
+        <strong>{@scooter_counts.needs_service}</strong>
       </.link>
-      <.link
-        navigate={~p"/manager/scooters/waiting_for_part"}
-        class="btn min-h-13 w-full justify-start"
-      >
-        دستگاه‌های در انتظار قطعه
+      <.link navigate={~p"/manager/scooters/waiting_for_part"} class="manager-device-card">
+        <span>در انتظار قطعه</span>
+        <strong>{@scooter_counts.waiting_for_part}</strong>
       </.link>
-      <.link
-        navigate={~p"/manager/scooters/out_of_service"}
-        class="btn min-h-13 w-full justify-start"
-      >
-        دستگاه‌های از مدار خارج شده
+      <.link navigate={~p"/manager/scooters/out_of_service"} class="manager-device-card">
+        <span>از مدار خارج شده</span>
+        <strong>{@scooter_counts.out_of_service}</strong>
       </.link>
     </section>
   </section>

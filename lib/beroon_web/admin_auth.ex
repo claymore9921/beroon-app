@@ -3,6 +3,7 @@ defmodule BeroonWeb.AdminAuth do
   import Phoenix.Controller
 
   alias Beroon.Auth
+  alias Beroon.Operations
 
   use BeroonWeb, :verified_routes
 
@@ -20,11 +21,13 @@ defmodule BeroonWeb.AdminAuth do
       |> assign(:current_user_phone, normalized_phone)
       |> assign(:current_user_role, resolved_role)
       |> assign(:current_admin_phone, resolved_role == "admin" && normalized_phone)
+      |> assign(:current_branch_name, current_branch_name(resolved_role, normalized_phone))
     else
       conn
       |> assign(:current_user_phone, nil)
       |> assign(:current_user_role, nil)
       |> assign(:current_admin_phone, nil)
+      |> assign(:current_branch_name, nil)
     end
   end
 
@@ -65,4 +68,13 @@ defmodule BeroonWeb.AdminAuth do
 
   def log_out_user(conn), do: configure_session(conn, drop: true)
   def log_out_admin(conn), do: log_out_user(conn)
+
+  defp current_branch_name("branch_manager", phone) do
+    case Operations.get_branch_for_manager_phone(phone) do
+      nil -> nil
+      branch -> branch.name
+    end
+  end
+
+  defp current_branch_name(_role, _phone), do: nil
 end

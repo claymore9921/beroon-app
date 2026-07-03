@@ -199,6 +199,7 @@ defmodule Beroon.Reports do
         |> Repo.insert!()
       end)
 
+      resolve_returned_location_alerts(evening_count, scanned_scooters)
       create_location_alerts(evening_count, attrs, scanned_scooters)
 
       evening_count
@@ -231,10 +232,44 @@ defmodule Beroon.Reports do
     end)
   end
 
+  defp resolve_returned_location_alerts(evening_count, scanned_scooters) do
+    returned_scooter_ids =
+      scanned_scooters
+      |> Enum.uniq_by(& &1.id)
+      |> Enum.filter(&(&1.branch_id == evening_count.branch_id))
+      |> Enum.map(& &1.id)
+
+    if returned_scooter_ids != [] do
+      ScooterLocationAlert
+      |> where(
+        [a],
+        a.resolved == false and
+          a.home_branch_id == ^evening_count.branch_id and
+          a.scooter_id in ^returned_scooter_ids
+      )
+      |> Repo.update_all(set: [resolved: true])
+    end
+  end
+
   def list_location_alerts_for_date(date) do
     location_alert_base_query()
     |> where([a, s, h, d, t], a.detected_on == ^date)
     |> order_by([a], desc: a.detected_at)
+    |> Repo.all()
+  end
+
+  def list_open_location_alerts_for_date(date) do
+    location_alert_base_query()
+    |> where([a, s, h, d, t], a.detected_on == ^date and a.resolved == false)
+    |> order_by([a], desc: a.detected_at)
+    |> Repo.all()
+  end
+
+  def list_location_alert_dates do
+    ScooterLocationAlert
+    |> distinct([a], a.detected_on)
+    |> order_by([a], desc: a.detected_on)
+    |> select([a], a.detected_on)
     |> Repo.all()
   end
 

@@ -145,6 +145,15 @@ defmodule Beroon.Fleet do
     |> Repo.aggregate(:count, :id)
   end
 
+  def count_scooters_for_branch_by_status(branch_id) do
+    Scooter
+    |> where([s], s.branch_id == ^branch_id)
+    |> group_by([s], s.status)
+    |> select([s], {s.status, count(s.id)})
+    |> Repo.all()
+    |> Map.new()
+  end
+
   def get_scooter_by_barcode(branch_id, barcode) when is_binary(barcode) do
     clean_barcode = String.trim(barcode)
 

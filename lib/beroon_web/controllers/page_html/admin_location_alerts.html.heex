@@ -1,0 +1,88 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+    <header class="flex items-start justify-between gap-3 border-b border-zinc-200 pb-4">
+      <div class="min-w-0">
+        <.link navigate={~p"/admin/reports"} class="text-sm font-semibold text-orange-700">
+          بازگشت به ادمین
+        </.link>
+        <h1 class="mt-1 text-2xl font-bold">گزارش جابجایی دستگاه‌ها</h1>
+        <p class="mt-1 text-sm text-zinc-500">{Beroon.Calendar.persian_date(@date)}</p>
+      </div>
+      <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
+    </header>
+
+    <form
+      id="admin-location-alerts-filter"
+      method="get"
+      action={~p"/admin/location-alerts"}
+      class="mt-4 grid grid-cols-[1fr_auto] items-end gap-2 rounded-lg border border-zinc-200 bg-white p-3"
+    >
+      <label class="form-control min-w-0">
+        <span class="label-text">تاریخ جابجایی</span>
+        <select name="date" class="select select-bordered min-h-11 w-full">
+          <option value={Date.to_iso8601(Date.utc_today())} selected={@date == Date.utc_today()}>
+            امروز - {Beroon.Calendar.persian_date(Date.utc_today())}
+          </option>
+          <option
+            :for={date <- @alert_dates}
+            value={Date.to_iso8601(date)}
+            selected={@date == date}
+          >
+            {Beroon.Calendar.persian_date(date)}
+          </option>
+        </select>
+      </label>
+      <button class="btn btn-neutral min-h-11">نمایش</button>
+    </form>
+
+    <div class="mt-4 grid gap-3">
+      <p
+        :if={@alerts == []}
+        class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500"
+      >
+        برای این تاریخ جابجایی ثبت نشده است.
+      </p>
+
+      <article :for={alert <- @alerts} class="rounded-lg border border-zinc-200 bg-white p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-bold text-zinc-950">پلاک {alert.plate}</p>
+            <p class="mt-1 text-sm text-zinc-500">بارکد {alert.barcode}</p>
+          </div>
+          <span class={[
+            "shrink-0 rounded-md px-2 py-1 text-xs font-bold",
+            if(alert.resolved,
+              do: "bg-emerald-100 text-emerald-700",
+              else: "bg-amber-100 text-amber-800"
+            )
+          ]}>
+            {if alert.resolved, do: "برگشته", else: "باز"}
+          </span>
+        </div>
+
+        <p class="mt-3 text-sm leading-7 text-zinc-700">
+          دستگاه متعلق به شعبه {alert.home_branch_name} است و در آمار شعبه {alert.detected_branch_name} اسکن شده.
+        </p>
+
+        <div class="mt-3 grid gap-1 text-sm text-zinc-500">
+          <p>
+            {Enum.join(
+              Enum.reject(
+                [
+                  alert.device_type_identifier,
+                  alert.device_type_category,
+                  alert.device_type_name
+                ],
+                &is_nil/1
+              ),
+              " - "
+            )}
+          </p>
+          <p>ثبت توسط: {alert.detected_by_manager_name || "-"}</p>
+          <p>ساعت ثبت: {Calendar.strftime(alert.detected_at, "%H:%M")}</p>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>

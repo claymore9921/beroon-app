@@ -224,5 +224,60 @@ defmodule Beroon.ReportsTest do
       evening_count = evening_count_fixture()
       assert %Ecto.Changeset{} = Reports.change_evening_count(evening_count)
     end
+
+    test "create_evening_count_with_items resolves open location alerts when scooter returns home" do
+      home_branch = Beroon.OperationsFixtures.branch_fixture(%{code: "sepah", name: "سپه"})
+      detected_branch = Beroon.OperationsFixtures.branch_fixture(%{code: "hafez", name: "حافظ"})
+
+      scooter =
+        Beroon.FleetFixtures.scooter_fixture(%{
+          branch_id: home_branch.id,
+          barcode: "return-barcode",
+          plate: "RETURN-1"
+        })
+
+      {:ok, _mismatch_count} =
+        Reports.create_evening_count_with_items(
+          %{
+            "branch_id" => detected_branch.id,
+            "counted_on" => ~D[2026-07-01],
+            "counted_at" => ~U[2026-07-01 21:00:00Z],
+            "manager_name" => "Hafez manager",
+            "manager_phone" => "09121111111",
+            "total_count" => 1,
+            "available_count" => 1,
+            "rented_count" => 0,
+            "damaged_count" => 0,
+            "missing_count" => 0
+          },
+          [scooter]
+        )
+
+      assert [%{plate: "RETURN-1", resolved: false}] =
+               Reports.list_open_location_alerts_for_home_branch(home_branch.id)
+
+      {:ok, _home_count} =
+        Reports.create_evening_count_with_items(
+          %{
+            "branch_id" => home_branch.id,
+            "counted_on" => ~D[2026-07-02],
+            "counted_at" => ~U[2026-07-02 21:00:00Z],
+            "manager_name" => "Sepah manager",
+            "manager_phone" => "09122222222",
+            "total_count" => 1,
+            "available_count" => 1,
+            "rented_count" => 0,
+            "damaged_count" => 0,
+            "missing_count" => 0
+          },
+          [scooter]
+        )
+
+      assert [] = Reports.list_open_location_alerts_for_home_branch(home_branch.id)
+      assert [] = Reports.list_open_location_alerts_for_date(~D[2026-07-01])
+
+      assert [%{plate: "RETURN-1", resolved: true}] =
+               Reports.list_location_alerts_for_date(~D[2026-07-01])
+    end
   end
 end

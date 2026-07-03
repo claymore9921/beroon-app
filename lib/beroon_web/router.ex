@@ -63,6 +63,7 @@ defmodule BeroonWeb.Router do
     pipe_through [:browser, :require_admin]
 
     get "/admin/reports", PageController, :admin_reports
+    get "/admin/location-alerts", PageController, :admin_location_alerts
     get "/admin/managers", PageController, :admin_manager_registrations
     post "/admin/managers/:id/approve", PageController, :approve_manager_registration
     get "/admin/checklists", PageController, :admin_checklist_branches
