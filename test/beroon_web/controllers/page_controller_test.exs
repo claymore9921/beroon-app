@@ -232,4 +232,108 @@ defmodule BeroonWeb.PageControllerTest do
     assert response =~ "2n1"
     refute response =~ "other-unchecked"
   end
+
+  test "admin branch evening reports show branch counts filtered by counted day", %{conn: conn} do
+    branch = branch_fixture(%{name: "Evening branch", manager_name: "Evening manager"})
+    other_branch = branch_fixture(%{name: "Other branch"})
+    device_type = device_type_fixture(%{device_identifier: "EVT", category: "Scooter"})
+
+    scooter =
+      scooter_fixture(%{
+        branch_id: branch.id,
+        device_type_id: device_type.id,
+        barcode: "evening-barcode-1",
+        plate: "EVN-1"
+      })
+
+    old_scooter =
+      scooter_fixture(%{
+        branch_id: branch.id,
+        device_type_id: device_type.id,
+        barcode: "evening-barcode-old",
+        plate: "EVN-OLD"
+      })
+
+    other_scooter =
+      scooter_fixture(%{
+        branch_id: other_branch.id,
+        device_type_id: device_type.id,
+        barcode: "other-evening-barcode",
+        plate: "OTHER-EVN"
+      })
+
+    {:ok, report} =
+      Beroon.Reports.create_evening_count_with_items(
+        %{
+          "branch_id" => branch.id,
+          "counted_on" => ~D[2026-07-01],
+          "counted_at" => ~U[2026-07-01 21:00:00Z],
+          "manager_name" => "Evening manager",
+          "manager_phone" => "09120000000",
+          "total_count" => 1,
+          "available_count" => 1,
+          "rented_count" => 0,
+          "damaged_count" => 0,
+          "missing_count" => 0
+        },
+        [scooter]
+      )
+
+    {:ok, _old_report} =
+      Beroon.Reports.create_evening_count_with_items(
+        %{
+          "branch_id" => branch.id,
+          "counted_on" => ~D[2026-06-30],
+          "counted_at" => ~U[2026-06-30 21:00:00Z],
+          "manager_name" => "Evening manager",
+          "manager_phone" => "09120000000",
+          "total_count" => 1,
+          "available_count" => 1,
+          "rented_count" => 0,
+          "damaged_count" => 0,
+          "missing_count" => 0
+        },
+        [old_scooter]
+      )
+
+    {:ok, _other_report} =
+      Beroon.Reports.create_evening_count_with_items(
+        %{
+          "branch_id" => other_branch.id,
+          "counted_on" => ~D[2026-07-01],
+          "counted_at" => ~U[2026-07-01 21:00:00Z],
+          "manager_name" => "Other manager",
+          "manager_phone" => "09129999999",
+          "total_count" => 1,
+          "available_count" => 1,
+          "rented_count" => 0,
+          "damaged_count" => 0,
+          "missing_count" => 0
+        },
+        [other_scooter]
+      )
+
+    conn =
+      conn
+      |> log_in_admin()
+      |> get(~p"/admin/evening-reports/branches/#{branch}?date=2026-07-01")
+
+    response = html_response(conn, 200)
+    assert response =~ Beroon.Calendar.persian_date(~D[2026-07-01])
+    assert response =~ ~p"/admin/evening-reports/counts/#{report.id}"
+    refute response =~ "EVN-1"
+    refute response =~ "EVN-OLD"
+    refute response =~ "OTHER-EVN"
+
+    conn =
+      build_conn()
+      |> log_in_admin()
+      |> get(~p"/admin/evening-reports/counts/#{report}")
+
+    response = html_response(conn, 200)
+    assert response =~ "EVN-1"
+    assert response =~ "evening-barcode-1"
+    refute response =~ "EVN-OLD"
+    refute response =~ "OTHER-EVN"
+  end
 end

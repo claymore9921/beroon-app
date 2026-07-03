@@ -50,6 +50,78 @@ defmodule Beroon.Reports do
       })
       |> Repo.all()
 
+    attach_evening_count_items(counts)
+  end
+
+  def list_evening_report_dates_for_branch(branch_id) do
+    EveningCount
+    |> where([e], e.branch_id == ^branch_id)
+    |> distinct([e], e.counted_on)
+    |> order_by([e], desc: e.counted_on)
+    |> select([e], e.counted_on)
+    |> Repo.all()
+  end
+
+  def list_evening_counts_for_branch(branch_id, date \\ nil) do
+    EveningCount
+    |> join(:left, [e], b in Branch, on: b.id == e.branch_id)
+    |> where([e], e.branch_id == ^branch_id)
+    |> maybe_filter_counted_on(date)
+    |> order_by([e], desc: e.counted_on, desc: e.counted_at)
+    |> select([e, b], %{
+      id: e.id,
+      branch_name: b.name,
+      manager_name: e.manager_name,
+      manager_phone: e.manager_phone,
+      total_count: e.total_count,
+      available_count: e.available_count,
+      rented_count: e.rented_count,
+      damaged_count: e.damaged_count,
+      missing_count: e.missing_count,
+      counted_on: e.counted_on,
+      counted_at: e.counted_at,
+      notes: e.notes
+    })
+    |> Repo.all()
+  end
+
+  def get_evening_count_report!(id) do
+    count =
+      EveningCount
+      |> join(:left, [e], b in Branch, on: b.id == e.branch_id)
+      |> where([e], e.id == ^id)
+      |> select([e, b], %{
+        id: e.id,
+        branch_id: e.branch_id,
+        branch_name: b.name,
+        manager_name: e.manager_name,
+        manager_phone: e.manager_phone,
+        total_count: e.total_count,
+        available_count: e.available_count,
+        rented_count: e.rented_count,
+        damaged_count: e.damaged_count,
+        missing_count: e.missing_count,
+        counted_on: e.counted_on,
+        counted_at: e.counted_at,
+        notes: e.notes
+      })
+      |> Repo.one!()
+
+    count
+    |> List.wrap()
+    |> attach_evening_count_items()
+    |> List.first()
+  end
+
+  defp maybe_filter_counted_on(query, nil), do: query
+
+  defp maybe_filter_counted_on(query, date) do
+    where(query, [e], e.counted_on == ^date)
+  end
+
+  defp attach_evening_count_items([]), do: []
+
+  defp attach_evening_count_items(counts) do
     items_by_count =
       EveningCountItem
       |> join(:inner, [i], s in Scooter, on: s.id == i.scooter_id)

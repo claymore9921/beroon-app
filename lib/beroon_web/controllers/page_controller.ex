@@ -201,14 +201,36 @@ defmodule BeroonWeb.PageController do
     end
   end
 
-  def admin_reports(conn, params) do
-    date = parse_date(params["date"])
+  def admin_reports(conn, _params) do
+    date = Date.utc_today()
 
-    render(conn, :admin_reports,
-      date: date,
-      morning_reports: Reports.list_morning_inspections_for_date(date),
-      evening_reports: Reports.list_evening_counts_for_date(date),
-      location_alerts: Reports.list_location_alerts_for_date(date)
+    render(conn, :admin_reports, location_alerts: Reports.list_location_alerts_for_date(date))
+  end
+
+  def admin_evening_report_branches(conn, _params) do
+    render(conn, :admin_evening_report_branches, branches: Operations.list_branches())
+  end
+
+  def admin_branch_evening_reports(conn, %{"id" => id} = params) do
+    branch = Operations.get_branch!(id)
+    filter_dates = Reports.list_evening_report_dates_for_branch(branch.id)
+    selected_date = parse_optional_date(params["date"])
+
+    render(conn, :admin_branch_evening_reports,
+      branch: branch,
+      filter_dates: filter_dates,
+      selected_date: selected_date,
+      reports: Reports.list_evening_counts_for_branch(branch.id, selected_date)
+    )
+  end
+
+  def admin_evening_report_detail(conn, %{"id" => id}) do
+    report = Reports.get_evening_count_report!(id)
+    branch = Operations.get_branch!(report.branch_id)
+
+    render(conn, :admin_evening_report_detail,
+      branch: branch,
+      report: report
     )
   end
 
@@ -281,6 +303,16 @@ defmodule BeroonWeb.PageController do
     case Date.from_iso8601(date) do
       {:ok, parsed} -> parsed
       _ -> Date.utc_today()
+    end
+  end
+
+  defp parse_optional_date(nil), do: nil
+  defp parse_optional_date(""), do: nil
+
+  defp parse_optional_date(date) do
+    case Date.from_iso8601(date) do
+      {:ok, parsed} -> parsed
+      _ -> nil
     end
   end
 

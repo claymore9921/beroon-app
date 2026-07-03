@@ -67,6 +67,9 @@ defmodule BeroonWeb.Router do
     post "/admin/managers/:id/approve", PageController, :approve_manager_registration
     get "/admin/checklists", PageController, :admin_checklist_branches
     get "/admin/checklists/branches/:id", PageController, :admin_branch_checklists
+    get "/admin/evening-reports", PageController, :admin_evening_report_branches
+    get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail
+    get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports
 
     get "/admin/checklists/branches/:id/unchecked",
         PageController,
