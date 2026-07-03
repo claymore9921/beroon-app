@@ -1,0 +1,54 @@
+<Layouts.app flash={@flash} current_admin_phone={@current_admin_phone}>
+  <section id="scooter-show-page" dir="rtl" class="space-y-4">
+    <header class="flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <.link navigate={~p"/scooters"} class="text-sm font-semibold text-orange-700">
+          بازگشت به دستگاه‌ها
+        </.link>
+        <h1 class="mt-1 truncate text-2xl font-bold text-zinc-950">پلاک {@scooter.plate}</h1>
+      </div>
+      <.link navigate={~p"/scooters/#{@scooter}/edit"} class="btn btn-primary min-h-12 shrink-0">
+        ویرایش
+      </.link>
+    </header>
+
+    <article class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <dl class="grid gap-3 text-sm">
+        <div class="grid grid-cols-2 gap-2">
+          <div class="rounded-md bg-zinc-50 p-3">
+            <dt class="text-zinc-500">آیدی دستگاه</dt>
+            <dd class="mt-1 font-bold text-zinc-950">{@scooter.id}</dd>
+          </div>
+          <div class="rounded-md bg-zinc-50 p-3">
+            <dt class="text-zinc-500">پلاک</dt>
+            <dd class="mt-1 font-bold text-zinc-950">{@scooter.plate}</dd>
+          </div>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">نوع دستگاه</dt>
+          <dd class="mt-1 font-semibold text-zinc-950">
+            {device_type_label(@scooter.device_type)}
+          </dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">شعبه دستگاه</dt>
+          <dd class="mt-1 font-semibold text-zinc-950">
+            {if @scooter.branch, do: @scooter.branch.name, else: "-"}
+          </dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">بارکد</dt>
+          <dd class="mt-1 font-semibold text-zinc-950">{@scooter.barcode}</dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">وضعیت</dt>
+          <dd class="mt-1 font-semibold text-zinc-950">{status_label(@scooter.status)}</dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">توضیحات</dt>
+          <dd class="mt-1 font-semibold text-zinc-950">{@scooter.notes || "-"}</dd>
+        </div>
+      </dl>
+    </article>
+  </section>
+</Layouts.app>

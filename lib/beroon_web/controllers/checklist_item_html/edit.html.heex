@@ -1,0 +1,17 @@
+<Layouts.app flash={@flash} current_admin_phone={@current_admin_phone}>
+  <section dir="rtl" class="space-y-4">
+    <header>
+      <.link navigate={~p"/checklist_items"} class="text-sm text-orange-700">
+        بازگشت به چک‌لیست‌ها
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold">ویرایش آیتم چک‌لیست</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@checklist_item.title}</p>
+    </header>
+
+    <.checklist_item_form
+      changeset={@changeset}
+      action={~p"/checklist_items/#{@checklist_item}"}
+      return_to={~p"/checklist_items"}
+    />
+  </section>
+</Layouts.app>

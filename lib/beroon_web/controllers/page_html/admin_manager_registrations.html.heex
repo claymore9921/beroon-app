@@ -1,0 +1,53 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+    <header class="flex items-start justify-between gap-3 border-b border-zinc-200 pb-4">
+      <div>
+        <.link navigate={~p"/admin/reports"} class="text-sm font-semibold text-orange-700">
+          بازگشت به ادمین
+        </.link>
+        <h1 class="mt-1 text-2xl font-bold">تایید مدیران شعبه</h1>
+      </div>
+      <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
+    </header>
+
+    <div class="mt-4 grid gap-3">
+      <p
+        :if={@registrations == []}
+        class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500"
+      >
+        درخواست تایید جدیدی وجود ندارد.
+      </p>
+
+      <article
+        :for={registration <- @registrations}
+        class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="font-bold text-zinc-950">{registration.phone}</p>
+            <p class="mt-1 text-sm text-zinc-500">
+              درخواست در {Calendar.strftime(registration.requested_at, "%Y-%m-%d %H:%M")}
+            </p>
+          </div>
+          <span class="rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+            در انتظار
+          </span>
+        </div>
+
+        <form
+          method="post"
+          action={~p"/admin/managers/#{registration}/approve"}
+          class="mt-4 grid gap-2"
+        >
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <select name="manager[branch_id]" class="select select-bordered min-h-12 w-full">
+            <option value="">انتخاب شعبه</option>
+            <option :for={branch <- @branches} value={branch.id}>{branch.name}</option>
+          </select>
+          <button class="btn btn-primary min-h-12 w-full">تایید و اتصال به شعبه</button>
+        </form>
+      </article>
+    </div>
+  </section>
+</main>

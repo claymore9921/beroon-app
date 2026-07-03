@@ -1,0 +1,17 @@
+<Layouts.app flash={@flash} current_admin_phone={@current_admin_phone}>
+  <section id="new-scooter-page" dir="rtl" class="space-y-4">
+    <header>
+      <.link navigate={~p"/scooters"} class="text-sm font-semibold text-orange-700">
+        بازگشت به دستگاه‌ها
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold text-zinc-950">دستگاه جدید</h1>
+    </header>
+    <.scooter_form
+      form={@form}
+      branches={@branches}
+      device_types={@device_types}
+      action={~p"/scooters"}
+      return_to={~p"/scooters"}
+    />
+  </section>
+</Layouts.app>

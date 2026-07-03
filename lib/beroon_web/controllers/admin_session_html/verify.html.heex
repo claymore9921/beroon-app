@@ -1,0 +1,27 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <div class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-stone-50 px-4 py-8">
+    <section class="rounded-lg border border-zinc-200 bg-white p-5">
+      <p class="text-sm font-semibold text-orange-600">برون</p>
+      <h1 class="mt-1 text-2xl font-bold">تایید کد ورود</h1>
+
+      <.form :let={f} for={%{}} as={:otp} action={~p"/verify"} class="mt-5 grid gap-4">
+        <input type="hidden" name="otp[phone]" value={@phone} />
+        <.input
+          field={f[:code]}
+          type="text"
+          label="کد ۶ رقمی"
+          autocomplete="one-time-code"
+          inputmode="numeric"
+          maxlength="6"
+          class="input input-bordered min-h-12 w-full text-center text-2xl tracking-widest"
+        />
+        <.button class="btn btn-primary min-h-14 w-full">ورود</.button>
+      </.form>
+
+      <.link navigate={~p"/login"} class="btn btn-ghost mt-3 min-h-12 w-full">
+        دریافت کد جدید
+      </.link>
+    </section>
+  </div>
+</main>

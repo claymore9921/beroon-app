@@ -1,0 +1,40 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Listing Morning inspections
+    <:actions>
+      <.button href={~p"/morning_inspections/new"}>
+        <.icon name="hero-plus" /> New Morning inspection
+      </.button>
+    </:actions>
+  </.header>
+
+  <.table
+    id="morning_inspections"
+    rows={@morning_inspections}
+    row_click={&JS.navigate(~p"/morning_inspections/#{&1}")}
+  >
+    <:col :let={morning_inspection} label="Checked on">{morning_inspection.checked_on}</:col>
+    <:col :let={morning_inspection} label="Checked at">{morning_inspection.checked_at}</:col>
+    <:col :let={morning_inspection} label="Manager name">{morning_inspection.manager_name}</:col>
+    <:col :let={morning_inspection} label="Status">{morning_inspection.status}</:col>
+    <:col :let={morning_inspection} label="Notes">{morning_inspection.notes}</:col>
+    <:col :let={morning_inspection} label="Submitted before deadline">
+      {morning_inspection.submitted_before_deadline}
+    </:col>
+    <:action :let={morning_inspection}>
+      <div class="sr-only">
+        <.link navigate={~p"/morning_inspections/#{morning_inspection}"}>Show</.link>
+      </div>
+      <.link navigate={~p"/morning_inspections/#{morning_inspection}/edit"}>Edit</.link>
+    </:action>
+    <:action :let={morning_inspection}>
+      <.link
+        href={~p"/morning_inspections/#{morning_inspection}"}
+        method="delete"
+        data-confirm="Are you sure?"
+      >
+        Delete
+      </.link>
+    </:action>
+  </.table>
+</Layouts.app>

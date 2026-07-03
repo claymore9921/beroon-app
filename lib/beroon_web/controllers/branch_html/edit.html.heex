@@ -1,0 +1,15 @@
+<Layouts.app flash={@flash} current_admin_phone={@current_admin_phone}>
+  <section dir="rtl" class="space-y-4">
+    <header>
+      <.link navigate={~p"/branches"} class="text-sm text-orange-700">بازگشت به شعبه‌ها</.link>
+      <h1 class="mt-1 text-2xl font-bold">ویرایش شعبه</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@branch.name}</p>
+    </header>
+
+    <.branch_form
+      changeset={@changeset}
+      action={~p"/branches/#{@branch}"}
+      return_to={~p"/branches"}
+    />
+  </section>
+</Layouts.app>

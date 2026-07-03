@@ -1,0 +1,28 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Morning inspection {@morning_inspection.id}
+    <:subtitle>This is a morning_inspection record from your database.</:subtitle>
+    <:actions>
+      <.button navigate={~p"/morning_inspections"}>
+        <.icon name="hero-arrow-left" />
+      </.button>
+      <.button
+        variant="primary"
+        navigate={~p"/morning_inspections/#{@morning_inspection}/edit?return_to=show"}
+      >
+        <.icon name="hero-pencil-square" /> Edit morning_inspection
+      </.button>
+    </:actions>
+  </.header>
+
+  <.list>
+    <:item title="Checked on">{@morning_inspection.checked_on}</:item>
+    <:item title="Checked at">{@morning_inspection.checked_at}</:item>
+    <:item title="Manager name">{@morning_inspection.manager_name}</:item>
+    <:item title="Status">{@morning_inspection.status}</:item>
+    <:item title="Notes">{@morning_inspection.notes}</:item>
+    <:item title="Submitted before deadline">
+      {@morning_inspection.submitted_before_deadline}
+    </:item>
+  </.list>
+</Layouts.app>

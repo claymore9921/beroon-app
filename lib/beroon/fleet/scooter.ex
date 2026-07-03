@@ -1,0 +1,51 @@
+defmodule Beroon.Fleet.Scooter do
+  use Ecto.Schema
+  import Ecto.Changeset
+
+  alias Beroon.Fleet.DeviceType
+  alias Beroon.Operations.Branch
+
+  @statuses ["active", "needs_service", "waiting_for_part", "out_of_service"]
+  @note_required_statuses ["needs_service", "waiting_for_part"]
+
+  schema "scooters" do
+    field :plate, :string
+    field :barcode, :string
+    field :model, :string
+    field :status, :string
+    field :notes, :string
+    belongs_to :branch, Branch
+    belongs_to :device_type, DeviceType
+
+    timestamps(type: :utc_datetime)
+  end
+
+  @doc false
+  def changeset(scooter, attrs) do
+    scooter
+    |> cast(attrs, [
+      :plate,
+      :barcode,
+      :model,
+      :status,
+      :notes,
+      :branch_id,
+      :device_type_id
+    ])
+    |> validate_required([:plate, :barcode, :status, :branch_id, :device_type_id])
+    |> validate_inclusion(:status, @statuses)
+    |> validate_notes_for_repair_status()
+    |> unique_constraint(:plate)
+    |> unique_constraint(:barcode)
+  end
+
+  defp validate_notes_for_repair_status(changeset) do
+    status = get_field(changeset, :status)
+
+    if status in @note_required_statuses do
+      validate_required(changeset, [:notes])
+    else
+      changeset
+    end
+  end
+end

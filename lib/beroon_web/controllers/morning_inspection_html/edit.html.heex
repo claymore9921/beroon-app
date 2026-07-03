@@ -1,0 +1,12 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Edit Morning inspection {@morning_inspection.id}
+    <:subtitle>Use this form to manage morning_inspection records in your database.</:subtitle>
+  </.header>
+
+  <.morning_inspection_form
+    changeset={@changeset}
+    action={~p"/morning_inspections/#{@morning_inspection}"}
+    return_to={~p"/morning_inspections"}
+  />
+</Layouts.app>

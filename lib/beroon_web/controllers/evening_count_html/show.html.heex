@@ -1,0 +1,29 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Evening count {@evening_count.id}
+    <:subtitle>This is a evening_count record from your database.</:subtitle>
+    <:actions>
+      <.button navigate={~p"/evening_counts"}>
+        <.icon name="hero-arrow-left" />
+      </.button>
+      <.button
+        variant="primary"
+        navigate={~p"/evening_counts/#{@evening_count}/edit?return_to=show"}
+      >
+        <.icon name="hero-pencil-square" /> Edit evening_count
+      </.button>
+    </:actions>
+  </.header>
+
+  <.list>
+    <:item title="Counted on">{@evening_count.counted_on}</:item>
+    <:item title="Counted at">{@evening_count.counted_at}</:item>
+    <:item title="Manager name">{@evening_count.manager_name}</:item>
+    <:item title="Total count">{@evening_count.total_count}</:item>
+    <:item title="Available count">{@evening_count.available_count}</:item>
+    <:item title="Rented count">{@evening_count.rented_count}</:item>
+    <:item title="Damaged count">{@evening_count.damaged_count}</:item>
+    <:item title="Missing count">{@evening_count.missing_count}</:item>
+    <:item title="Notes">{@evening_count.notes}</:item>
+  </.list>
+</Layouts.app>

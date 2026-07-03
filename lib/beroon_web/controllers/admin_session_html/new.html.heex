@@ -1,0 +1,22 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <div class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-stone-50 px-4 py-8">
+    <section class="rounded-lg border border-zinc-200 bg-white p-5">
+      <p class="text-sm font-semibold text-orange-600">برون</p>
+      <h1 class="mt-1 text-2xl font-bold">ورود ادمین</h1>
+
+      <.form :let={f} for={%{}} as={:otp} action={~p"/login"} class="mt-5 grid gap-4">
+        <.input
+          field={f[:phone]}
+          type="tel"
+          label="شماره موبایل"
+          value={@phone}
+          autocomplete="tel"
+          inputmode="tel"
+          class="input input-bordered min-h-12 w-full"
+        />
+        <.button class="btn btn-primary min-h-14 w-full">دریافت کد ورود</.button>
+      </.form>
+    </section>
+  </div>
+</main>

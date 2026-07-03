@@ -1,0 +1,11 @@
+<Layouts.app flash={@flash} current_admin_phone={@current_admin_phone}>
+  <section id="new-device-type-page" dir="rtl" class="space-y-4">
+    <header>
+      <.link navigate={~p"/device_types"} class="text-sm font-semibold text-orange-700">
+        بازگشت به نوع دستگاه‌ها
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold text-zinc-950">نوع دستگاه جدید</h1>
+    </header>
+    <.device_type_form form={@form} action={~p"/device_types"} return_to={~p"/device_types"} />
+  </section>
+</Layouts.app>

@@ -1,0 +1,41 @@
+<.form
+  :let={f}
+  for={@changeset}
+  action={@action}
+  class="rounded-lg border border-zinc-200 bg-white p-4"
+>
+  <div class="grid gap-3">
+    <.input
+      field={f[:title]}
+      type="text"
+      label="عنوان آیتم"
+      class="input input-bordered min-h-12 w-full"
+    />
+    <.input
+      field={f[:description]}
+      type="textarea"
+      label="توضیحات"
+      class="textarea textarea-bordered min-h-28 w-full"
+    />
+    <.input
+      field={f[:position]}
+      type="number"
+      label="ترتیب نمایش"
+      class="input input-bordered min-h-12 w-full"
+    />
+
+    <div class="grid gap-2 rounded-lg bg-zinc-50 p-3">
+      <.input field={f[:required]} type="checkbox" label="اجباری باشد" />
+      <.input
+        field={f[:active]}
+        type="checkbox"
+        label="در فرم مدیر شعبه نمایش داده شود"
+      />
+    </div>
+  </div>
+
+  <div class="mt-5 grid gap-2 sm:grid-cols-2">
+    <.button class="btn btn-primary min-h-12 w-full">ذخیره</.button>
+    <.link :if={@return_to} navigate={@return_to} class="btn min-h-12 w-full">انصراف</.link>
+  </div>
+</.form>
