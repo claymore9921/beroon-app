@@ -1,0 +1,47 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+    <header class="flex items-start justify-between gap-3 border-b border-zinc-200 pb-4">
+      <div>
+        <p class="text-sm font-semibold text-teal-700">تعمیرگاه</p>
+        <h1 class="mt-1 text-2xl font-bold">{@workshop.name}</h1>
+      </div>
+      <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
+    </header>
+
+    <section class="mt-5 grid gap-3">
+      <.link navigate={~p"/workshop/acceptance"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-arrow-down-tray" />
+        </div>
+        <div class="manager-card-body">
+          <h2>پذیرش دستگاه</h2>
+          <strong>{@acceptance_count}</strong>
+          <span>دستگاه خراب</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/workshop/repairing"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-wrench-screwdriver" />
+        </div>
+        <div class="manager-card-body">
+          <h2>در حال تعمیر</h2>
+          <strong>{@repairing_count}</strong>
+          <span>دستگاه در فرایند تعمیر</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/workshop/discharge"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-check-circle" />
+        </div>
+        <div class="manager-card-body">
+          <h2>ترخیص</h2>
+          <strong>{@discharge_count}</strong>
+          <span>آماده ترخیص از تعمیرگاه</span>
+        </div>
+      </.link>
+    </section>
+  </section>
+</main>

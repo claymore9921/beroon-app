@@ -50,8 +50,11 @@
             <span class={[
               "shrink-0 rounded px-2 py-0.5 text-[11px] font-bold",
               scooter.status == "active" && "bg-emerald-100 text-emerald-700",
-              scooter.status == "needs_service" && "bg-amber-100 text-amber-700",
-              scooter.status == "waiting_for_part" && "bg-sky-100 text-sky-700",
+              scooter.status == "needs_service" && "bg-red-100 text-red-700",
+              scooter.status == "awaiting_repair" && "bg-amber-100 text-amber-700",
+              scooter.status == "repairing" && "bg-sky-100 text-sky-700",
+              scooter.status == "waiting_for_part" && "bg-purple-100 text-purple-700",
+              scooter.status == "ready_for_pickup" && "bg-teal-100 text-teal-700",
               scooter.status == "out_of_service" && "bg-zinc-200 text-zinc-700"
             ]}>
               {status_label(scooter.status)}
@@ -65,6 +68,31 @@
             </p>
           </div>
         </.link>
+
+        <form
+          id={"scooter-status-form-#{scooter.id}"}
+          method="post"
+          action={~p"/scooters/#{scooter}/status"}
+          class="mt-2 grid grid-cols-[1fr_auto] gap-2"
+        >
+          <input type="hidden" name="_method" value="put" />
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <input type="hidden" name="q" value={@query} />
+          <select
+            id={"scooter-status-#{scooter.id}"}
+            name="scooter[status]"
+            class="select select-bordered min-h-10 w-full text-xs"
+          >
+            <option
+              :for={{label, value} <- status_options()}
+              value={value}
+              selected={scooter.status == value}
+            >
+              {label}
+            </option>
+          </select>
+          <button class="btn btn-primary min-h-10 px-3 text-xs">تغییر</button>
+        </form>
       </article>
     </div>
   </section>

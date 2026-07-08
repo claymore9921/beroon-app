@@ -27,6 +27,9 @@ defmodule Beroon.Auth do
       Operations.get_branch_for_manager_phone(normalize_phone(phone)) ->
         :branch_manager
 
+      Operations.get_workshop_for_manager_phone(normalize_phone(phone)) ->
+        :workshop_manager
+
       true ->
         :branch_manager_pending
     end

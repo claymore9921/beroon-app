@@ -49,4 +49,11 @@ defmodule BeroonWeb.ConnCase do
     |> Plug.Conn.put_session(:user_phone, phone)
     |> Plug.Conn.put_session(:user_role, "branch_manager")
   end
+
+  def log_in_workshop_manager(conn, phone \\ "09130000000") do
+    conn
+    |> Phoenix.ConnTest.init_test_session(%{})
+    |> Plug.Conn.put_session(:user_phone, phone)
+    |> Plug.Conn.put_session(:user_role, "workshop_manager")
+  end
 end

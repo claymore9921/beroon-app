@@ -284,14 +284,6 @@ body {
   object-fit: contain;
 }
 
-.beroon-header-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-  background: #14b8a6;
-  box-shadow: 0 0 0 5px rgba(20, 184, 166, 0.15), 0 0 20px rgba(20, 184, 166, 0.8);
-}
-
 .beroon-mobile-menu {
   position: relative;
 }
@@ -756,32 +748,107 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   width: min(100vw, 430px);
-  min-height: 78px;
+  min-height: 84px;
   transform: translateX(50%);
-  border-top: 1px solid rgba(20, 184, 166, 0.18);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.08);
+  border-top: 1px solid rgba(204, 241, 238, 0.2);
+  background:
+    radial-gradient(circle at 50% -30%, rgba(20, 184, 166, 0.48), transparent 12rem),
+    linear-gradient(135deg, #111827 0%, #12383b 54%, #0f766e 100%);
+  box-shadow: 0 -16px 36px rgba(17, 24, 39, 0.22);
   backdrop-filter: blur(18px);
 }
 
 .manager-bottom-nav a {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   place-items: center;
-  padding: 10px 4px 8px;
-  color: #64748b !important;
+  padding: 9px 4px 8px;
+  color: rgba(255, 255, 255, 0.74) !important;
   font-size: 12px;
   font-weight: 800;
   text-decoration: none;
 }
 
 .manager-bottom-nav svg {
-  width: 27px;
-  height: 27px;
+  width: 34px;
+  height: 34px;
 }
 
 .manager-bottom-nav a.is-active {
-  color: var(--beroon-primary) !important;
+  color: #ffffff !important;
+}
+
+.repair-device-card {
+  overflow: hidden;
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--beroon-soft-shadow);
+}
+
+.repair-device-card summary {
+  display: flex;
+  min-height: 76px;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+}
+
+.repair-device-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.repair-device-card[open] summary {
+  background: rgba(204, 241, 238, 0.35);
+}
+
+.repair-device-card form {
+  padding: 0 14px 14px;
+}
+
+.ready-pickup-card {
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 16px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.manager-fixed-bottom-button {
+  position: fixed;
+  right: 50%;
+  bottom: 60px;
+  z-index: 50;
+  display: flex;
+  width: min(calc(100vw - 32px), 398px);
+  min-height: 58px;
+  transform: translateX(50%);
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #13b9aa, #04897e);
+  color: #ffffff !important;
+  font-size: 16px;
+  font-weight: 900;
+  text-decoration: none;
+  box-shadow: 0 18px 34px rgba(20, 184, 166, 0.28);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.manager-fixed-bottom-button:hover {
+  transform: translateX(50%) translateY(-2px);
+  box-shadow: 0 22px 40px rgba(20, 184, 166, 0.34);
+}
+
+.manager-fixed-bottom-button svg {
+  width: 22px;
+  height: 22px;
 }
 
 @media (max-width: 370px) {

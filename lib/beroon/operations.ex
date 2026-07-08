@@ -35,12 +35,29 @@ defmodule Beroon.Operations do
     normalized_phone = String.trim(phone)
 
     Branch
-    |> where([b], b.manager_phone == ^normalized_phone and b.active == true)
+    |> where(
+      [b],
+      b.manager_phone == ^normalized_phone and b.active == true and b.kind == "branch"
+    )
     |> order_by([b], asc: b.name)
     |> Repo.one()
   end
 
   def get_branch_for_manager_phone(_phone), do: nil
+
+  def get_workshop_for_manager_phone(phone) when is_binary(phone) do
+    normalized_phone = String.trim(phone)
+
+    Branch
+    |> where(
+      [b],
+      b.manager_phone == ^normalized_phone and b.active == true and b.kind == "workshop"
+    )
+    |> order_by([b], asc: b.name)
+    |> Repo.one()
+  end
+
+  def get_workshop_for_manager_phone(_phone), do: nil
 
   def ensure_manager_registration(phone) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)

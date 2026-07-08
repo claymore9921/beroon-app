@@ -102,8 +102,11 @@ defmodule Beroon.Fleet do
 
     [
       {"active", "فعال"},
-      {"needs_service", "نیازمند تعمیر"},
+      {"needs_service", "خراب"},
+      {"awaiting_repair", "در انتظار تعمیر"},
+      {"repairing", "در حال تعمیر"},
       {"waiting_for_part", "در انتظار قطعه"},
+      {"ready_for_pickup", "آماده تحویل"},
       {"out_of_service", "از مدار خارج شده"}
     ]
     |> Enum.filter(fn {value, label} ->
@@ -132,8 +135,74 @@ defmodule Beroon.Fleet do
     |> Repo.all()
   end
 
+  def list_scooters_for_branch_by_statuses(branch_id, statuses)
+
+  def list_scooters_for_branch_by_statuses(nil, _statuses), do: []
+
+  def list_scooters_for_branch_by_statuses(branch_id, statuses) do
+    Scooter
+    |> where([s], s.branch_id == ^branch_id)
+    |> where([s], s.status in ^List.wrap(statuses))
+    |> order_by([s], asc: s.plate)
+    |> preload([:branch, :device_type])
+    |> Repo.all()
+  end
+
+  def list_scooters_for_branch_search(branch_id, search_term \\ nil, status \\ nil)
+
+  def list_scooters_for_branch_search(nil, _search_term, _status), do: []
+
+  def list_scooters_for_branch_search(branch_id, search_term, status) do
+    search_term = search_term |> to_string() |> String.trim()
+    pattern = "%#{search_term}%"
+
+    Scooter
+    |> where([s], s.branch_id == ^branch_id)
+    |> maybe_filter_status(status)
+    |> then(fn query ->
+      if search_term == "" do
+        query
+      else
+        where(query, [s], ilike(s.plate, ^pattern) or ilike(s.barcode, ^pattern))
+      end
+    end)
+    |> order_by([s], asc: s.plate)
+    |> preload([:branch, :device_type])
+    |> Repo.all()
+  end
+
+  def list_scooters_by_statuses(statuses) do
+    list_scooters_by_statuses(statuses, nil)
+  end
+
+  def list_scooters_by_statuses(statuses, search_term) do
+    search_term = search_term |> to_string() |> String.trim()
+    pattern = "%#{search_term}%"
+
+    Scooter
+    |> where([s], s.status in ^List.wrap(statuses))
+    |> then(fn query ->
+      if search_term == "" do
+        query
+      else
+        where(query, [s], ilike(s.plate, ^pattern) or ilike(s.barcode, ^pattern))
+      end
+    end)
+    |> order_by([s], asc: s.plate)
+    |> preload([:branch, :device_type])
+    |> Repo.all()
+  end
+
   defp maybe_filter_status(query, status)
-       when status in ["active", "needs_service", "waiting_for_part", "out_of_service"] do
+       when status in [
+              "active",
+              "needs_service",
+              "awaiting_repair",
+              "repairing",
+              "waiting_for_part",
+              "ready_for_pickup",
+              "out_of_service"
+            ] do
     where(query, [s], s.status == ^status)
   end
 

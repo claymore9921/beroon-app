@@ -29,10 +29,21 @@ defmodule BeroonWeb.PageControllerTest do
   end
 
   test "manager panel greets manager and shows branch device buttons", %{conn: conn} do
-    branch_fixture(%{
-      name: "باهنر",
-      manager_name: "احمد",
-      manager_phone: "09120000000"
+    branch =
+      branch_fixture(%{
+        name: "باهنر",
+        manager_name: "احمد",
+        manager_phone: "09120000000"
+      })
+
+    device_type = device_type_fixture()
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "workshop-accepted",
+      plate: "WORKSHOP-ACCEPTED",
+      status: "awaiting_repair"
     })
 
     conn =
@@ -45,6 +56,7 @@ defmodule BeroonWeb.PageControllerTest do
     assert response =~ "باهنر"
     assert response =~ "لیست دستگاه‌های شعبه من"
     assert response =~ "دستگاه‌های فعال"
+    assert response =~ "تعمیرگاه"
   end
 
   test "manager scooter list is scoped to manager branch and status", %{conn: conn} do
@@ -71,8 +83,24 @@ defmodule BeroonWeb.PageControllerTest do
       device_type_id: device_type.id,
       barcode: "manager-repair",
       plate: "manager-repair",
-      status: "needs_service",
-      notes: "نیاز به بررسی"
+      status: "awaiting_repair"
+    })
+
+    scooter_fixture(%{
+      branch_id: manager_branch.id,
+      device_type_id: device_type.id,
+      barcode: "manager-repairing",
+      plate: "manager-repairing",
+      status: "repairing"
+    })
+
+    scooter_fixture(%{
+      branch_id: manager_branch.id,
+      device_type_id: device_type.id,
+      barcode: "manager-waiting-part",
+      plate: "manager-waiting-part",
+      status: "waiting_for_part",
+      notes: "part"
     })
 
     scooter_fixture(%{
@@ -91,7 +119,225 @@ defmodule BeroonWeb.PageControllerTest do
     response = html_response(conn, 200)
     assert response =~ "manager-active"
     refute response =~ "manager-repair"
+    refute response =~ "manager-repairing"
     refute response =~ "other-active"
+
+    conn =
+      build_conn()
+      |> log_in_branch_manager("09120000000")
+      |> get(~p"/manager/scooters/workshop")
+
+    response = html_response(conn, 200)
+    assert response =~ "manager-repair"
+    assert response =~ "manager-repairing"
+    refute response =~ "manager-waiting-part"
+    refute response =~ "manager-active"
+    refute response =~ "other-active"
+  end
+
+  test "branch manager sends damaged scooter to workshop", %{conn: conn} do
+    branch = branch_fixture(%{manager_phone: "09120000000"})
+    device_type = device_type_fixture()
+
+    scooter =
+      scooter_fixture(%{
+        branch_id: branch.id,
+        device_type_id: device_type.id,
+        barcode: "damage-1",
+        plate: "DAMAGE-1",
+        status: "active"
+      })
+
+    conn =
+      conn
+      |> log_in_branch_manager("09120000000")
+      |> post(~p"/manager/repairs/#{scooter}/send", repair: %{notes: "broken brake"})
+
+    assert redirected_to(conn) == ~p"/manager/repairs?q=DAMAGE-1"
+    assert Beroon.Fleet.get_scooter!(scooter.id).status == "needs_service"
+    assert Beroon.Fleet.get_scooter!(scooter.id).notes == "broken brake"
+  end
+
+  test "manager repairs page lists only active branch scooters", %{conn: conn} do
+    branch = branch_fixture(%{manager_phone: "09120000000"})
+    device_type = device_type_fixture()
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "repair-active",
+      plate: "REPAIR-ACTIVE",
+      status: "active"
+    })
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "repair-damaged",
+      plate: "REPAIR-DAMAGED",
+      status: "needs_service",
+      notes: "broken"
+    })
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "repair-awaiting",
+      plate: "REPAIR-AWAITING",
+      status: "awaiting_repair"
+    })
+
+    conn =
+      conn
+      |> log_in_branch_manager("09120000000")
+      |> get(~p"/manager/repairs")
+
+    response = html_response(conn, 200)
+    assert response =~ "REPAIR-ACTIVE"
+    refute response =~ "REPAIR-DAMAGED"
+    refute response =~ "REPAIR-AWAITING"
+  end
+
+  test "manager repairs page shows ready for pickup alert for branch scooters", %{conn: conn} do
+    branch = branch_fixture(%{manager_phone: "09120000000"})
+    other_branch = branch_fixture(%{manager_phone: "09129999999"})
+    device_type = device_type_fixture()
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "ready-local",
+      plate: "READY-LOCAL",
+      status: "ready_for_pickup"
+    })
+
+    scooter_fixture(%{
+      branch_id: other_branch.id,
+      device_type_id: device_type.id,
+      barcode: "ready-other",
+      plate: "READY-OTHER",
+      status: "ready_for_pickup"
+    })
+
+    conn =
+      conn
+      |> log_in_branch_manager("09120000000")
+      |> get(~p"/manager/repairs")
+
+    response = html_response(conn, 200)
+    assert response =~ ~s(id="ready-for-pickup-box")
+    assert response =~ "ترخیص‌شده از تعمیرگاه"
+    assert response =~ "READY-LOCAL"
+    refute response =~ "READY-OTHER"
+  end
+
+  test "workshop discharges scooter for branch pickup and manager receives it", %{conn: conn} do
+    workshop = branch_fixture(%{kind: "workshop", manager_phone: "09130000000"})
+    branch = branch_fixture(%{manager_phone: "09120000000"})
+    device_type = device_type_fixture()
+
+    scooter =
+      scooter_fixture(%{
+        branch_id: branch.id,
+        device_type_id: device_type.id,
+        barcode: "repair-1",
+        plate: "REPAIR-1",
+        status: "needs_service",
+        notes: "needs repair"
+      })
+
+    conn =
+      conn
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> post(~p"/workshop/scooters/#{scooter}/accept")
+
+    assert redirected_to(conn) == ~p"/workshop/acceptance"
+    assert Beroon.Fleet.get_scooter!(scooter.id).status == "awaiting_repair"
+
+    conn =
+      build_conn()
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> post(~p"/workshop/scooters/#{scooter}/start")
+
+    assert redirected_to(conn) == ~p"/workshop/repairing"
+    assert Beroon.Fleet.get_scooter!(scooter.id).status == "repairing"
+
+    conn =
+      build_conn()
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> post(~p"/workshop/scooters/#{scooter}/discharge")
+
+    assert redirected_to(conn) == ~p"/workshop/discharge"
+    assert Beroon.Fleet.get_scooter!(scooter.id).status == "ready_for_pickup"
+
+    conn =
+      build_conn()
+      |> log_in_branch_manager(branch.manager_phone)
+      |> post(~p"/manager/repairs/receive", receive: %{plate: scooter.plate})
+
+    assert redirected_to(conn) == ~p"/manager/repairs/receive"
+    assert Beroon.Fleet.get_scooter!(scooter.id).status == "active"
+  end
+
+  test "workshop pages are split and searchable by plate", %{conn: conn} do
+    workshop = branch_fixture(%{kind: "workshop", manager_phone: "09130000000"})
+    branch = branch_fixture()
+    device_type = device_type_fixture()
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "accept-search",
+      plate: "ACCEPT-1",
+      status: "needs_service",
+      notes: "broken"
+    })
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "repair-search",
+      plate: "REPAIR-1",
+      status: "repairing"
+    })
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "other-search",
+      plate: "OTHER-1",
+      status: "active"
+    })
+
+    conn =
+      conn
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> get(~p"/workshop")
+
+    response = html_response(conn, 200)
+    assert response =~ ~p"/workshop/acceptance"
+    assert response =~ ~p"/workshop/repairing"
+    assert response =~ ~p"/workshop/discharge"
+
+    conn =
+      build_conn()
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> get(~p"/workshop/acceptance?q=ACCEPT")
+
+    response = html_response(conn, 200)
+    assert response =~ "ACCEPT-1"
+    refute response =~ "REPAIR-1"
+    refute response =~ "OTHER-1"
+
+    conn =
+      build_conn()
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> get(~p"/workshop/discharge?q=REPAIR")
+
+    response = html_response(conn, 200)
+    assert response =~ "REPAIR-1"
+    refute response =~ "ACCEPT-1"
+    refute response =~ "OTHER-1"
   end
 
   test "manager morning checklist shows selected branch scooter", %{conn: conn} do

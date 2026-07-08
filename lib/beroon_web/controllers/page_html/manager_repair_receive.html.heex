@@ -1,0 +1,35 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <.link navigate={~p"/manager/repairs"} class="text-sm font-semibold text-orange-700">
+        بازگشت
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold">تحویل از تعمیرگاه</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@branch.name} · {@persian_today}</p>
+    </header>
+
+    <form
+      id="receive-repaired-scooter-form"
+      method="post"
+      action={~p"/manager/repairs/receive"}
+      class="mt-5 grid gap-4 rounded-lg border border-zinc-200 bg-white p-4"
+    >
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+      <label class="grid gap-2 text-sm font-bold text-zinc-700">
+        پلاک / بارکد دستگاه آماده تحویل
+        <input
+          id="receive-repaired-scooter-plate"
+          name="receive[plate]"
+          value={@plate}
+          required
+          class="input input-bordered min-h-12 w-full"
+          placeholder="پلاک دستگاه"
+        />
+      </label>
+      <button id="receive-repaired-scooter-submit" class="btn btn-primary min-h-12 w-full">
+        تحویل گرفتم
+      </button>
+    </form>
+  </section>
+</main>

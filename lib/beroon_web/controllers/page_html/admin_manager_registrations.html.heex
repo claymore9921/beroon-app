@@ -6,7 +6,7 @@
         <.link navigate={~p"/admin/reports"} class="text-sm font-semibold text-orange-700">
           بازگشت به ادمین
         </.link>
-        <h1 class="mt-1 text-2xl font-bold">تایید مدیران شعبه</h1>
+        <h1 class="mt-1 text-2xl font-bold">تایید دسترسی مدیران</h1>
       </div>
       <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
     </header>
@@ -42,10 +42,12 @@
         >
           <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
           <select name="manager[branch_id]" class="select select-bordered min-h-12 w-full">
-            <option value="">انتخاب شعبه</option>
-            <option :for={branch <- @branches} value={branch.id}>{branch.name}</option>
+            <option value="">انتخاب شعبه یا تعمیرگاه</option>
+            <option :for={branch <- @branches} value={branch.id}>
+              {branch.name} - {if branch.kind == "workshop", do: "تعمیرگاه", else: "شعبه"}
+            </option>
           </select>
-          <button class="btn btn-primary min-h-12 w-full">تایید و اتصال به شعبه</button>
+          <button class="btn btn-primary min-h-12 w-full">تایید و اتصال</button>
         </form>
       </article>
     </div>

@@ -6,10 +6,13 @@ defmodule BeroonWeb.PageController do
   alias Beroon.Operations
   alias Beroon.Reports
 
+  @manager_workshop_statuses ["awaiting_repair", "repairing"]
+
   def home(conn, _params) do
     case conn.assigns[:current_user_role] do
       "admin" -> redirect(conn, to: ~p"/admin/reports")
       "branch_manager" -> redirect(conn, to: ~p"/manager")
+      "workshop_manager" -> redirect(conn, to: ~p"/workshop")
       "branch_manager_pending" -> redirect(conn, to: ~p"/manager/pending")
       _ -> redirect(conn, to: ~p"/login")
     end
@@ -51,9 +54,114 @@ defmodule BeroonWeb.PageController do
         branch: branch,
         status: status,
         title: manager_scooters_title(status),
-        scooters: Fleet.list_scooters_for_branch_with_details(branch.id, status),
+        scooters: manager_scooters_for_status(branch.id, status),
         persian_today: Beroon.Calendar.persian_date(Date.utc_today())
       )
+    end
+  end
+
+  def manager_repairs(conn, params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    query = params |> Map.get("q", "") |> String.trim()
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_repairs,
+        branch: branch,
+        query: query,
+        scooters: Fleet.list_scooters_for_branch_search(branch.id, query, "active"),
+        ready_for_pickup_scooters:
+          Fleet.list_scooters_for_branch_with_details(branch.id, "ready_for_pickup"),
+        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+      )
+    end
+  end
+
+  def send_scooter_to_workshop(conn, %{"id" => id, "repair" => %{"notes" => notes}}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    notes = String.trim(to_string(notes || ""))
+    scooter = branch && Fleet.get_scooter_for_branch_with_details(branch.id, id)
+
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
+
+      is_nil(scooter) ->
+        conn
+        |> put_flash(:error, "این دستگاه در شعبه شما پیدا نشد.")
+        |> redirect(to: ~p"/manager/repairs")
+
+      notes == "" ->
+        conn
+        |> put_flash(:error, "توضیحات خرابی اجباری است.")
+        |> redirect(to: ~p"/manager/repairs?q=#{scooter.plate}")
+
+      true ->
+        {:ok, _scooter} = Fleet.update_scooter(scooter, %{status: "needs_service", notes: notes})
+
+        conn
+        |> put_flash(:info, "دستگاه به لیست تعمیرگاه ارسال شد.")
+        |> redirect(to: ~p"/manager/repairs?q=#{scooter.plate}")
+    end
+  end
+
+  def manager_repair_receive(conn, _params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_repair_receive,
+        branch: branch,
+        plate: "",
+        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+      )
+    end
+  end
+
+  def receive_repaired_scooter(conn, %{"receive" => %{"plate" => plate}}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    plate = String.trim(to_string(plate || ""))
+    scooter = branch && Fleet.get_scooter_by_plate_or_barcode_with_details(branch.id, plate)
+
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
+
+      plate == "" ->
+        conn
+        |> put_flash(:error, "پلاک دستگاه را وارد کنید.")
+        |> render(:manager_repair_receive,
+          branch: branch,
+          plate: plate,
+          persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        )
+
+      is_nil(scooter) ->
+        conn
+        |> put_flash(:error, "دستگاهی با این پلاک در شعبه شما پیدا نشد.")
+        |> render(:manager_repair_receive,
+          branch: branch,
+          plate: plate,
+          persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        )
+
+      scooter.status == "ready_for_pickup" ->
+        {:ok, _scooter} = Fleet.update_scooter(scooter, %{status: "active", notes: nil})
+
+        conn
+        |> put_flash(:info, "تحویل دستگاه از تعمیرگاه ثبت شد.")
+        |> redirect(to: ~p"/manager/repairs/receive")
+
+      true ->
+        conn
+        |> put_flash(:error, "این دستگاه هنوز آماده تحویل نیست.")
+        |> render(:manager_repair_receive,
+          branch: branch,
+          plate: plate,
+          persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        )
     end
   end
 
@@ -80,6 +188,96 @@ defmodule BeroonWeb.PageController do
         persian_today: Beroon.Calendar.persian_date(Date.utc_today())
       )
     end
+  end
+
+  def workshop_home(conn, _params) do
+    workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(workshop) do
+      conn
+      |> put_flash(:error, "دسترسی تعمیرگاه برای این شماره فعال نیست.")
+      |> redirect(to: ~p"/manager/pending")
+    else
+      render(conn, :workshop_home,
+        workshop: workshop,
+        acceptance_count: length(Fleet.list_scooters_by_statuses(["needs_service"])),
+        repairing_count:
+          length(
+            Fleet.list_scooters_by_statuses(["awaiting_repair", "repairing", "waiting_for_part"])
+          ),
+        discharge_count:
+          length(Fleet.list_scooters_by_statuses(["repairing", "waiting_for_part"]))
+      )
+    end
+  end
+
+  def workshop_acceptance(conn, params) do
+    render_workshop_section(conn, params, :workshop_acceptance, ["needs_service"])
+  end
+
+  def workshop_repairing(conn, params) do
+    render_workshop_section(conn, params, :workshop_repairing, [
+      "awaiting_repair",
+      "repairing",
+      "waiting_for_part"
+    ])
+  end
+
+  def workshop_discharge(conn, params) do
+    render_workshop_section(conn, params, :workshop_discharge, ["repairing", "waiting_for_part"])
+  end
+
+  def workshop_accept_scooter(conn, %{"id" => id}) do
+    with %{} = workshop <-
+           Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone),
+         scooter <- Fleet.get_scooter_with_details!(id),
+         true <- scooter.status == "needs_service",
+         {:ok, _scooter} <- Fleet.update_scooter(scooter, %{status: "awaiting_repair"}) do
+      conn
+      |> put_flash(:info, "پذیرش دستگاه در #{workshop.name} ثبت شد.")
+      |> redirect(to: ~p"/workshop/acceptance")
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "پذیرش دستگاه انجام نشد.")
+        |> redirect(to: ~p"/workshop/acceptance")
+    end
+  end
+
+  def workshop_start_repair(conn, %{"id" => id}) do
+    workshop_update_status(
+      conn,
+      id,
+      "repairing",
+      "دستگاه وارد مرحله تعمیر شد.",
+      %{},
+      ~p"/workshop/repairing"
+    )
+  end
+
+  def workshop_waiting_part(conn, %{"id" => id}) do
+    scooter = Fleet.get_scooter!(id)
+    notes = scooter.notes || "در انتظار قطعه"
+
+    workshop_update_status(
+      conn,
+      id,
+      "waiting_for_part",
+      "وضعیت دستگاه در انتظار قطعه شد.",
+      %{notes: notes},
+      ~p"/workshop/repairing"
+    )
+  end
+
+  def workshop_discharge_scooter(conn, %{"id" => id}) do
+    workshop_update_status(
+      conn,
+      id,
+      "ready_for_pickup",
+      "دستگاه آماده تحویل شد.",
+      %{},
+      ~p"/workshop/discharge"
+    )
   end
 
   def submit_morning(conn, %{"morning" => params}) do
@@ -363,10 +561,18 @@ defmodule BeroonWeb.PageController do
       all: Enum.sum(Map.values(by_status)),
       active: Map.get(by_status, "active", 0),
       needs_service: Map.get(by_status, "needs_service", 0),
+      awaiting_repair: Map.get(by_status, "awaiting_repair", 0),
+      workshop: Enum.sum(Enum.map(@manager_workshop_statuses, &Map.get(by_status, &1, 0))),
       waiting_for_part: Map.get(by_status, "waiting_for_part", 0),
       out_of_service: Map.get(by_status, "out_of_service", 0)
     }
   end
+
+  defp manager_scooters_for_status(branch_id, "workshop"),
+    do: Fleet.list_scooters_for_branch_by_statuses(branch_id, @manager_workshop_statuses)
+
+  defp manager_scooters_for_status(branch_id, status),
+    do: Fleet.list_scooters_for_branch_with_details(branch_id, status)
 
   defp admin_scooter_counts do
     by_status = Fleet.count_scooters_by_status()
@@ -374,15 +580,64 @@ defmodule BeroonWeb.PageController do
     %{
       active: Map.get(by_status, "active", 0),
       needs_service: Map.get(by_status, "needs_service", 0),
+      awaiting_repair: Map.get(by_status, "awaiting_repair", 0),
+      repairing: Map.get(by_status, "repairing", 0),
       waiting_for_part: Map.get(by_status, "waiting_for_part", 0),
+      ready_for_pickup: Map.get(by_status, "ready_for_pickup", 0),
       out_of_service: Map.get(by_status, "out_of_service", 0)
     }
+  end
+
+  defp render_workshop_section(conn, params, template, statuses) do
+    workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
+    query = params |> Map.get("q", "") |> String.trim()
+
+    if is_nil(workshop) do
+      conn
+      |> put_flash(:error, "دسترسی تعمیرگاه برای این شماره فعال نیست.")
+      |> redirect(to: ~p"/manager/pending")
+    else
+      render(conn, template,
+        workshop: workshop,
+        query: query,
+        scooters: Fleet.list_scooters_by_statuses(statuses, query)
+      )
+    end
+  end
+
+  defp workshop_update_status(conn, id, status, message, extra_attrs, redirect_path) do
+    if Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone) do
+      scooter = Fleet.get_scooter!(id)
+      attrs = Map.merge(%{status: status}, extra_attrs)
+
+      case Fleet.update_scooter(scooter, attrs) do
+        {:ok, _scooter} ->
+          conn
+          |> put_flash(:info, message)
+          |> redirect(to: redirect_path)
+
+        {:error, _changeset} ->
+          conn
+          |> put_flash(:error, "تغییر وضعیت دستگاه انجام نشد.")
+          |> redirect(to: redirect_path)
+      end
+    else
+      conn
+      |> put_flash(:error, "دسترسی تعمیرگاه برای این شماره فعال نیست.")
+      |> redirect(to: ~p"/manager/pending")
+    end
   end
 
   defp manager_scooters_title("active"), do: "دستگاه‌های فعال"
 
   defp manager_scooters_title("needs_service"),
     do: "دستگاه‌های نیازمند تعمیر"
+
+  defp manager_scooters_title("awaiting_repair"),
+    do: "دستگاه‌های در انتظار تعمیر"
+
+  defp manager_scooters_title("workshop"),
+    do: "دستگاه‌های تعمیرگاه"
 
   defp manager_scooters_title("waiting_for_part"),
     do: "دستگاه‌های در انتظار قطعه"

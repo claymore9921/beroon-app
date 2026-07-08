@@ -53,10 +53,23 @@ defmodule BeroonWeb.Router do
     get "/manager/pending", PageController, :manager_pending
     get "/manager/scooters", PageController, :manager_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
+    get "/manager/repairs", PageController, :manager_repairs
+    post "/manager/repairs/:id/send", PageController, :send_scooter_to_workshop
+    get "/manager/repairs/receive", PageController, :manager_repair_receive
+    post "/manager/repairs/receive", PageController, :receive_repaired_scooter
     get "/manager/morning", PageController, :manager_morning
     post "/manager/morning", PageController, :submit_morning
     get "/manager/evening", PageController, :manager_evening
     post "/manager/evening", PageController, :submit_evening
+
+    get "/workshop", PageController, :workshop_home
+    get "/workshop/acceptance", PageController, :workshop_acceptance
+    get "/workshop/repairing", PageController, :workshop_repairing
+    get "/workshop/discharge", PageController, :workshop_discharge
+    post "/workshop/scooters/:id/accept", PageController, :workshop_accept_scooter
+    post "/workshop/scooters/:id/start", PageController, :workshop_start_repair
+    post "/workshop/scooters/:id/waiting-part", PageController, :workshop_waiting_part
+    post "/workshop/scooters/:id/discharge", PageController, :workshop_discharge_scooter
   end
 
   scope "/", BeroonWeb do
@@ -77,6 +90,7 @@ defmodule BeroonWeb.Router do
         :admin_branch_unchecked_scooters
 
     resources "/branches", BranchController
+    put "/scooters/:id/status", ScooterController, :update_status
     resources "/scooters", ScooterController
     resources "/device_types", DeviceTypeController
     resources "/checklist_items", ChecklistItemController

@@ -8,19 +8,26 @@
     <.input
       field={f[:name]}
       type="text"
-      label="نام شعبه"
+      label="نام"
       class="input input-bordered min-h-12 w-full"
     />
     <.input
       field={f[:code]}
       type="text"
-      label="کد شعبه"
+      label="کد"
       class="input input-bordered min-h-12 w-full"
+    />
+    <.input
+      field={f[:kind]}
+      type="select"
+      label="نوع"
+      options={[{"شعبه", "branch"}, {"تعمیرگاه", "workshop"}]}
+      class="select select-bordered min-h-12 w-full"
     />
     <.input
       field={f[:manager_name]}
       type="text"
-      label="نام مدیر شعبه"
+      label="نام مدیر"
       class="input input-bordered min-h-12 w-full"
     />
     <.input
@@ -32,7 +39,7 @@
     />
 
     <div class="rounded-lg bg-zinc-50 p-3">
-      <.input field={f[:active]} type="checkbox" label="شعبه فعال باشد" />
+      <.input field={f[:active]} type="checkbox" label="فعال باشد" />
     </div>
   </div>
 

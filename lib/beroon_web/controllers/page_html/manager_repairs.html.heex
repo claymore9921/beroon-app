@@ -1,0 +1,104 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-44 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <.link navigate={~p"/manager"} class="text-sm font-semibold text-orange-700">
+        بازگشت
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold">خرابی دستگاه‌ها</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@branch.name} · {@persian_today}</p>
+    </header>
+
+    <section id="ready-for-pickup-box" class="ready-pickup-card mt-4">
+      <div class="flex items-start justify-between gap-3 border-b border-zinc-100 pb-3">
+        <div>
+          <h2 class="text-lg font-black text-zinc-950">ترخیص‌شده از تعمیرگاه</h2>
+          <p class="mt-1 text-sm text-zinc-500">
+            این پلاک‌ها آماده تحویل گرفتن هستند.
+          </p>
+        </div>
+        <span class="rounded-full bg-teal-100 px-3 py-1 text-sm font-black text-teal-700">
+          {length(@ready_for_pickup_scooters)}
+        </span>
+      </div>
+
+      <div class="mt-3 grid max-h-80 gap-2 overflow-y-auto">
+        <p
+          :if={@ready_for_pickup_scooters == []}
+          class="rounded-lg bg-zinc-50 p-3 text-sm text-zinc-500"
+        >
+          فعلاً دستگاهی آماده تحویل نیست.
+        </p>
+
+        <article
+          :for={scooter <- @ready_for_pickup_scooters}
+          class="rounded-lg border border-teal-100 bg-teal-50/60 p-3"
+        >
+          <p class="font-black text-zinc-950">پلاک {scooter.plate}</p>
+          <p class="mt-1 text-xs font-bold text-zinc-500">
+            بارکد {scooter.barcode} · {device_type_label(scooter.device_type)}
+          </p>
+        </article>
+      </div>
+
+      <.link navigate={~p"/manager/repairs/receive"} class="btn btn-primary mt-4 min-h-12 w-full">
+        رفتن به تحویل از تعمیرگاه
+      </.link>
+    </section>
+
+    <form
+      id="manager-repair-search"
+      method="get"
+      action={~p"/manager/repairs"}
+      class="mt-4 grid grid-cols-[1fr_auto] gap-2"
+    >
+      <input
+        id="repair-plate-search"
+        type="search"
+        name="q"
+        value={@query}
+        placeholder="جستجو بر اساس پلاک"
+        class="input input-bordered min-h-12 w-full"
+      />
+      <button class="btn btn-neutral min-h-12 px-4">جستجو</button>
+    </form>
+
+    <div class="mt-4 grid gap-3">
+      <p
+        :if={@scooters == []}
+        class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500"
+      >
+        دستگاهی با این پلاک پیدا نشد.
+      </p>
+
+      <details :for={scooter <- @scooters} class="repair-device-card">
+        <summary>
+          <div>
+            <p class="font-bold text-zinc-950">پلاک {scooter.plate}</p>
+            <p class="mt-1 text-xs text-zinc-500">{device_type_label(scooter.device_type)}</p>
+          </div>
+          <span class={["rounded px-2 py-1 text-xs font-bold", status_badge_class(scooter.status)]}>
+            {status_label(scooter.status)}
+          </span>
+        </summary>
+
+        <form
+          method="post"
+          action={~p"/manager/repairs/#{scooter}/send"}
+          class="mt-3 grid gap-3 border-t border-zinc-100 pt-3"
+        >
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <label class="grid gap-2 text-sm font-bold text-zinc-700">
+            توضیحات خرابی <textarea
+              name="repair[notes]"
+              required
+              class="textarea textarea-bordered min-h-28 w-full"
+              placeholder="شرح خرابی دستگاه را وارد کنید"
+            >{scooter.notes}</textarea>
+          </label>
+          <button class="btn btn-primary min-h-12 w-full">ارسال به تعمیرگاه</button>
+        </form>
+      </details>
+    </div>
+  </section>
+</main>

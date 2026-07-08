@@ -5,7 +5,15 @@ defmodule Beroon.Fleet.Scooter do
   alias Beroon.Fleet.DeviceType
   alias Beroon.Operations.Branch
 
-  @statuses ["active", "needs_service", "waiting_for_part", "out_of_service"]
+  @statuses [
+    "active",
+    "needs_service",
+    "awaiting_repair",
+    "repairing",
+    "waiting_for_part",
+    "ready_for_pickup",
+    "out_of_service"
+  ]
   @note_required_statuses ["needs_service", "waiting_for_part"]
 
   schema "scooters" do

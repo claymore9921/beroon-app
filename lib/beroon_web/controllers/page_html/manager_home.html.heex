@@ -119,51 +119,46 @@
         </div>
       </.link>
 
-      <.link navigate={~p"/manager/scooters/needs_service"} class="manager-stat-card">
+      <.link navigate={~p"/manager/scooters/workshop"} class="manager-stat-card">
         <div class="manager-card-icon">
           <.icon name="hero-exclamation-triangle" />
         </div>
         <div class="manager-card-body">
-          <h2>نیازمند تعمیر</h2>
-          <strong>{@scooter_counts.needs_service}</strong>
+          <h2>تعمیرگاه</h2>
+          <strong>{@scooter_counts.workshop}</strong>
           <span>دستگاه</span>
         </div>
       </.link>
 
-      <.link navigate={~p"/manager/scooters/out_of_service"} class="manager-stat-card">
+      <.link navigate={~p"/manager/scooters/waiting_for_part"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-no-symbol" />
+          <.icon name="hero-wrench-screwdriver" />
         </div>
         <div class="manager-card-body">
-          <h2>از مدار خارج شده</h2>
-          <strong>{@scooter_counts.out_of_service}</strong>
+          <h2>در انتظار قطعه</h2>
+          <strong>{@scooter_counts.waiting_for_part}</strong>
           <span>دستگاه</span>
         </div>
       </.link>
     </section>
-
-    <.link navigate={~p"/manager/scooters"} class="manager-all-devices-button">
-      <span>مشاهده لیست تمام دستگاه‌ها</span>
-      <.icon name="hero-chevron-double-left" />
-    </.link>
   </section>
 
   <nav class="manager-bottom-nav" aria-label="ناوبری مدیر شعبه">
     <.link navigate={~p"/manager"} class="is-active">
-      <.icon name="hero-home" />
+      <.icon class="size-9" name="hero-home" />
       <span>خانه</span>
     </.link>
     <.link navigate={~p"/manager/scooters"}>
-      <.icon name="hero-bolt" />
+      <.icon class="size-9" name="hero-bolt" />
       <span>دستگاه‌ها</span>
     </.link>
     <.link navigate={~p"/manager/morning"}>
-      <.icon name="hero-clipboard-document-check" />
+      <.icon class="size-9" name="hero-clipboard-document-check" />
       <span>چک لیست‌ها</span>
     </.link>
-    <.link navigate={~p"/manager/evening"}>
-      <.icon name="hero-chart-bar" />
-      <span>گزارش‌ها</span>
+    <.link navigate={~p"/manager/repairs"}>
+      <.icon class="size-9" name="hero-wrench-screwdriver" />
+      <span>خرابی</span>
     </.link>
   </nav>
 </main>

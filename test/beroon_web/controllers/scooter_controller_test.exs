@@ -118,6 +118,17 @@ defmodule BeroonWeb.ScooterControllerTest do
       conn = put(conn, ~p"/scooters/#{scooter}", scooter: @invalid_attrs)
       assert html_response(conn, 200) =~ "ویرایش دستگاه"
     end
+
+    test "admin quickly updates scooter status from index", %{conn: conn, scooter: scooter} do
+      conn =
+        put(conn, ~p"/scooters/#{scooter}/status", scooter: %{status: "needs_service"}, q: "some")
+
+      assert redirected_to(conn) == ~p"/scooters?q=some"
+
+      scooter = Beroon.Fleet.get_scooter!(scooter.id)
+      assert scooter.status == "needs_service"
+      assert scooter.notes == "some notes"
+    end
   end
 
   describe "delete scooter" do

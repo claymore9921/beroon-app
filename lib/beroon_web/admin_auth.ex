@@ -76,5 +76,12 @@ defmodule BeroonWeb.AdminAuth do
     end
   end
 
+  defp current_branch_name("workshop_manager", phone) do
+    case Operations.get_workshop_for_manager_phone(phone) do
+      nil -> nil
+      workshop -> workshop.name
+    end
+  end
+
   defp current_branch_name(_role, _phone), do: nil
 end

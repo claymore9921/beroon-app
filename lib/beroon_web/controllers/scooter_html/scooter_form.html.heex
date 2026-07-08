@@ -41,8 +41,11 @@
       label="وضعیت"
       options={[
         {"فعال", "active"},
-        {"نیازمند تعمیر", "needs_service"},
+        {"خراب", "needs_service"},
+        {"در انتظار تعمیر", "awaiting_repair"},
+        {"در حال تعمیر", "repairing"},
         {"در انتظار قطعه", "waiting_for_part"},
+        {"آماده تحویل", "ready_for_pickup"},
         {"از مدار خارج شده", "out_of_service"}
       ]}
       class="select select-bordered min-h-12 w-full"
@@ -51,7 +54,7 @@
       field={@form[:notes]}
       type="textarea"
       label="توضیحات"
-      placeholder="برای وضعیت نیازمند تعمیر و در انتظار قطعه اجباری است"
+      placeholder="برای وضعیت خراب و در انتظار قطعه اجباری است"
       class="textarea textarea-bordered min-h-28 w-full"
     />
   </div>

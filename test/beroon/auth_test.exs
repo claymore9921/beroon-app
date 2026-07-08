@@ -20,6 +20,17 @@ defmodule Beroon.AuthTest do
     assert Auth.role_for_phone(manager_challenge.phone) == :branch_manager
   end
 
+  test "role_for_phone/1 resolves approved workshop manager" do
+    workshop =
+      Beroon.OperationsFixtures.branch_fixture(%{
+        kind: "workshop",
+        manager_phone: "09130000000"
+      })
+
+    assert workshop.kind == "workshop"
+    assert Auth.role_for_phone("09130000000") == :workshop_manager
+  end
+
   test "verify_login_otp/2 creates pending registration for unapproved manager" do
     assert {:ok, _challenge} = Auth.request_login_otp("09120000000")
 

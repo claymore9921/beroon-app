@@ -1,0 +1,82 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <.link navigate={~p"/workshop"} class="text-sm font-semibold text-orange-700">
+        بازگشت
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold">در حال تعمیر</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@workshop.name}</p>
+    </header>
+
+    <form
+      id="workshop-repairing-search"
+      method="get"
+      action={~p"/workshop/repairing"}
+      class="mt-4 grid grid-cols-[1fr_auto] gap-2"
+    >
+      <input
+        id="workshop-repairing-q"
+        type="search"
+        name="q"
+        value={@query}
+        placeholder="جستجوی پلاک یا بارکد"
+        class="input input-bordered min-h-12 w-full"
+      />
+      <button class="btn btn-neutral min-h-12 px-4">جستجو</button>
+    </form>
+
+    <section class="mt-4 grid gap-3">
+      <p
+        :if={@scooters == []}
+        class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500"
+      >
+        دستگاهی در فرایند تعمیر وجود ندارد.
+      </p>
+
+      <article :for={scooter <- @scooters} class="repair-device-card p-4">
+        <div class="grid gap-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="font-bold text-zinc-950">پلاک {scooter.plate}</p>
+              <p class="mt-1 text-xs text-zinc-500">
+                {if scooter.branch, do: scooter.branch.name, else: "-"} · {device_type_label(
+                  scooter.device_type
+                )}
+              </p>
+              <p class="mt-2 text-sm text-zinc-600">{scooter.notes}</p>
+            </div>
+            <span class={[
+              "rounded px-2 py-1 text-xs font-bold",
+              status_badge_class(scooter.status)
+            ]}>
+              {status_label(scooter.status)}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <form
+              :if={scooter.status == "awaiting_repair"}
+              id={"workshop-start-repair-#{scooter.id}"}
+              method="post"
+              action={~p"/workshop/scooters/#{scooter}/start"}
+            >
+              <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+              <button class="btn btn-primary min-h-11 w-full">شروع تعمیر</button>
+            </form>
+
+            <form
+              :if={scooter.status in ["repairing", "awaiting_repair"]}
+              id={"workshop-waiting-part-#{scooter.id}"}
+              method="post"
+              action={~p"/workshop/scooters/#{scooter}/waiting-part"}
+            >
+              <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+              <button class="btn min-h-11 w-full">در انتظار قطعه</button>
+            </form>
+          </div>
+        </div>
+      </article>
+    </section>
+  </section>
+</main>

@@ -75,6 +75,24 @@ defmodule BeroonWeb.ScooterController do
     end
   end
 
+  def update_status(conn, %{"id" => id, "scooter" => %{"status" => status}} = params) do
+    scooter = Fleet.get_scooter!(id)
+    query = params |> Map.get("q", "") |> String.trim()
+    attrs = quick_status_attrs(scooter, status)
+
+    case Fleet.update_scooter(scooter, attrs) do
+      {:ok, _scooter} ->
+        conn
+        |> put_flash(:info, "وضعیت دستگاه تغییر کرد.")
+        |> redirect(to: ~p"/scooters?#{[q: query]}")
+
+      {:error, _changeset} ->
+        conn
+        |> put_flash(:error, "تغییر وضعیت دستگاه انجام نشد.")
+        |> redirect(to: ~p"/scooters?#{[q: query]}")
+    end
+  end
+
   def delete(conn, %{"id" => id}) do
     scooter = Fleet.get_scooter!(id)
     {:ok, _scooter} = Fleet.delete_scooter(scooter)
@@ -83,4 +101,18 @@ defmodule BeroonWeb.ScooterController do
     |> put_flash(:info, "دستگاه حذف شد.")
     |> redirect(to: ~p"/scooters")
   end
+
+  defp quick_status_attrs(scooter, status) when status in ["needs_service", "waiting_for_part"] do
+    notes =
+      scooter.notes
+      |> to_string()
+      |> String.trim()
+
+    %{
+      status: status,
+      notes: if(notes == "", do: "تغییر وضعیت توسط ادمین", else: notes)
+    }
+  end
+
+  defp quick_status_attrs(_scooter, status), do: %{status: status}
 end
