@@ -51,6 +51,9 @@ defmodule BeroonWeb.Router do
 
     get "/manager", PageController, :manager_home
     get "/manager/pending", PageController, :manager_pending
+    get "/manager/notifications", PageController, :manager_notifications
+    get "/manager/notifications/:id", PageController, :manager_notification_detail
+    get "/manager/scan", PageController, :manager_scan
     get "/manager/scooters", PageController, :manager_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
     get "/manager/repairs", PageController, :manager_repairs
@@ -63,6 +66,7 @@ defmodule BeroonWeb.Router do
     post "/manager/evening", PageController, :submit_evening
 
     get "/workshop", PageController, :workshop_home
+    get "/workshop/info", PageController, :workshop_info
     get "/workshop/acceptance", PageController, :workshop_acceptance
     get "/workshop/repairing", PageController, :workshop_repairing
     get "/workshop/discharge", PageController, :workshop_discharge
@@ -76,11 +80,15 @@ defmodule BeroonWeb.Router do
     pipe_through [:browser, :require_admin]
 
     get "/admin/reports", PageController, :admin_reports
+    get "/admin/notifications", PageController, :admin_notifications
+    post "/admin/notifications", PageController, :send_admin_notification
     get "/admin/location-alerts", PageController, :admin_location_alerts
     get "/admin/managers", PageController, :admin_manager_registrations
     post "/admin/managers/:id/approve", PageController, :approve_manager_registration
     get "/admin/checklists", PageController, :admin_checklist_branches
     get "/admin/checklists/branches/:id", PageController, :admin_branch_checklists
+    get "/admin/report-export", PageController, :admin_report_export
+    get "/admin/report-export/download", PageController, :download_admin_report_export
     get "/admin/evening-reports", PageController, :admin_evening_report_branches
     get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail
     get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports

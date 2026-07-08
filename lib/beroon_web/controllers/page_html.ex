@@ -6,6 +6,50 @@ defmodule BeroonWeb.PageHTML do
 
   embed_templates "page_html/*"
 
+  attr :active, :string, default: "home"
+
+  def manager_bottom_nav(assigns) do
+    ~H"""
+    <nav class="manager-bottom-nav" aria-label="ناوبری مدیر شعبه">
+      <.link navigate={~p"/manager"} class={[@active == "home" && "is-active"]}>
+        <.icon class="size-9" name="hero-home" />
+        <span>خانه</span>
+      </.link>
+      <.link navigate={~p"/manager/scooters"} class={[@active == "devices" && "is-active"]}>
+        <.icon class="size-9" name="hero-bolt" />
+        <span>دستگاه‌ها</span>
+      </.link>
+      <.link navigate={~p"/manager/scan"} class={["is-scan", @active == "scan" && "is-active"]}>
+        <span class="manager-scan-bubble">
+          <.icon class="size-9" name="hero-qr-code" />
+        </span>
+        <span>اسکن</span>
+      </.link>
+      <.link navigate={~p"/manager/morning"} class={[@active == "checklists" && "is-active"]}>
+        <.icon class="size-9" name="hero-clipboard-document-check" />
+        <span>چک‌لیست</span>
+      </.link>
+      <.link navigate={~p"/manager/repairs"} class={[@active == "repairs" && "is-active"]}>
+        <.icon class="size-9" name="hero-wrench-screwdriver" />
+        <span>خرابی</span>
+      </.link>
+    </nav>
+    """
+  end
+
+  attr :active, :string, default: "info"
+
+  def workshop_bottom_nav(assigns) do
+    ~H"""
+    <nav class="workshop-bottom-nav" aria-label="ناوبری تعمیرگاه">
+      <.link navigate={~p"/workshop/info"} class={[@active == "info" && "is-active"]}>
+        <.icon class="size-9" name="hero-information-circle" />
+        <span>اطلاعات</span>
+      </.link>
+    </nav>
+    """
+  end
+
   def device_type_label(nil), do: "-"
 
   def device_type_label(device_type) do

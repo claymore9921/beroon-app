@@ -4,6 +4,7 @@ defmodule BeroonWeb.PageController do
   alias Beroon.Checklists
   alias Beroon.Fleet
   alias Beroon.Operations
+  alias Beroon.Repo
   alias Beroon.Reports
 
   @manager_workshop_statuses ["awaiting_repair", "repairing"]
@@ -41,6 +42,53 @@ defmodule BeroonWeb.PageController do
 
   def manager_pending(conn, _params) do
     render(conn, :manager_pending, phone: conn.assigns.current_user_phone)
+  end
+
+  def manager_notifications(conn, _params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_notifications,
+        branch: branch,
+        notifications: Reports.list_branch_notifications(branch.id)
+      )
+    end
+  end
+
+  def manager_notification_detail(conn, %{"id" => id}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      Reports.mark_branch_notification_read(branch.id, id)
+
+      render(conn, :manager_notification_detail,
+        branch: branch,
+        notification: Reports.get_branch_notification_for_recipient!(branch.id, id)
+      )
+    end
+  end
+
+  def manager_scan(conn, _params) do
+    today = Date.utc_today()
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_scan,
+        branch: branch,
+        manager_name: manager_name(branch),
+        persian_today: Beroon.Calendar.persian_date(today),
+        morning_submitted:
+          Reports.morning_submitted_today?(conn.assigns.current_user_phone, today),
+        evening_submitted:
+          Reports.evening_submitted_today?(conn.assigns.current_user_phone, today)
+      )
+    end
   end
 
   def manager_scooters(conn, params) do
@@ -98,7 +146,7 @@ defmodule BeroonWeb.PageController do
         |> redirect(to: ~p"/manager/repairs?q=#{scooter.plate}")
 
       true ->
-        {:ok, _scooter} = Fleet.update_scooter(scooter, %{status: "needs_service", notes: notes})
+        {:ok, _scooter} = send_scooter_to_workshop_with_report(scooter, branch, notes, conn)
 
         conn
         |> put_flash(:info, "دستگاه به لیست تعمیرگاه ارسال شد.")
@@ -207,6 +255,21 @@ defmodule BeroonWeb.PageController do
           ),
         discharge_count:
           length(Fleet.list_scooters_by_statuses(["repairing", "waiting_for_part"]))
+      )
+    end
+  end
+
+  def workshop_info(conn, _params) do
+    workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(workshop) do
+      conn
+      |> put_flash(:error, "دسترسی تعمیرگاه برای این شماره فعال نیست.")
+      |> redirect(to: ~p"/manager/pending")
+    else
+      render(conn, :workshop_info,
+        workshop: workshop,
+        branch_repairs: Reports.repair_report_counts_by_branch()
       )
     end
   end
@@ -467,6 +530,64 @@ defmodule BeroonWeb.PageController do
     end
   end
 
+  def admin_report_export(conn, params) do
+    date = parse_date(params["date"])
+
+    render(conn, :admin_report_export,
+      selected_date: date,
+      persian_date: Beroon.Calendar.persian_date(date)
+    )
+  end
+
+  def admin_notifications(conn, _params) do
+    render(conn, :admin_notifications,
+      branches: Operations.list_active_branches(),
+      subject: "",
+      body: "",
+      selected_branch_ids: []
+    )
+  end
+
+  def send_admin_notification(conn, %{"notification" => params}) do
+    branch_ids = params |> Map.get("branch_ids", []) |> List.wrap() |> Enum.reject(&(&1 == ""))
+    subject = params |> Map.get("subject", "") |> String.trim()
+    body = params |> Map.get("body", "") |> String.trim()
+
+    cond do
+      subject == "" or body == "" ->
+        render_admin_notification_error(conn, params, "موضوع و متن پیام اجباری است.")
+
+      branch_ids == [] ->
+        render_admin_notification_error(conn, params, "حداقل یک شعبه را انتخاب کنید.")
+
+      true ->
+        {:ok, _notification} =
+          Reports.create_branch_notification(
+            %{
+              "subject" => subject,
+              "body" => body,
+              "sent_by_admin_phone" => conn.assigns.current_user_phone
+            },
+            branch_ids
+          )
+
+        conn
+        |> put_flash(:info, "پیام برای شعبه‌های انتخاب‌شده ارسال شد.")
+        |> redirect(to: ~p"/admin/notifications")
+    end
+  end
+
+  def download_admin_report_export(conn, params) do
+    date = parse_date(params["date"])
+    export = Reports.evening_inventory_export(date)
+    filename = "beroon-evening-inventory-#{Date.to_iso8601(date)}.xls"
+
+    conn
+    |> put_resp_content_type("application/vnd.ms-excel; charset=utf-8")
+    |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
+    |> send_resp(200, evening_inventory_xls(export))
+  end
+
   def admin_checklist_branches(conn, _params) do
     render(conn, :admin_checklist_branches,
       branches: Operations.list_branches(),
@@ -506,6 +627,77 @@ defmodule BeroonWeb.PageController do
 
   defp selected_morning_scooter(branch, code) do
     Fleet.get_scooter_by_plate_or_barcode_with_details(branch.id, code)
+  end
+
+  defp render_admin_notification_error(conn, params, message) do
+    conn
+    |> put_flash(:error, message)
+    |> render(:admin_notifications,
+      branches: Operations.list_active_branches(),
+      subject: params |> Map.get("subject", "") |> String.trim(),
+      body: params |> Map.get("body", "") |> String.trim(),
+      selected_branch_ids: params |> Map.get("branch_ids", []) |> List.wrap()
+    )
+  end
+
+  defp evening_inventory_xls(export) do
+    header_cells =
+      [
+        "<th>نوع دستگاه</th>",
+        Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end)
+      ]
+
+    body_rows =
+      Enum.map(export.rows, fn row ->
+        branch_cells =
+          Enum.map(export.branches, fn branch ->
+            "<td>#{Map.get(row.branch_counts, branch.id, 0)}</td>"
+          end)
+
+        [
+          "<tr>",
+          "<td>#{escape_html(row.device_type.label)}</td>",
+          branch_cells,
+          "</tr>"
+        ]
+      end)
+
+    [
+      "\uFEFF",
+      """
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body { font-family: Tahoma, Arial, sans-serif; direction: rtl; }
+            table { border-collapse: collapse; direction: rtl; }
+            th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; }
+            th { background: #ccf1ee; font-weight: bold; }
+            td:first-child, th:first-child { text-align: right; min-width: 180px; }
+          </style>
+        </head>
+        <body>
+          <h3>خروجی گزارش آمار شبانه - #{escape_html(Beroon.Calendar.persian_date(export.date))}</h3>
+          <table>
+            <thead>
+              <tr>#{IO.iodata_to_binary(header_cells)}</tr>
+            </thead>
+            <tbody>
+              #{IO.iodata_to_binary(body_rows)}
+            </tbody>
+          </table>
+        </body>
+      </html>
+      """
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp escape_html(value) do
+    value
+    |> to_string()
+    |> Phoenix.HTML.html_escape()
+    |> Phoenix.HTML.safe_to_string()
   end
 
   defp parse_date(nil), do: Date.utc_today()
@@ -573,6 +765,31 @@ defmodule BeroonWeb.PageController do
 
   defp manager_scooters_for_status(branch_id, status),
     do: Fleet.list_scooters_for_branch_with_details(branch_id, status)
+
+  defp send_scooter_to_workshop_with_report(scooter, branch, notes, conn) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    Repo.transaction(fn ->
+      updated_scooter =
+        case Fleet.update_scooter(scooter, %{status: "needs_service", notes: notes}) do
+          {:ok, scooter} -> scooter
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+
+      case Reports.create_scooter_repair_report(%{
+             scooter_id: scooter.id,
+             branch_id: branch.id,
+             reported_by_manager_name: manager_name(branch),
+             reported_by_manager_phone: conn.assigns.current_user_phone,
+             notes: notes,
+             reported_on: Date.utc_today(),
+             reported_at: now
+           }) do
+        {:ok, _report} -> updated_scooter
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
 
   defp admin_scooter_counts do
     by_status = Fleet.count_scooters_by_status()

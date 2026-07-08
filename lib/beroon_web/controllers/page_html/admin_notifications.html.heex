@@ -1,0 +1,58 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <p class="text-sm font-semibold text-teal-700">پنل ادمین</p>
+      <h1 class="mt-1 text-2xl font-bold">اطلاع‌رسانی</h1>
+      <p class="mt-1 text-sm text-zinc-500">ارسال پیام برای شعبه‌های انتخاب‌شده</p>
+    </header>
+
+    <form
+      id="admin-notification-form"
+      method="post"
+      action={~p"/admin/notifications"}
+      class="mt-5 grid gap-4"
+    >
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+
+      <label class="grid gap-2">
+        <span class="text-sm font-bold text-zinc-700">موضوع</span>
+        <input
+          id="admin-notification-subject"
+          type="text"
+          name="notification[subject]"
+          value={@subject}
+          class="input input-bordered min-h-12 w-full"
+          required
+        />
+      </label>
+
+      <label class="grid gap-2">
+        <span class="text-sm font-bold text-zinc-700">پیام ادمین</span>
+        <textarea
+          id="admin-notification-body"
+          name="notification[body]"
+          class="textarea textarea-bordered min-h-36 w-full resize-none"
+          required
+        >{@body}</textarea>
+      </label>
+
+      <section class="admin-notification-branches">
+        <h2>انتخاب شعبه‌ها</h2>
+        <p :if={@branches == []} class="text-sm text-zinc-500">شعبه فعالی ثبت نشده است.</p>
+
+        <label :for={branch <- @branches} class="admin-notification-branch-option">
+          <input
+            type="checkbox"
+            name="notification[branch_ids][]"
+            value={branch.id}
+            checked={to_string(branch.id) in Enum.map(@selected_branch_ids, &to_string/1)}
+          />
+          <span>{branch.name}</span>
+        </label>
+      </section>
+
+      <button class="btn btn-primary min-h-12 w-full">ارسال پیام</button>
+    </form>
+  </section>
+</main>

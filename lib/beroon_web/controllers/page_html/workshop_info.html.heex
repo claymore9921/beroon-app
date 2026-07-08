@@ -1,0 +1,36 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <.link navigate={~p"/workshop"} class="text-sm font-semibold text-orange-700">
+        بازگشت
+      </.link>
+      <p class="mt-2 text-sm font-semibold text-teal-700">اطلاعات تعمیرگاه</p>
+      <h1 class="mt-1 text-2xl font-bold">رتبه‌بندی خرابی شعبه‌ها</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@workshop.name}</p>
+    </header>
+
+    <section class="mt-5 grid gap-3">
+      <p
+        :if={@branch_repairs == []}
+        class="rounded-2xl border border-teal-100 bg-white p-5 text-center text-sm font-bold text-zinc-500 shadow-sm"
+      >
+        فعلاً دستگاهی در چرخه تعمیرگاه ثبت نشده است.
+      </p>
+
+      <article
+        :for={{row, index} <- Enum.with_index(@branch_repairs, 1)}
+        class="workshop-info-card"
+      >
+        <div class="workshop-rank-badge">{index}</div>
+        <div class="min-w-0">
+          <h2>{row.branch_name}</h2>
+          <p>تعداد گزارش‌های خرابی ثبت‌شده</p>
+        </div>
+        <strong>{row.count}</strong>
+      </article>
+    </section>
+  </section>
+
+  <.workshop_bottom_nav active="info" />
+</main>

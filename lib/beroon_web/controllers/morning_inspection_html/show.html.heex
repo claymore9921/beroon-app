@@ -4,13 +4,13 @@
     <:subtitle>This is a morning_inspection record from your database.</:subtitle>
     <:actions>
       <.button navigate={~p"/morning_inspections"}>
-        <.icon name="hero-arrow-left" />
+        <.icon name="hero-arrow-left" class="size-9" />
       </.button>
       <.button
         variant="primary"
         navigate={~p"/morning_inspections/#{@morning_inspection}/edit?return_to=show"}
       >
-        <.icon name="hero-pencil-square" /> Edit morning_inspection
+        <.icon name="hero-pencil-square" class="size-9" /> Edit morning_inspection
       </.button>
     </:actions>
   </.header>

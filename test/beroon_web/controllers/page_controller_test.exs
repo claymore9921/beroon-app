@@ -19,6 +19,49 @@ defmodule BeroonWeb.PageControllerTest do
     assert redirected_to(conn) == ~p"/admin/reports"
   end
 
+  test "admin panel shows all scooter status boxes", %{conn: conn} do
+    branch = branch_fixture()
+    device_type = device_type_fixture()
+
+    [
+      "active",
+      "needs_service",
+      "awaiting_repair",
+      "repairing",
+      "waiting_for_part",
+      "ready_for_pickup",
+      "out_of_service"
+    ]
+    |> Enum.with_index()
+    |> Enum.each(fn {status, index} ->
+      scooter_fixture(%{
+        branch_id: branch.id,
+        device_type_id: device_type.id,
+        barcode: "admin-status-#{index}",
+        plate: "ADMIN-STATUS-#{index}",
+        status: status,
+        notes: if(status in ["needs_service", "waiting_for_part"], do: "note", else: nil)
+      })
+    end)
+
+    conn =
+      conn
+      |> log_in_admin()
+      |> get(~p"/admin/reports")
+
+    response = html_response(conn, 200)
+    assert response =~ "فعال"
+    assert response =~ "خراب"
+    assert response =~ "در انتظار تعمیر"
+    assert response =~ "در حال تعمیر"
+    assert response =~ "در انتظار قطعه"
+    assert response =~ "آماده تحویل"
+    assert response =~ "از مدار خارج شده"
+    assert response =~ ~s(class="admin-bottom-nav")
+    assert response =~ ~p"/admin/report-export"
+    assert response =~ ~p"/admin/evening-reports"
+  end
+
   test "GET / sends branch manager to manager panel", %{conn: conn} do
     conn =
       conn
@@ -26,6 +69,26 @@ defmodule BeroonWeb.PageControllerTest do
       |> get(~p"/")
 
     assert redirected_to(conn) == ~p"/manager"
+  end
+
+  test "manager scan page shows morning and evening actions", %{conn: conn} do
+    branch_fixture(%{
+      name: "حافظ",
+      manager_name: "محسن",
+      manager_phone: "09120000000"
+    })
+
+    conn =
+      conn
+      |> log_in_branch_manager("09120000000")
+      |> get(~p"/manager/scan")
+
+    response = html_response(conn, 200)
+    assert response =~ "اسکن و ثبت گزارش"
+    assert response =~ "چک لیست صبح"
+    assert response =~ "آمار شب"
+    assert response =~ ~p"/manager/morning"
+    assert response =~ ~p"/manager/evening"
   end
 
   test "manager panel greets manager and shows branch device buttons", %{conn: conn} do
@@ -57,6 +120,66 @@ defmodule BeroonWeb.PageControllerTest do
     assert response =~ "لیست دستگاه‌های شعبه من"
     assert response =~ "دستگاه‌های فعال"
     assert response =~ "تعمیرگاه"
+    assert response =~ ~p"/manager/scan"
+  end
+
+  test "admin sends notification and branch manager reads it", %{conn: conn} do
+    branch =
+      branch_fixture(%{
+        name: "Notification branch",
+        manager_phone: "09120000000"
+      })
+
+    conn =
+      conn
+      |> log_in_admin()
+      |> get(~p"/admin/notifications")
+
+    response = html_response(conn, 200)
+    assert response =~ "admin-notification-form"
+    assert response =~ "Notification branch"
+
+    conn =
+      build_conn()
+      |> log_in_admin()
+      |> post(~p"/admin/notifications",
+        notification: %{
+          subject: "Service update",
+          body: "Message body",
+          branch_ids: [to_string(branch.id)]
+        }
+      )
+
+    assert redirected_to(conn) == ~p"/admin/notifications"
+
+    conn =
+      build_conn()
+      |> log_in_branch_manager(branch.manager_phone)
+      |> get(~p"/manager")
+
+    response = html_response(conn, 200)
+    assert response =~ ~p"/manager/notifications"
+    assert response =~ ~s(class="beroon-header-bell")
+
+    conn =
+      build_conn()
+      |> log_in_branch_manager(branch.manager_phone)
+      |> get(~p"/manager/notifications")
+
+    response = html_response(conn, 200)
+    assert response =~ "Service update"
+    assert response =~ "is-unread"
+    [recipient] = Beroon.Reports.list_branch_notifications(branch.id)
+
+    conn =
+      build_conn()
+      |> log_in_branch_manager(branch.manager_phone)
+      |> get(~p"/manager/notifications/#{recipient.id}")
+
+    response = html_response(conn, 200)
+    assert response =~ "Service update"
+    assert response =~ "Message body"
+    assert Beroon.Reports.count_unread_branch_notifications(branch.id) == 0
   end
 
   test "manager scooter list is scoped to manager branch and status", %{conn: conn} do
@@ -340,6 +463,90 @@ defmodule BeroonWeb.PageControllerTest do
     refute response =~ "OTHER-1"
   end
 
+  test "workshop info ranks branches by repair report counts", %{conn: conn} do
+    workshop = branch_fixture(%{kind: "workshop", manager_phone: "09130000000"})
+    busy_branch = branch_fixture(%{name: "Busy branch", manager_phone: "09120000000"})
+    quiet_branch = branch_fixture(%{name: "Quiet branch", manager_phone: "09120000001"})
+    unreported_branch = branch_fixture(%{name: "Unreported branch"})
+    device_type = device_type_fixture()
+
+    busy_scooter =
+      scooter_fixture(%{
+        branch_id: busy_branch.id,
+        device_type_id: device_type.id,
+        barcode: "busy-repeated",
+        plate: "BUSY-1",
+        status: "active"
+      })
+
+    quiet_scooter =
+      scooter_fixture(%{
+        branch_id: quiet_branch.id,
+        device_type_id: device_type.id,
+        barcode: "quiet-once",
+        plate: "QUIET-1",
+        status: "active"
+      })
+
+    scooter_fixture(%{
+      branch_id: unreported_branch.id,
+      device_type_id: device_type.id,
+      barcode: "unreported-needs-service",
+      plate: "UNREPORTED-1",
+      status: "needs_service",
+      notes: "broken without report"
+    })
+
+    conn
+    |> log_in_branch_manager(busy_branch.manager_phone)
+    |> post(~p"/manager/repairs/#{busy_scooter}/send", repair: %{notes: "first failure"})
+
+    build_conn()
+    |> log_in_branch_manager(busy_branch.manager_phone)
+    |> post(~p"/manager/repairs/#{busy_scooter}/send", repair: %{notes: "second failure"})
+
+    build_conn()
+    |> log_in_branch_manager(quiet_branch.manager_phone)
+    |> post(~p"/manager/repairs/#{quiet_scooter}/send", repair: %{notes: "one failure"})
+
+    conn =
+      build_conn()
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> get(~p"/workshop/info")
+
+    response = html_response(conn, 200)
+    assert response =~ ~s(class="workshop-bottom-nav")
+    assert response =~ "Busy branch"
+    assert response =~ "Quiet branch"
+    assert response =~ "2"
+    assert response =~ "1"
+    refute response =~ "Unreported branch"
+    assert :binary.match(response, "Busy branch") < :binary.match(response, "Quiet branch")
+  end
+
+  test "legacy workshop info status counts are ignored without repair reports", %{conn: conn} do
+    workshop = branch_fixture(%{kind: "workshop", manager_phone: "09130000000"})
+    branch = branch_fixture(%{name: "Status-only branch"})
+    device_type = device_type_fixture()
+
+    scooter_fixture(%{
+      branch_id: branch.id,
+      device_type_id: device_type.id,
+      barcode: "status-only-needs-service",
+      plate: "STATUS-ONLY-1",
+      status: "needs_service",
+      notes: "broken"
+    })
+
+    conn =
+      conn
+      |> log_in_workshop_manager(workshop.manager_phone)
+      |> get(~p"/workshop/info")
+
+    response = html_response(conn, 200)
+    refute response =~ "Status-only branch"
+  end
+
   test "manager morning checklist shows selected branch scooter", %{conn: conn} do
     branch = branch_fixture(%{manager_name: "احمد", manager_phone: "09120000000"})
     device_type = device_type_fixture()
@@ -581,5 +788,114 @@ defmodule BeroonWeb.PageControllerTest do
     assert response =~ "evening-barcode-1"
     refute response =~ "EVN-OLD"
     refute response =~ "OTHER-EVN"
+  end
+
+  test "admin exports evening inventory excel by date", %{conn: conn} do
+    hafez = branch_fixture(%{name: "حافظ", manager_name: "Hafez manager"})
+    sepeh = branch_fixture(%{name: "سپه", manager_name: "Sepeh manager"})
+
+    scooter_type =
+      device_type_fixture(%{
+        device_identifier: "x9",
+        category: "اسکوتر سبز",
+        device_model: "x9"
+      })
+
+    bike_type =
+      device_type_fixture(%{
+        device_identifier: "h1",
+        category: "دوچرخه برقی سبز",
+        device_model: "h1"
+      })
+
+    hafez_scooter_1 =
+      scooter_fixture(%{
+        branch_id: hafez.id,
+        device_type_id: scooter_type.id,
+        barcode: "hafez-scooter-1",
+        plate: "H-S-1"
+      })
+
+    hafez_scooter_2 =
+      scooter_fixture(%{
+        branch_id: hafez.id,
+        device_type_id: scooter_type.id,
+        barcode: "hafez-scooter-2",
+        plate: "H-S-2"
+      })
+
+    sepeh_scooter =
+      scooter_fixture(%{
+        branch_id: sepeh.id,
+        device_type_id: scooter_type.id,
+        barcode: "sepeh-scooter-1",
+        plate: "S-S-1"
+      })
+
+    hafez_bike =
+      scooter_fixture(%{
+        branch_id: hafez.id,
+        device_type_id: bike_type.id,
+        barcode: "hafez-bike-1",
+        plate: "H-B-1"
+      })
+
+    {:ok, _report} =
+      Beroon.Reports.create_evening_count_with_items(
+        %{
+          "branch_id" => hafez.id,
+          "counted_on" => ~D[2026-07-01],
+          "counted_at" => ~U[2026-07-01 21:00:00Z],
+          "manager_name" => "Hafez manager",
+          "manager_phone" => "09120000000",
+          "total_count" => 3,
+          "available_count" => 3,
+          "rented_count" => 0,
+          "damaged_count" => 0,
+          "missing_count" => 0
+        },
+        [hafez_scooter_1, hafez_scooter_2, hafez_bike]
+      )
+
+    {:ok, _report} =
+      Beroon.Reports.create_evening_count_with_items(
+        %{
+          "branch_id" => sepeh.id,
+          "counted_on" => ~D[2026-07-01],
+          "counted_at" => ~U[2026-07-01 21:00:00Z],
+          "manager_name" => "Sepeh manager",
+          "manager_phone" => "09129999999",
+          "total_count" => 1,
+          "available_count" => 1,
+          "rented_count" => 0,
+          "damaged_count" => 0,
+          "missing_count" => 0
+        },
+        [sepeh_scooter]
+      )
+
+    conn =
+      conn
+      |> log_in_admin()
+      |> get(~p"/admin/report-export")
+
+    response = html_response(conn, 200)
+    assert response =~ "خروجی گزارش"
+    assert response =~ "admin-report-export-form"
+
+    conn =
+      build_conn()
+      |> log_in_admin()
+      |> get(~p"/admin/report-export/download?date=2026-07-01")
+
+    response = response(conn, 200)
+    assert get_resp_header(conn, "content-disposition") |> List.first() =~ ".xls"
+    assert response =~ "نوع دستگاه"
+    assert response =~ "حافظ"
+    assert response =~ "سپه"
+    assert response =~ "اسکوتر سبز x9"
+    assert response =~ "دوچرخه برقی سبز h1"
+    assert response =~ "<td>2</td>"
+    assert response =~ "<td>1</td>"
   end
 end

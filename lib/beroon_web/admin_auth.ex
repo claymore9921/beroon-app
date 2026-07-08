@@ -22,12 +22,14 @@ defmodule BeroonWeb.AdminAuth do
       |> assign(:current_user_role, resolved_role)
       |> assign(:current_admin_phone, resolved_role == "admin" && normalized_phone)
       |> assign(:current_branch_name, current_branch_name(resolved_role, normalized_phone))
+      |> assign(:current_branch_id, current_branch_id(resolved_role, normalized_phone))
     else
       conn
       |> assign(:current_user_phone, nil)
       |> assign(:current_user_role, nil)
       |> assign(:current_admin_phone, nil)
       |> assign(:current_branch_name, nil)
+      |> assign(:current_branch_id, nil)
     end
   end
 
@@ -84,4 +86,20 @@ defmodule BeroonWeb.AdminAuth do
   end
 
   defp current_branch_name(_role, _phone), do: nil
+
+  defp current_branch_id("branch_manager", phone) do
+    case Operations.get_branch_for_manager_phone(phone) do
+      nil -> nil
+      branch -> branch.id
+    end
+  end
+
+  defp current_branch_id("workshop_manager", phone) do
+    case Operations.get_workshop_for_manager_phone(phone) do
+      nil -> nil
+      workshop -> workshop.id
+    end
+  end
+
+  defp current_branch_id(_role, _phone), do: nil
 end

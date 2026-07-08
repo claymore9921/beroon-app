@@ -1,6 +1,6 @@
 <Layouts.flash_group flash={@flash} />
 <main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
-  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
     <header class="flex items-start justify-between gap-3 border-b border-zinc-200 pb-4">
       <div>
         <p class="text-sm font-semibold text-teal-700">تعمیرگاه</p>
@@ -12,7 +12,7 @@
     <section class="mt-5 grid gap-3">
       <.link navigate={~p"/workshop/acceptance"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-arrow-down-tray" />
+          <.icon name="hero-arrow-down-tray" class="size-9" />
         </div>
         <div class="manager-card-body">
           <h2>پذیرش دستگاه</h2>
@@ -23,7 +23,7 @@
 
       <.link navigate={~p"/workshop/repairing"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-wrench-screwdriver" />
+          <.icon name="hero-wrench-screwdriver" class="size-9" />
         </div>
         <div class="manager-card-body">
           <h2>در حال تعمیر</h2>
@@ -34,7 +34,7 @@
 
       <.link navigate={~p"/workshop/discharge"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-check-circle" />
+          <.icon name="hero-check-circle" class="size-9" />
         </div>
         <div class="manager-card-body">
           <h2>ترخیص</h2>
@@ -44,4 +44,6 @@
       </.link>
     </section>
   </section>
+
+  <.workshop_bottom_nav active="info" />
 </main>

@@ -71,15 +71,15 @@ defmodule BeroonWeb.CoreComponents do
         @kind == :info && "alert-info",
         @kind == :error && "alert-error"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
+        <.icon :if={@kind == :info} name="hero-information-circle" class="size-9 shrink-0" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-9 shrink-0" />
         <div>
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
         </div>
         <div class="flex-1" />
         <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
+          <.icon name="hero-x-mark" class="size-9 opacity-40 group-hover:opacity-70" />
         </button>
       </div>
     </div>
@@ -306,7 +306,7 @@ defmodule BeroonWeb.CoreComponents do
   defp error(assigns) do
     ~H"""
     <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
-      <.icon name="hero-exclamation-circle" class="size-5" />
+      <.icon name="hero-exclamation-circle" class="size-9" />
       {render_slot(@inner_block)}
     </p>
     """
@@ -440,11 +440,11 @@ defmodule BeroonWeb.CoreComponents do
 
   ## Examples
 
-      <.icon name="hero-x-mark" />
-      <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
+      <.icon name="hero-x-mark" class="size-9" />
+      <.icon name="hero-arrow-path" class="ml-1 size-9 motion-safe:animate-spin" />
   """
   attr :name, :string, required: true
-  attr :class, :any, default: "size-4"
+  attr :class, :any, default: "size-9"
 
   def icon(%{name: "hero-" <> _} = assigns) do
     ~H"""

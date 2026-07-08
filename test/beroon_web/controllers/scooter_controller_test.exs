@@ -36,6 +36,8 @@ defmodule BeroonWeb.ScooterControllerTest do
 
       assert response =~ "دستگاه‌ها"
       assert response =~ "scooter-search-form"
+      assert response =~ ~s(class="admin-bottom-nav")
+      assert response =~ ~p"/admin/evening-reports"
     end
 
     test "filters scooters by search query", %{conn: conn} do

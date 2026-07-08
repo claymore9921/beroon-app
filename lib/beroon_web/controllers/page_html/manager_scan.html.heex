@@ -1,0 +1,58 @@
+<Layouts.flash_group flash={@flash} />
+<main class="manager-dashboard-shell min-h-screen text-zinc-950" dir="rtl">
+  <section class="manager-dashboard mx-auto min-h-screen w-full max-w-md px-4 pb-32 pt-6">
+    <header class="manager-scan-header">
+      <div>
+        <.link navigate={~p"/manager"} class="text-sm font-semibold text-orange-700">
+          بازگشت
+        </.link>
+        <p class="mt-3 text-sm font-black text-teal-700">ثبت روزانه شعبه</p>
+        <h1 class="mt-1 text-2xl font-black text-zinc-950">اسکن و ثبت گزارش</h1>
+        <span class="mt-1 block text-sm font-bold text-zinc-500">
+          {@branch.name} · {@persian_today}
+        </span>
+      </div>
+      <div class="manager-scan-orb">
+        <.icon name="hero-qr-code" class="size-9" />
+      </div>
+    </header>
+
+    <section class="mt-5 grid gap-4">
+      <.link navigate={~p"/manager/morning"} class="manager-scan-action-card is-morning">
+        <div class="manager-scan-action-icon">
+          <.icon name="hero-sun" class="size-9" />
+        </div>
+        <div class="min-w-0">
+          <h2>چک لیست صبح</h2>
+          <p>اسکن پلاک دستگاه و ثبت چک‌لیست همان دستگاه</p>
+          <span class={[
+            "manager-scan-state",
+            if(@morning_submitted, do: "is-success", else: "is-danger")
+          ]}>
+            {if @morning_submitted, do: "امروز ثبت شده", else: "در انتظار ثبت"}
+          </span>
+        </div>
+        <.icon class="size-9 manager-scan-arrow" name="hero-chevron-left" />
+      </.link>
+
+      <.link navigate={~p"/manager/evening"} class="manager-scan-action-card is-evening">
+        <div class="manager-scan-action-icon">
+          <.icon name="hero-moon" class="size-9" />
+        </div>
+        <div class="min-w-0">
+          <h2>آمار شب</h2>
+          <p>اسکن دستگاه‌های موجود در پایان روز و ارسال آمار شعبه</p>
+          <span class={[
+            "manager-scan-state",
+            if(@evening_submitted, do: "is-success", else: "is-danger")
+          ]}>
+            {if @evening_submitted, do: "امروز ثبت شده", else: "در انتظار ثبت"}
+          </span>
+        </div>
+        <.icon class="size-9 manager-scan-arrow" name="hero-chevron-left" />
+      </.link>
+    </section>
+  </section>
+
+  <.manager_bottom_nav active="scan" />
+</main>

@@ -5,7 +5,7 @@
       <div class="manager-date-actions">
         <p>{Beroon.Calendar.persian_date(Date.utc_today())}</p>
         <.link href={~p"/logout"} method="delete" class="manager-logout">
-          <.icon name="hero-arrow-left-on-rectangle" /> خروج
+          <.icon name="hero-arrow-left-on-rectangle" class="size-9" /> خروج
         </.link>
       </div>
 
@@ -19,10 +19,10 @@
     <section class="manager-status-grid">
       <.link navigate={~p"/scooters?q=active"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-bolt" />
+          <.icon name="hero-bolt" class="size-9" />
         </div>
         <div class="manager-card-body">
-          <h2>دستگاه‌های فعال</h2>
+          <h2>فعال</h2>
           <strong>{@scooter_counts.active}</strong>
           <span>دستگاه</span>
         </div>
@@ -30,29 +30,62 @@
 
       <.link navigate={~p"/scooters?q=needs_service"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-exclamation-triangle" />
+          <.icon name="hero-exclamation-triangle" class="size-9" />
         </div>
         <div class="manager-card-body">
-          <h2>دستگاه‌های تعمیری</h2>
+          <h2>خراب</h2>
           <strong>{@scooter_counts.needs_service}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/scooters?q=awaiting_repair"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-clock" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>در انتظار تعمیر</h2>
+          <strong>{@scooter_counts.awaiting_repair}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/scooters?q=repairing"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-wrench" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>در حال تعمیر</h2>
+          <strong>{@scooter_counts.repairing}</strong>
           <span>دستگاه</span>
         </div>
       </.link>
 
       <.link navigate={~p"/scooters?q=waiting_for_part"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-wrench-screwdriver" />
+          <.icon name="hero-wrench-screwdriver" class="size-9" />
         </div>
         <div class="manager-card-body">
-          <h2>نیازمند قطعه</h2>
+          <h2>در انتظار قطعه</h2>
           <strong>{@scooter_counts.waiting_for_part}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/scooters?q=ready_for_pickup"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-check-circle" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>آماده تحویل</h2>
+          <strong>{@scooter_counts.ready_for_pickup}</strong>
           <span>دستگاه</span>
         </div>
       </.link>
 
       <.link navigate={~p"/scooters?q=out_of_service"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-no-symbol" />
+          <.icon name="hero-no-symbol" class="size-9" />
         </div>
         <div class="manager-card-body">
           <h2>از مدار خارج شده</h2>
@@ -60,25 +93,6 @@
           <span>دستگاه</span>
         </div>
       </.link>
-    </section>
-
-    <section class="mt-5 grid grid-cols-2 gap-2">
-      <.link navigate={~p"/checklist_items"} class="btn min-h-12">چک‌لیست</.link>
-      <.link navigate={~p"/admin/checklists"} class="btn min-h-12">
-        گزارش چک‌لیست شعبه‌ها
-      </.link>
-      <.link navigate={~p"/admin/evening-reports"} class="btn min-h-12">
-        گزارش آمارگیری شعبه‌ها
-      </.link>
-      <.link navigate={~p"/admin/location-alerts"} class="btn min-h-12">
-        گزارش جابجایی دستگاه‌ها
-      </.link>
-      <.link navigate={~p"/admin/managers"} class="btn min-h-12">
-        تایید مدیران شعبه
-      </.link>
-      <.link navigate={~p"/device_types"} class="btn min-h-12">نوع دستگاه</.link>
-      <.link navigate={~p"/branches"} class="btn min-h-12">شعبه‌ها</.link>
-      <.link navigate={~p"/scooters"} class="btn min-h-12">دستگاه‌ها</.link>
     </section>
 
     <section

@@ -9,11 +9,108 @@ defmodule Beroon.Reports do
   alias Beroon.Fleet.DeviceType
   alias Beroon.Fleet.Scooter
   alias Beroon.Operations.Branch
+  alias Beroon.Reports.BranchNotification
+  alias Beroon.Reports.BranchNotificationRecipient
   alias Beroon.Reports.EveningCountItem
   alias Beroon.Reports.MorningInspectionItem
   alias Beroon.Reports.ScooterLocationAlert
+  alias Beroon.Reports.ScooterRepairReport
 
   alias Beroon.Reports.EveningCount
+
+  def create_branch_notification(attrs, branch_ids) do
+    branch_ids =
+      branch_ids
+      |> List.wrap()
+      |> Enum.map(&to_string/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    Repo.transaction(fn ->
+      notification =
+        attrs
+        |> Map.put_new("sent_at", DateTime.utc_now() |> DateTime.truncate(:second))
+        |> create_notification!()
+
+      Enum.each(branch_ids, fn branch_id ->
+        %BranchNotificationRecipient{}
+        |> BranchNotificationRecipient.changeset(%{
+          notification_id: notification.id,
+          branch_id: branch_id
+        })
+        |> Repo.insert!()
+      end)
+
+      notification
+    end)
+  end
+
+  defp create_notification!(attrs) do
+    %BranchNotification{}
+    |> BranchNotification.changeset(attrs)
+    |> Repo.insert!()
+  end
+
+  def list_branch_notifications(branch_id) do
+    BranchNotificationRecipient
+    |> join(:inner, [r], n in BranchNotification, on: n.id == r.notification_id)
+    |> where([r, n], r.branch_id == ^branch_id)
+    |> order_by([r, n], desc: n.sent_at)
+    |> select([r, n], %{
+      id: r.id,
+      notification_id: n.id,
+      subject: n.subject,
+      sent_at: n.sent_at,
+      read_at: r.read_at
+    })
+    |> Repo.all()
+  end
+
+  def count_unread_branch_notifications(nil), do: 0
+
+  def count_unread_branch_notifications(branch_id) do
+    BranchNotificationRecipient
+    |> where([r], r.branch_id == ^branch_id and is_nil(r.read_at))
+    |> Repo.aggregate(:count, :id)
+  end
+
+  def get_branch_notification_for_recipient!(branch_id, recipient_id) do
+    BranchNotificationRecipient
+    |> join(:inner, [r], n in BranchNotification, on: n.id == r.notification_id)
+    |> where([r, n], r.id == ^recipient_id and r.branch_id == ^branch_id)
+    |> select([r, n], %{
+      id: r.id,
+      notification_id: n.id,
+      subject: n.subject,
+      body: n.body,
+      sent_at: n.sent_at,
+      read_at: r.read_at
+    })
+    |> Repo.one!()
+  end
+
+  def mark_branch_notification_read(branch_id, recipient_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    BranchNotificationRecipient
+    |> where([r], r.id == ^recipient_id and r.branch_id == ^branch_id and is_nil(r.read_at))
+    |> Repo.update_all(set: [read_at: now])
+  end
+
+  def create_scooter_repair_report(attrs) do
+    %ScooterRepairReport{}
+    |> ScooterRepairReport.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def repair_report_counts_by_branch do
+    ScooterRepairReport
+    |> join(:inner, [r], b in Branch, on: b.id == r.branch_id)
+    |> group_by([r, b], [b.id, b.name])
+    |> select([r, b], %{branch_id: b.id, branch_name: b.name, count: count(r.id)})
+    |> order_by([r, b], desc: count(r.id), asc: b.name)
+    |> Repo.all()
+  end
 
   @doc """
   Returns the list of evening_counts.
@@ -51,6 +148,47 @@ defmodule Beroon.Reports do
       |> Repo.all()
 
     attach_evening_count_items(counts)
+  end
+
+  def evening_inventory_export(%Date{} = date) do
+    branches =
+      Branch
+      |> where([b], b.active == true and b.kind == "branch")
+      |> order_by([b], asc: b.name)
+      |> select([b], %{id: b.id, name: b.name})
+      |> Repo.all()
+
+    device_types =
+      DeviceType
+      |> where([d], d.active == true)
+      |> order_by([d], asc: d.category, asc: d.device_model, asc: d.device_identifier)
+      |> select([d], %{
+        id: d.id,
+        label: fragment("concat_ws(' ', ?, ?)", d.category, d.device_model)
+      })
+      |> Repo.all()
+
+    counts =
+      EveningCountItem
+      |> join(:inner, [i], e in EveningCount, on: e.id == i.evening_count_id)
+      |> join(:inner, [i, e], s in Scooter, on: s.id == i.scooter_id)
+      |> where([i, e, s], e.counted_on == ^date and not is_nil(s.device_type_id))
+      |> group_by([i, e, s], [e.branch_id, s.device_type_id])
+      |> select([i, e, s], {{s.device_type_id, e.branch_id}, count(i.id)})
+      |> Repo.all()
+      |> Map.new()
+
+    rows =
+      Enum.map(device_types, fn device_type ->
+        branch_counts =
+          Map.new(branches, fn branch ->
+            {branch.id, Map.get(counts, {device_type.id, branch.id}, 0)}
+          end)
+
+        %{device_type: device_type, branch_counts: branch_counts}
+      end)
+
+    %{date: date, branches: branches, rows: rows}
   end
 
   def list_evening_report_dates_for_branch(branch_id) do

@@ -1,6 +1,6 @@
 <Layouts.flash_group flash={@flash} />
 <main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
-  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
     <header class="border-b border-zinc-200 pb-4">
       <.link navigate={~p"/workshop"} class="text-sm font-semibold text-orange-700">
         بازگشت
@@ -66,4 +66,6 @@
       </article>
     </section>
   </section>
+
+  <.workshop_bottom_nav active="info" />
 </main>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="utf-8" />
@@ -30,6 +30,15 @@
   <body>
     <% current_role = assigns[:current_user_role] %>
     <% show_menu = current_role == "admin" %>
+    <% conn = Map.get(assigns, :conn) %>
+    <% current_path = if conn, do: conn.request_path, else: "" %>
+    <% current_branch_id = assigns[:current_branch_id] %>
+    <% unread_notifications =
+      if current_role == "branch_manager" do
+        Beroon.Reports.count_unread_branch_notifications(current_branch_id)
+      else
+        0
+      end %>
 
     <header class="beroon-app-header">
       <div class={[
@@ -37,9 +46,19 @@
         current_role == "branch_manager" && "beroon-header-inner-manager"
       ]}>
         <div class="beroon-header-side beroon-header-menu-side">
+          <.link
+            :if={current_role == "branch_manager"}
+            navigate={~p"/manager/notifications"}
+            class="beroon-header-bell"
+            aria-label="پیام‌ها"
+          >
+            <.icon name="hero-bell" class="size-9" />
+            <span :if={unread_notifications > 0}></span>
+          </.link>
+
           <details :if={show_menu} class="beroon-mobile-menu">
             <summary aria-label="باز کردن منو">
-              <.icon name="hero-bars-3" class="size-6" />
+              <.icon name="hero-bars-3" class="size-9" />
             </summary>
             <nav class="beroon-menu-panel" aria-label="منوی اصلی">
               <div class="beroon-menu-head">
@@ -51,33 +70,37 @@
               </div>
 
               <div class="beroon-menu-list">
-                <.link navigate={~p"/admin/reports"}><.icon name="hero-home" />داشبورد</.link>
+                <.link navigate={~p"/admin/reports"}>
+                  <.icon name="hero-home" class="size-9" />داشبورد
+                </.link>
                 <.link navigate={~p"/checklist_items"}>
-                  <.icon name="hero-clipboard-document-check" />چک‌لیست‌ها
+                  <.icon name="hero-clipboard-document-check" class="size-9" />چک‌لیست‌ها
                 </.link>
                 <.link navigate={~p"/admin/checklists"}>
-                  <.icon name="hero-document-chart-bar" />گزارش چک‌لیست
+                  <.icon name="hero-document-chart-bar" class="size-9" />گزارش چک‌لیست
                 </.link>
                 <.link navigate={~p"/admin/evening-reports"}>
-                  <.icon name="hero-chart-bar-square" />گزارش آمارگیری
+                  <.icon name="hero-chart-bar-square" class="size-9" />گزارش آمارگیری
                 </.link>
                 <.link navigate={~p"/admin/location-alerts"}>
-                  <.icon name="hero-map-pin" />گزارش جابجایی
+                  <.icon name="hero-map-pin" class="size-9" />گزارش جابجایی
                 </.link>
                 <.link navigate={~p"/admin/managers"}>
-                  <.icon name="hero-user-plus" />تایید مدیران
+                  <.icon name="hero-user-plus" class="size-9" />تایید مدیران
                 </.link>
-                <.link navigate={~p"/scooters"}><.icon name="hero-qr-code" />دستگاه‌ها</.link>
+                <.link navigate={~p"/admin/notifications"}>
+                  <.icon name="hero-bell-alert" class="size-9" />اطلاع‌رسانی
+                </.link>
                 <.link navigate={~p"/device_types"}>
-                  <.icon name="hero-squares-2x2" />نوع دستگاه
+                  <.icon name="hero-squares-2x2" class="size-9" />نوع دستگاه
                 </.link>
                 <.link navigate={~p"/branches"}>
-                  <.icon name="hero-building-storefront" />شعبه‌ها
+                  <.icon name="hero-building-storefront" class="size-9" />شعبه‌ها
                 </.link>
               </div>
 
               <.link href={~p"/logout"} method="delete" class="beroon-menu-logout">
-                <.icon name="hero-arrow-right-on-rectangle" />خروج
+                <.icon name="hero-arrow-right-on-rectangle" class="size-9" />خروج
               </.link>
             </nav>
           </details>
@@ -96,5 +119,52 @@
     </header>
 
     {@inner_content}
+
+    <nav
+      :if={current_role == "admin"}
+      class="admin-bottom-nav"
+      aria-label="ناوبری ادمین"
+    >
+      <.link
+        navigate={~p"/admin/report-export"}
+        class={[String.starts_with?(current_path, "/admin/report-export") && "is-active"]}
+      >
+        <.icon name="hero-arrow-down-tray" class="size-9" />
+        <span>خروجی گزارش</span>
+      </.link>
+      <.link
+        navigate={~p"/admin/notifications"}
+        class={[String.starts_with?(current_path, "/admin/notifications") && "is-active"]}
+      >
+        <.icon name="hero-bell-alert" class="size-9" />
+        <span>اطلاع‌رسانی</span>
+      </.link>
+      <.link
+        navigate={~p"/admin/evening-reports"}
+        class={[
+          "is-primary",
+          String.starts_with?(current_path, "/admin/evening-reports") && "is-active"
+        ]}
+      >
+        <span class="admin-nav-bubble">
+          <.icon name="hero-chart-bar-square" class="size-9" />
+        </span>
+        <span>آمارگیری</span>
+      </.link>
+      <.link
+        navigate={~p"/admin/checklists"}
+        class={[String.starts_with?(current_path, "/admin/checklists") && "is-active"]}
+      >
+        <.icon name="hero-clipboard-document-check" class="size-9" />
+        <span>چک صبح</span>
+      </.link>
+      <.link
+        navigate={~p"/admin/location-alerts"}
+        class={[String.starts_with?(current_path, "/admin/location-alerts") && "is-active"]}
+      >
+        <.icon name="hero-map-pin" class="size-9" />
+        <span>جابجایی</span>
+      </.link>
+    </nav>
   </body>
 </html>
