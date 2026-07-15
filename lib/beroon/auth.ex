@@ -55,7 +55,7 @@ defmodule Beroon.Auth do
     |> Repo.insert()
     |> case do
       {:ok, challenge} ->
-        Logger.warning("Beroon OTP for #{phone} (#{role_for_phone(phone)}): #{code}")
+        Logger.info("Beroon OTP for #{phone} (#{role_for_phone(phone)}): #{code}")
         {:ok, challenge}
 
       error ->

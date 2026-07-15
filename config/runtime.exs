@@ -47,6 +47,10 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
+  config :beroon, Beroon.Auth,
+    admin_phone: System.get_env("ADMIN_PHONE", "09399644901"),
+    otp_secret: System.get_env("OTP_SECRET", secret_key_base)
+
   host = System.get_env("PHX_HOST") || "example.com"
 
   config :beroon, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
