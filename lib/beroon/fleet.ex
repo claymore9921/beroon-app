@@ -240,12 +240,12 @@ defmodule Beroon.Fleet do
   end
 
   def get_scooter_by_plate_or_barcode(code) when is_binary(code) do
-    clean_code = String.trim(code)
+    codes = lookup_codes(code)
 
     Scooter
     |> join(:left, [s], b in Beroon.Operations.Branch, on: b.id == s.branch_id)
     |> join(:left, [s, b], d in DeviceType, on: d.id == s.device_type_id)
-    |> where([s], s.barcode == ^clean_code or s.plate == ^clean_code)
+    |> where([s], s.barcode in ^codes or s.plate in ^codes)
     |> select([s, b, d], %{
       id: s.id,
       plate: s.plate,
@@ -263,23 +263,23 @@ defmodule Beroon.Fleet do
   end
 
   def get_scooter_by_plate_or_barcode(branch_id, code) when is_binary(code) do
-    clean_code = String.trim(code)
+    codes = lookup_codes(code)
 
     Scooter
     |> where(
       [s],
-      s.branch_id == ^branch_id and (s.barcode == ^clean_code or s.plate == ^clean_code)
+      s.branch_id == ^branch_id and (s.barcode in ^codes or s.plate in ^codes)
     )
     |> Repo.one()
   end
 
   def get_scooter_by_plate_or_barcode_with_details(branch_id, code) when is_binary(code) do
-    clean_code = String.trim(code)
+    codes = lookup_codes(code)
 
     Scooter
     |> where(
       [s],
-      s.branch_id == ^branch_id and (s.barcode == ^clean_code or s.plate == ^clean_code)
+      s.branch_id == ^branch_id and (s.barcode in ^codes or s.plate in ^codes)
     )
     |> preload([:branch, :device_type])
     |> Repo.one()
@@ -312,6 +312,63 @@ defmodule Beroon.Fleet do
     Scooter
     |> preload([:branch, :device_type])
     |> Repo.get!(id)
+  end
+
+  defp lookup_codes(code) when is_binary(code) do
+    code
+    |> String.trim()
+    |> lookup_code_candidates()
+    |> Enum.uniq()
+  end
+
+  defp lookup_code_candidates("") do
+    []
+  end
+
+  defp lookup_code_candidates(code) do
+    uri = URI.parse(code)
+
+    query_candidates =
+      uri.query
+      |> case do
+        nil ->
+          []
+
+        query ->
+          URI.decode_query(query)
+          |> Map.values()
+          |> Enum.filter(&is_binary/1)
+      end
+
+    path_candidates =
+      uri.path
+      |> case do
+        nil ->
+          []
+
+        path ->
+          path
+          |> String.split("/", trim: true)
+          |> Enum.filter(&(&1 != ""))
+      end
+
+    line_candidates =
+      code
+      |> String.split(["\n", "\r"], trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    [code, uri.fragment | query_candidates ++ path_candidates ++ line_candidates]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.flat_map(fn candidate ->
+      candidate
+      |> String.trim()
+      |> case do
+        "" -> []
+        trimmed -> [trimmed, URI.decode(trimmed)]
+      end
+    end)
+    |> Enum.reject(&(&1 == ""))
   end
 
   @doc """

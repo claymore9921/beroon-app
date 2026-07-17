@@ -8,6 +8,7 @@ defmodule BeroonWeb.Endpoint do
     store: :cookie,
     key: "_beroon_key",
     signing_salt: "5PowDtHr",
+    max_age: 60 * 60 * 24 * 90,
     same_site: "Lax"
   ]
 

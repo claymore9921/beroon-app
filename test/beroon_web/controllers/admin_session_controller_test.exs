@@ -26,6 +26,9 @@ defmodule BeroonWeb.AdminSessionControllerTest do
     assert get_session(conn, :user_phone) == "09399644901"
     assert get_session(conn, :user_role) == "admin"
     assert redirected_to(conn) == ~p"/admin/reports"
+
+    assert [session_cookie | _] = get_resp_header(conn, "set-cookie")
+    assert session_cookie =~ "max-age=7776000"
   end
 
   test "confirming OTP sends unapproved branch manager to pending page", %{conn: conn} do

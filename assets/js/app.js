@@ -23,6 +23,7 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/beroon"
+import jsQR from "../vendor/jsQR"
 import topbar from "../vendor/topbar"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
@@ -46,6 +47,170 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+const buildScannedCard = (scooter) => {
+  const deviceTypeLabel = [
+    scooter.device_type_identifier,
+    scooter.device_type_category,
+    scooter.device_type_name,
+  ].filter(Boolean).join(" - ") || "نوع ثبت نشده"
+
+  const hidden = document.createElement("input")
+  hidden.type = "hidden"
+  hidden.name = "evening[scanned_codes][]"
+  hidden.value = scooter.plate
+
+  const card = document.createElement("div")
+  card.className = "rounded-md bg-white p-3 text-sm"
+  card.innerHTML = `
+    <div class="flex items-start justify-between gap-2">
+      <div>
+        <p class="font-bold">${scooter.plate || "-"}</p>
+        <p class="text-zinc-500">${deviceTypeLabel}</p>
+        <p class="text-zinc-500">${scooter.branch_name || "شعبه نامشخص"}</p>
+      </div>
+    </div>
+  `
+  card.appendChild(hidden)
+  return card
+}
+
+const lookupScooter = async (code) => {
+  const clean = (code || "").trim()
+  if (!clean) return null
+
+  const response = await fetch(`/api/scooters/lookup?code=${encodeURIComponent(clean)}`)
+  if (!response.ok) {
+    alert("این پلاک قبلا توسط ادمین ثبت نشده است.")
+    return null
+  }
+
+  const payload = await response.json()
+  return payload.scooter
+}
+
+const addScannedScooter = (scooter) => {
+  const list = document.getElementById("scanned-list")
+  const count = document.getElementById("scan-count")
+  if (!list || !count) return
+
+  if (list.querySelector(`input[value="${CSS.escape(scooter.plate)}"]`)) return
+
+  list.prepend(buildScannedCard(scooter))
+  count.textContent = String(list.querySelectorAll('input[name="evening[scanned_codes][]"]').length)
+}
+
+const setupEveningScanner = () => {
+  const startPanel = document.getElementById("start-panel")
+  const startButton = document.getElementById("start-count")
+  const scanButton = document.getElementById("scan-button")
+  const input = document.getElementById("scan-input")
+  const manualAdd = document.getElementById("manual-add")
+  const dialog = document.getElementById("scan-dialog")
+  const closeButton = document.getElementById("scan-close")
+  const retryButton = document.getElementById("scan-retry")
+  const status = document.getElementById("scan-status")
+  const video = document.getElementById("scan-video")
+
+  if (!startButton || !startPanel || !scanButton || !input || !manualAdd || !dialog || !video || !status) return
+
+  let stream = null
+  let scanning = false
+  const seenPlates = new Set()
+
+  startButton.addEventListener("click", () => {
+    startPanel.classList.add("hidden")
+    const form = document.getElementById("count-form")
+    form?.classList.remove("hidden")
+  })
+
+  const stopScanner = () => {
+    scanning = false
+
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+      stream = null
+    }
+
+    video.pause()
+    video.srcObject = null
+
+    if (dialog.open) dialog.close()
+  }
+
+  const scanFrame = async () => {
+    if (!scanning || !stream) return
+
+    const canvas = document.createElement("canvas")
+    const context = canvas.getContext("2d", {willReadFrequently: true})
+    if (!context) {
+      status.textContent = "اسکنر آماده نشد. دوباره تلاش کنید."
+      stopScanner()
+      return
+    }
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts: "attemptBoth"})
+
+    if (code?.data) {
+      const scooter = await lookupScooter(code.data)
+      if (scooter) {
+        if (!seenPlates.has(scooter.plate)) {
+          seenPlates.add(scooter.plate)
+          addScannedScooter(scooter)
+        }
+        input.value = scooter.plate || code.data
+      }
+      stopScanner()
+      return
+    }
+
+    requestAnimationFrame(scanFrame)
+  }
+
+  const openScanner = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("این دستگاه دسترسی به دوربین را پشتیبانی نمی‌کند.")
+      return
+    }
+
+    dialog.showModal()
+    status.textContent = "در حال اتصال به دوربین..."
+    scanning = true
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
+      video.srcObject = stream
+      await video.play()
+      status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
+      scanFrame()
+    } catch (_error) {
+      status.textContent = "دسترسی به دوربین ممکن نشد."
+      stopScanner()
+    }
+  }
+
+  scanButton.addEventListener("click", openScanner)
+  manualAdd.addEventListener("click", async () => {
+    const scooter = await lookupScooter(input.value)
+    if (!scooter) return
+    addScannedScooter(scooter)
+    input.value = ""
+  })
+  closeButton.addEventListener("click", stopScanner)
+  retryButton?.addEventListener("click", async () => {
+    stopScanner()
+    await openScanner()
+  })
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault()
+    stopScanner()
+  })
+}
+
 const setupMorningChecklist = () => {
   const checkAll = document.getElementById("check-all-morning-items")
   if (checkAll) {
@@ -56,40 +221,102 @@ const setupMorningChecklist = () => {
 
   const scanButton = document.getElementById("morning-scan-button")
   const input = document.getElementById("morning-code-input")
-  const video = document.getElementById("morning-scan-video")
   const form = document.getElementById("morning-scan-form")
+  const dialog = document.getElementById("morning-scan-dialog")
+  const closeButton = document.getElementById("morning-scan-close")
+  const retryButton = document.getElementById("morning-scan-retry")
+  const status = document.getElementById("morning-scan-status")
+  const video = document.getElementById("morning-scan-video")
 
-  if (!scanButton || !input || !video || !form) return
+  if (!scanButton || !input || !video || !form || !dialog || !status) return
 
-  scanButton.addEventListener("click", async () => {
-    if (!("BarcodeDetector" in window)) {
-      alert("مرورگر این دستگاه اسکن مستقیم را پشتیبانی نمی‌کند. پلاک را دستی وارد کنید.")
-      input.focus()
+  let stream = null
+  let scanning = false
+
+  const stopScanner = () => {
+    scanning = false
+
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+      stream = null
+    }
+
+    video.pause()
+    video.srcObject = null
+
+    if (dialog.open) dialog.close()
+  }
+
+  const scanFrame = async () => {
+    if (!scanning || !stream) return
+
+    const canvas = document.createElement("canvas")
+    const context = canvas.getContext("2d", {willReadFrequently: true})
+    if (!context) {
+      status.textContent = "اسکنر آماده نشد. دوباره تلاش کنید."
+      stopScanner()
       return
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
-    video.srcObject = stream
-    video.classList.remove("hidden")
-    await video.play()
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    const detector = new BarcodeDetector({formats: ["qr_code", "code_128", "code_39", "ean_13"]})
-    const scan = async () => {
-      const codes = await detector.detect(video)
-      if (codes.length > 0) {
-        input.value = codes[0].rawValue
-        stream.getTracks().forEach(track => track.stop())
-        video.classList.add("hidden")
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts: "attemptBoth"})
+
+    if (code?.data) {
+      const scooter = await lookupScooter(code.data)
+      if (scooter) {
+        input.value = scooter.barcode || scooter.plate || code.data
+        stopScanner()
         form.requestSubmit()
         return
       }
-      requestAnimationFrame(scan)
+
+      stopScanner()
+      return
     }
-    scan()
+
+    requestAnimationFrame(scanFrame)
+  }
+
+  const openScanner = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("این دستگاه دسترسی به دوربین را پشتیبانی نمی‌کند.")
+      return
+    }
+
+    dialog.showModal()
+    status.textContent = "در حال اتصال به دوربین..."
+    scanning = true
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
+      video.srcObject = stream
+      await video.play()
+      status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
+      scanFrame()
+    } catch (_error) {
+      status.textContent = "دسترسی به دوربین ممکن نشد."
+      stopScanner()
+    }
+  }
+
+  scanButton.addEventListener("click", openScanner)
+  closeButton.addEventListener("click", stopScanner)
+  retryButton?.addEventListener("click", async () => {
+    stopScanner()
+    await openScanner()
+  })
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault()
+    stopScanner()
   })
 }
 
 window.addEventListener("DOMContentLoaded", setupMorningChecklist)
+window.addEventListener("DOMContentLoaded", setupEveningScanner)
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

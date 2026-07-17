@@ -124,5 +124,25 @@ defmodule Beroon.FleetTest do
       scooter = scooter_fixture()
       assert %Ecto.Changeset{} = Fleet.change_scooter(scooter)
     end
+
+    test "get_scooter_by_plate_or_barcode/1 resolves QR-style payloads" do
+      scooter =
+        scooter_fixture(%{
+          plate: "QR-PLATE-1",
+          barcode: "QR-BARCODE-1"
+        })
+
+      assert scanned_by_barcode =
+               Fleet.get_scooter_by_plate_or_barcode(
+                 "https://example.test/scan?code=QR-BARCODE-1"
+               )
+
+      assert scanned_by_barcode.id == scooter.id
+
+      assert scanned_by_plate =
+               Fleet.get_scooter_by_plate_or_barcode("https://example.test/scan/QR-PLATE-1")
+
+      assert scanned_by_plate.id == scooter.id
+    end
   end
 end
