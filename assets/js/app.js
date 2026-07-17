@@ -315,8 +315,102 @@ const setupMorningChecklist = () => {
   })
 }
 
+const setupScooterFormScanner = () => {
+  const scanButton = document.getElementById("scooter-scan-button")
+  const plateInput = document.getElementById("scooter-plate-input")
+  const barcodeInput = document.getElementById("scooter-barcode-input")
+  const dialog = document.getElementById("scooter-scan-dialog")
+  const closeButton = document.getElementById("scooter-scan-close")
+  const retryButton = document.getElementById("scooter-scan-retry")
+  const status = document.getElementById("scooter-scan-status")
+  const video = document.getElementById("scooter-scan-video")
+
+  if (!scanButton || !plateInput || !barcodeInput || !dialog || !closeButton || !retryButton || !status || !video) return
+
+  let stream = null
+  let scanning = false
+
+  const stopScanner = () => {
+    scanning = false
+
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+      stream = null
+    }
+
+    video.pause()
+    video.srcObject = null
+
+    if (dialog.open) dialog.close()
+  }
+
+  const scanFrame = async () => {
+    if (!scanning || !stream) return
+
+    const canvas = document.createElement("canvas")
+    const context = canvas.getContext("2d", {willReadFrequently: true})
+    if (!context) {
+      status.textContent = "اسکنر آماده نشد. دوباره تلاش کنید."
+      stopScanner()
+      return
+    }
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts: "attemptBoth"})
+
+    if (code?.data) {
+      const scannedValue = code.data.trim()
+      plateInput.value = scannedValue
+      barcodeInput.value = scannedValue
+      plateInput.focus()
+      stopScanner()
+      return
+    }
+
+    requestAnimationFrame(scanFrame)
+  }
+
+  const openScanner = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("این دستگاه دسترسی به دوربین را پشتیبانی نمی‌کند.")
+      return
+    }
+
+    dialog.showModal()
+    status.textContent = "در حال اتصال به دوربین..."
+    scanning = true
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
+      video.srcObject = stream
+      await video.play()
+      status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
+      scanFrame()
+    } catch (_error) {
+      status.textContent = "دسترسی به دوربین ممکن نشد."
+      stopScanner()
+    }
+  }
+
+  scanButton.addEventListener("click", openScanner)
+  closeButton.addEventListener("click", stopScanner)
+  retryButton.addEventListener("click", async () => {
+    stopScanner()
+    await openScanner()
+  })
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault()
+    stopScanner()
+  })
+}
+
 window.addEventListener("DOMContentLoaded", setupMorningChecklist)
 window.addEventListener("DOMContentLoaded", setupEveningScanner)
+window.addEventListener("DOMContentLoaded", setupScooterFormScanner)
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:
