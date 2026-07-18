@@ -13,6 +13,7 @@ config :beroon, BeroonWeb.Endpoint, cache_static_manifest: "priv/static/cache_ma
 config :beroon, BeroonWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
+    hsts: true,
     exclude: [
       # paths: ["/health"],
       hosts: ["localhost", "127.0.0.1"]

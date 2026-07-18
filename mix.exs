@@ -11,7 +11,10 @@ defmodule Beroon.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      releases: [
+        beroon: [validate_compile_env: false]
+      ]
     ]
   end
 

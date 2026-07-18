@@ -66,6 +66,23 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
+  ssl_key_path = System.get_env("SSL_KEY_PATH")
+  ssl_cert_path = System.get_env("SSL_CERT_PATH")
+
+  if ssl_key_path && ssl_cert_path do
+    config :beroon, BeroonWeb.Endpoint,
+      https: [
+        port: String.to_integer(System.get_env("SSL_PORT", "443")),
+        cipher_suite: :strong,
+        keyfile: ssl_key_path,
+        certfile: ssl_cert_path
+      ],
+      force_ssl: [
+        rewrite_on: [:x_forwarded_proto],
+        hsts: true
+      ]
+  end
+
   # ## SSL Support
   #
   # To get SSL working, you will need to add the `https` key

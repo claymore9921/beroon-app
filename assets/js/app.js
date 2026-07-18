@@ -112,6 +112,8 @@ const setupEveningScanner = () => {
   const video = document.getElementById("scan-video")
 
   if (!startButton || !startPanel || !scanButton || !input || !manualAdd || !dialog || !video || !status) return
+  if (scanButton.dataset.scannerBound === "true") return
+  scanButton.dataset.scannerBound = "true"
 
   let stream = null
   let scanning = false
@@ -229,6 +231,8 @@ const setupMorningChecklist = () => {
   const video = document.getElementById("morning-scan-video")
 
   if (!scanButton || !input || !video || !form || !dialog || !status) return
+  if (scanButton.dataset.scannerBound === "true") return
+  scanButton.dataset.scannerBound = "true"
 
   let stream = null
   let scanning = false
@@ -326,6 +330,8 @@ const setupScooterFormScanner = () => {
   const video = document.getElementById("scooter-scan-video")
 
   if (!scanButton || !plateInput || !barcodeInput || !dialog || !closeButton || !retryButton || !status || !video) return
+  if (scanButton.dataset.scannerBound === "true") return
+  scanButton.dataset.scannerBound = "true"
 
   let stream = null
   let scanning = false
@@ -408,9 +414,14 @@ const setupScooterFormScanner = () => {
   })
 }
 
-window.addEventListener("DOMContentLoaded", setupMorningChecklist)
-window.addEventListener("DOMContentLoaded", setupEveningScanner)
-window.addEventListener("DOMContentLoaded", setupScooterFormScanner)
+const bootScannerPages = () => {
+  setupMorningChecklist()
+  setupEveningScanner()
+  setupScooterFormScanner()
+}
+
+window.addEventListener("DOMContentLoaded", bootScannerPages)
+window.addEventListener("phx:page-loading-stop", bootScannerPages)
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:
