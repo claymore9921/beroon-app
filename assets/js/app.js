@@ -414,10 +414,198 @@ const setupScooterFormScanner = () => {
   })
 }
 
+
+const setupSearchScanner = ({
+  buttonId,
+  inputId,
+  formId,
+  dialogId,
+  videoId,
+  statusId,
+  closeId,
+  retryId,
+  autoSubmit = true,
+}) => {
+  const scanButton = document.getElementById(buttonId)
+  const input = document.getElementById(inputId)
+  const form = document.getElementById(formId)
+  const dialog = document.getElementById(dialogId)
+  const video = document.getElementById(videoId)
+  const status = document.getElementById(statusId)
+  const closeButton = document.getElementById(closeId)
+  const retryButton = document.getElementById(retryId)
+
+  if (!scanButton || !input || !form || !dialog || !video || !status || !closeButton) return
+  if (scanButton.dataset.scannerBound === "true") return
+  scanButton.dataset.scannerBound = "true"
+
+  let stream = null
+  let scanning = false
+  let animationFrameId = null
+
+  const stopCamera = () => {
+    scanning = false
+
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = null
+    }
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+      stream = null
+    }
+
+    video.pause()
+    video.srcObject = null
+  }
+
+  const stopScanner = () => {
+    stopCamera()
+    if (dialog.open) dialog.close()
+  }
+
+  const scanFrame = () => {
+    if (!scanning || !stream) return
+
+    if (video.readyState < video.HAVE_ENOUGH_DATA) {
+      animationFrameId = requestAnimationFrame(scanFrame)
+      return
+    }
+
+    const canvas = document.createElement("canvas")
+    const context = canvas.getContext("2d", {willReadFrequently: true})
+
+    if (!context) {
+      status.textContent = "اسکنر آماده نشد. دوباره تلاش کنید."
+      stopCamera()
+      return
+    }
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "attemptBoth",
+    })
+
+    if (code?.data) {
+      const value = code.data.trim()
+
+      if (value) {
+        input.value = value
+        input.dispatchEvent(new Event("input", {bubbles: true}))
+        input.dispatchEvent(new Event("change", {bubbles: true}))
+        stopScanner()
+        input.focus()
+
+        if (autoSubmit) form.requestSubmit()
+        return
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(scanFrame)
+  }
+
+  const openScanner = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("این دستگاه دسترسی به دوربین را پشتیبانی نمی‌کند.")
+      return
+    }
+
+    stopCamera()
+    if (!dialog.open) dialog.showModal()
+    status.textContent = "در حال اتصال به دوربین..."
+    scanning = true
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {facingMode: {ideal: "environment"}},
+        audio: false,
+      })
+      video.srcObject = stream
+      await video.play()
+      status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
+      animationFrameId = requestAnimationFrame(scanFrame)
+    } catch (error) {
+      console.error("QR scanner camera error:", error)
+      stopCamera()
+      status.textContent = "دسترسی به دوربین ممکن نشد. مجوز دوربین را بررسی کنید."
+    }
+  }
+
+  scanButton.addEventListener("click", openScanner)
+  closeButton.addEventListener("click", stopScanner)
+  retryButton?.addEventListener("click", openScanner)
+  dialog.addEventListener("cancel", event => {
+    event.preventDefault()
+    stopScanner()
+  })
+  dialog.addEventListener("close", stopCamera)
+}
+
 const bootScannerPages = () => {
   setupMorningChecklist()
   setupEveningScanner()
   setupScooterFormScanner()
+
+  setupSearchScanner({
+    buttonId: "manager-repair-scan",
+    inputId: "repair-plate-search",
+    formId: "manager-repair-search",
+    dialogId: "manager-repair-scan-dialog",
+    videoId: "manager-repair-scan-video",
+    statusId: "manager-repair-scan-status",
+    closeId: "manager-repair-scan-close",
+    retryId: "manager-repair-scan-retry",
+  })
+
+  setupSearchScanner({
+    buttonId: "workshop-acceptance-scan",
+    inputId: "workshop-acceptance-q",
+    formId: "workshop-acceptance-search",
+    dialogId: "workshop-acceptance-scan-dialog",
+    videoId: "workshop-acceptance-scan-video",
+    statusId: "workshop-acceptance-scan-status",
+    closeId: "workshop-acceptance-scan-close",
+    retryId: "workshop-acceptance-scan-retry",
+  })
+
+  setupSearchScanner({
+    buttonId: "workshop-repairing-scan",
+    inputId: "workshop-repairing-q",
+    formId: "workshop-repairing-search",
+    dialogId: "workshop-repairing-scan-dialog",
+    videoId: "workshop-repairing-scan-video",
+    statusId: "workshop-repairing-scan-status",
+    closeId: "workshop-repairing-scan-close",
+    retryId: "workshop-repairing-scan-retry",
+  })
+
+  setupSearchScanner({
+    buttonId: "workshop-discharge-scan",
+    inputId: "workshop-discharge-q",
+    formId: "workshop-discharge-search",
+    dialogId: "workshop-discharge-scan-dialog",
+    videoId: "workshop-discharge-scan-video",
+    statusId: "workshop-discharge-scan-status",
+    closeId: "workshop-discharge-scan-close",
+    retryId: "workshop-discharge-scan-retry",
+  })
+
+  setupSearchScanner({
+    buttonId: "manager-repair-receive-scan",
+    inputId: "receive-repaired-scooter-plate",
+    formId: "receive-repaired-scooter-form",
+    dialogId: "manager-repair-receive-scan-dialog",
+    videoId: "manager-repair-receive-scan-video",
+    statusId: "manager-repair-receive-scan-status",
+    closeId: "manager-repair-receive-scan-close",
+    retryId: "manager-repair-receive-scan-retry",
+    autoSubmit: false,
+  })
 }
 
 window.addEventListener("DOMContentLoaded", bootScannerPages)

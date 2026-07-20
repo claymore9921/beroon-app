@@ -27,10 +27,49 @@
           placeholder="پلاک دستگاه"
         />
       </label>
-      <button id="receive-repaired-scooter-submit" class="btn btn-primary min-h-12 w-full">
-        تحویل گرفتم
-      </button>
+      <div class="grid grid-cols-2 gap-2">
+        <button
+          id="manager-repair-receive-scan"
+          type="button"
+          class="btn btn-neutral min-h-12 w-full"
+        >
+          اسکن QR
+        </button>
+        <button id="receive-repaired-scooter-submit" class="btn btn-primary min-h-12 w-full">
+          تحویل گرفتم
+        </button>
+      </div>
     </form>
   </section>
+
+
+  <dialog
+    id="manager-repair-receive-scan-dialog"
+    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 shadow-2xl backdrop:bg-zinc-950/70"
+    aria-labelledby="manager-repair-receive-scan-dialog-title"
+  >
+    <div class="grid gap-4 p-4" dir="rtl">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="manager-repair-receive-scan-dialog-title" class="text-lg font-black text-zinc-950">اسکن QR</h2>
+        <button id="manager-repair-receive-scan-close" type="button" class="btn btn-sm">بستن</button>
+      </div>
+
+      <video
+        id="manager-repair-receive-scan-video"
+        class="aspect-square w-full rounded-xl bg-zinc-950 object-cover"
+        playsinline
+        muted
+      ></video>
+
+      <p id="manager-repair-receive-scan-status" class="text-sm text-zinc-600">
+        برای شروع اسکن، دوربین را فعال کنید.
+      </p>
+
+      <button id="manager-repair-receive-scan-retry" type="button" class="btn btn-neutral min-h-11 w-full">
+        تلاش دوباره
+      </button>
+    </div>
+  </dialog>
+
   <.manager_bottom_nav active="repairs" />
 </main>

@@ -13,7 +13,7 @@
       id="workshop-acceptance-search"
       method="get"
       action={~p"/workshop/acceptance"}
-      class="mt-4 grid grid-cols-[1fr_auto] gap-2"
+      class="mt-4 grid grid-cols-[1fr_auto_auto] gap-2"
     >
       <input
         id="workshop-acceptance-q"
@@ -24,6 +24,9 @@
         class="input input-bordered min-h-12 w-full"
       />
       <button class="btn btn-neutral min-h-12 px-4">جستجو</button>
+      <button id="workshop-acceptance-scan" type="button" class="btn btn-primary min-h-12 px-4">
+        اسکن
+      </button>
     </form>
 
     <section class="mt-4 grid gap-3">
@@ -66,6 +69,36 @@
       </article>
     </section>
   </section>
+
+
+
+  <dialog
+    id="workshop-acceptance-scan-dialog"
+    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 shadow-2xl backdrop:bg-zinc-950/70"
+    aria-labelledby="workshop-acceptance-scan-dialog-title"
+  >
+    <div class="grid gap-4 p-4" dir="rtl">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="workshop-acceptance-scan-dialog-title" class="text-lg font-black text-zinc-950">اسکن QR</h2>
+        <button id="workshop-acceptance-scan-close" type="button" class="btn btn-sm">بستن</button>
+      </div>
+
+      <video
+        id="workshop-acceptance-scan-video"
+        class="aspect-square w-full rounded-xl bg-zinc-950 object-cover"
+        playsinline
+        muted
+      ></video>
+
+      <p id="workshop-acceptance-scan-status" class="text-sm text-zinc-600">
+        برای شروع اسکن، دوربین را فعال کنید.
+      </p>
+
+      <button id="workshop-acceptance-scan-retry" type="button" class="btn btn-neutral min-h-11 w-full">
+        تلاش دوباره
+      </button>
+    </div>
+  </dialog>
 
   <.workshop_bottom_nav active="info" />
 </main>
