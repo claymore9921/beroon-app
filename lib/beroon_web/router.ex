@@ -56,6 +56,8 @@ defmodule BeroonWeb.Router do
     get "/manager/scan", PageController, :manager_scan
     get "/manager/scooters", PageController, :manager_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
+    get "/manager/transports", PageController, :manager_transports
+    post "/manager/transports", PageController, :create_manager_transport
     get "/manager/repairs", PageController, :manager_repairs
     post "/manager/repairs/:id/send", PageController, :send_scooter_to_workshop
     get "/manager/repairs/receive", PageController, :manager_repair_receive
@@ -83,6 +85,7 @@ defmodule BeroonWeb.Router do
     get "/admin/notifications", PageController, :admin_notifications
     post "/admin/notifications", PageController, :send_admin_notification
     get "/admin/location-alerts", PageController, :admin_location_alerts
+    get "/admin/device-locations", PageController, :admin_device_locations
     get "/admin/managers", PageController, :admin_manager_registrations
     post "/admin/managers/:id/approve", PageController, :approve_manager_registration
     get "/admin/checklists", PageController, :admin_checklist_branches
@@ -99,6 +102,7 @@ defmodule BeroonWeb.Router do
 
     resources "/branches", BranchController
     put "/scooters/:id/status", ScooterController, :update_status
+    post "/scooters/import", ScooterController, :import
     resources "/scooters", ScooterController
     resources "/device_types", DeviceTypeController
     resources "/checklist_items", ChecklistItemController

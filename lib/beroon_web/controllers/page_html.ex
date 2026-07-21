@@ -15,9 +15,9 @@ defmodule BeroonWeb.PageHTML do
         <.icon class="size-9" name="hero-home" />
         <span>خانه</span>
       </.link>
-      <.link navigate={~p"/manager/scooters"} class={[@active == "devices" && "is-active"]}>
-        <.icon class="size-9" name="hero-bolt" />
-        <span>دستگاه‌ها</span>
+      <.link navigate={~p"/manager/transports"} class={[@active == "transports" && "is-active"]}>
+        <.icon class="size-9" name="hero-truck" />
+        <span>حمل‌ونقل</span>
       </.link>
       <.link navigate={~p"/manager/scan"} class={["is-scan", @active == "scan" && "is-active"]}>
         <span class="manager-scan-bubble">
@@ -84,4 +84,7 @@ defmodule BeroonWeb.PageHTML do
   def status_badge_class("ready_for_pickup"), do: "bg-teal-100 text-teal-700"
   def status_badge_class("out_of_service"), do: "bg-zinc-200 text-zinc-700"
   def status_badge_class(_status), do: "bg-zinc-100 text-zinc-700"
+  def transport_local_datetime(nil), do: nil
+  def transport_local_datetime(datetime), do: DateTime.add(datetime, 12_600, :second)
+
 end

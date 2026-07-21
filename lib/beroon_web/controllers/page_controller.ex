@@ -3,6 +3,7 @@ defmodule BeroonWeb.PageController do
 
   alias Beroon.Checklists
   alias Beroon.Fleet
+  alias Beroon.Logistics
   alias Beroon.Operations
   alias Beroon.Repo
   alias Beroon.Reports
@@ -20,7 +21,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_home(conn, _params) do
-    today = Date.utc_today()
+    today = Reports.iran_today()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
 
     if is_nil(branch) do
@@ -33,9 +34,9 @@ defmodule BeroonWeb.PageController do
         scooter_counts: manager_scooter_counts(branch.id),
         persian_today: Beroon.Calendar.persian_date(today),
         morning_submitted:
-          Reports.morning_submitted_today?(conn.assigns.current_user_phone, today),
+          Reports.morning_submitted_today?(branch.id, today),
         evening_submitted:
-          Reports.evening_submitted_today?(conn.assigns.current_user_phone, today)
+          Reports.evening_submission_locked?(branch.id)
       )
     end
   end
@@ -73,7 +74,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_scan(conn, _params) do
-    today = Date.utc_today()
+    today = Reports.iran_today()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
 
     if is_nil(branch) do
@@ -84,9 +85,9 @@ defmodule BeroonWeb.PageController do
         manager_name: manager_name(branch),
         persian_today: Beroon.Calendar.persian_date(today),
         morning_submitted:
-          Reports.morning_submitted_today?(conn.assigns.current_user_phone, today),
+          Reports.morning_submitted_today?(branch.id, today),
         evening_submitted:
-          Reports.evening_submitted_today?(conn.assigns.current_user_phone, today)
+          Reports.evening_submission_locked?(branch.id)
       )
     end
   end
@@ -98,13 +99,94 @@ defmodule BeroonWeb.PageController do
     if is_nil(branch) do
       redirect(conn, to: ~p"/manager/pending")
     else
+      scooters = manager_scooters_for_status(branch.id, status)
+
       render(conn, :manager_scooters,
         branch: branch,
         status: status,
         title: manager_scooters_title(status),
-        scooters: manager_scooters_for_status(branch.id, status),
-        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        scooters: scooters,
+        scooter_groups: group_scooters_by_device_type(scooters),
+        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
+    end
+  end
+
+  def manager_transports(conn, params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      after_evening = params["after_evening"] == "1"
+      bahonar = Operations.get_bahonar_branch()
+
+      render(conn, :manager_transports,
+        branch: branch,
+        after_evening: after_evening,
+        branches: Operations.list_active_transport_branches(),
+        default_destination_id: bahonar && bahonar.id,
+        transports: Logistics.list_transports_for_branch(branch.id),
+        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
+      )
+    end
+  end
+
+  def create_manager_transport(conn, %{"transport" => params}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    code = params |> Map.get("code", "") |> String.trim()
+    destination_id = params["destination_branch_id"]
+    notes = params["notes"] || ""
+
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
+
+      code == "" ->
+        conn
+        |> put_flash(:error, "پلاک یا بارکد دستگاه را وارد کنید.")
+        |> redirect(to: ~p"/manager/transports")
+
+      true ->
+        scooter = Fleet.get_scooter_by_plate_or_barcode_with_details(branch.id, code)
+        destination = destination_id && Operations.get_branch(destination_id)
+
+        cond do
+          is_nil(scooter) ->
+            conn
+            |> put_flash(:error, "این دستگاه متعلق به شعبه شما نیست یا پیدا نشد.")
+            |> redirect(to: ~p"/manager/transports")
+
+          is_nil(destination) ->
+            conn
+            |> put_flash(:error, "شعبه مقصد معتبر نیست.")
+            |> redirect(to: ~p"/manager/transports")
+
+          true ->
+            actor = %{phone: conn.assigns.current_user_phone, name: manager_name(branch)}
+
+            case Logistics.register_transport(scooter, destination, branch, actor, notes) do
+              {:ok, _transport} ->
+                conn
+                |> put_flash(:info, "حمل‌ونقل دستگاه #{scooter.plate} به شعبه #{destination.name} ثبت شد.")
+                |> redirect(to: ~p"/manager/transports")
+
+              {:error, :same_branch} ->
+                conn
+                |> put_flash(:error, "دستگاه همین حالا در شعبه مقصد قرار دارد.")
+                |> redirect(to: ~p"/manager/transports")
+
+              {:error, :not_owned_by_manager_branch} ->
+                conn
+                |> put_flash(:error, "این دستگاه متعلق به شعبه شما نیست.")
+                |> redirect(to: ~p"/manager/transports")
+
+              {:error, _reason} ->
+                conn
+                |> put_flash(:error, "ثبت حمل‌ونقل انجام نشد.")
+                |> redirect(to: ~p"/manager/transports")
+            end
+        end
     end
   end
 
@@ -121,7 +203,7 @@ defmodule BeroonWeb.PageController do
         scooters: Fleet.list_scooters_for_branch_search(branch.id, query, "active"),
         ready_for_pickup_scooters:
           Fleet.list_scooters_for_branch_with_details(branch.id, "ready_for_pickup"),
-        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
   end
@@ -163,7 +245,7 @@ defmodule BeroonWeb.PageController do
       render(conn, :manager_repair_receive,
         branch: branch,
         plate: "",
-        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
   end
@@ -183,7 +265,7 @@ defmodule BeroonWeb.PageController do
         |> render(:manager_repair_receive,
           branch: branch,
           plate: plate,
-          persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+          persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
         )
 
       is_nil(scooter) ->
@@ -192,7 +274,7 @@ defmodule BeroonWeb.PageController do
         |> render(:manager_repair_receive,
           branch: branch,
           plate: plate,
-          persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+          persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
         )
 
       scooter.status == "ready_for_pickup" ->
@@ -208,7 +290,7 @@ defmodule BeroonWeb.PageController do
         |> render(:manager_repair_receive,
           branch: branch,
           plate: plate,
-          persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+          persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
         )
     end
   end
@@ -230,10 +312,10 @@ defmodule BeroonWeb.PageController do
         selected_submitted:
           selected_scooter &&
             Reports.morning_scooter_submitted_today?(
-              conn.assigns.current_user_phone,
+              branch.id,
               selected_scooter.id
             ),
-        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
   end
@@ -358,7 +440,7 @@ defmodule BeroonWeb.PageController do
         |> put_flash(:error, "این دستگاه در شعبه شما پیدا نشد.")
         |> redirect(to: ~p"/manager/morning")
 
-      Reports.morning_scooter_submitted_today?(conn.assigns.current_user_phone, scooter.id) ->
+      Reports.morning_scooter_submitted_today?(branch.id, scooter.id) ->
         conn
         |> put_flash(:error, "چک‌لیست این دستگاه امروز قبلا ثبت شده است.")
         |> redirect(to: ~p"/manager/morning")
@@ -381,7 +463,7 @@ defmodule BeroonWeb.PageController do
         "manager_name" => manager_name(branch),
         "branch_id" => branch.id,
         "scooter_id" => scooter.id,
-        "checked_on" => Date.utc_today(),
+        "checked_on" => Reports.iran_today(),
         "checked_at" => now,
         "status" => if(all_checked?, do: "ready", else: "needs_service"),
         "manager_phone" => conn.assigns.current_user_phone,
@@ -409,23 +491,30 @@ defmodule BeroonWeb.PageController do
     else
       render(conn, :manager_evening,
         branches: [branch],
-        submitted: Reports.evening_submitted_today?(conn.assigns.current_user_phone),
-        persian_today: Beroon.Calendar.persian_date(Date.utc_today())
+        submitted: Reports.evening_submission_locked?(branch.id),
+        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
   end
 
   def submit_evening(conn, %{"evening" => params}) do
-    if Reports.evening_submitted_today?(conn.assigns.current_user_phone) do
-      conn
-      |> put_flash(:error, "آمار شب امروز قبلا ثبت شده است.")
-      |> redirect(to: ~p"/manager/evening")
-    else
-      do_submit_evening(conn, params)
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
+
+      Reports.evening_submission_locked?(branch.id) ->
+        conn
+        |> put_flash(:error, "آمار شب این شعبه قبلا ثبت شده و فعلا غیرفعال است.")
+        |> redirect(to: ~p"/manager/evening")
+
+      true ->
+        do_submit_evening(conn, params, branch)
     end
   end
 
-  defp do_submit_evening(conn, params) do
+  defp do_submit_evening(conn, params, branch) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     scanned_codes =
@@ -438,23 +527,25 @@ defmodule BeroonWeb.PageController do
 
     attrs =
       params
-      |> Map.take(["branch_id", "manager_name", "notes"])
+      |> Map.take(["notes"])
       |> Map.merge(%{
+        "branch_id" => branch.id,
+        "manager_name" => manager_name(branch),
         "manager_phone" => conn.assigns.current_user_phone,
         "total_count" => total_count,
         "available_count" => total_count,
         "rented_count" => 0,
         "damaged_count" => 0,
         "missing_count" => 0,
-        "counted_on" => Date.utc_today(),
+        "counted_on" => Reports.iran_today(),
         "counted_at" => now
       })
 
     case Reports.create_evening_count_with_items(attrs, scanned_scooters) do
       {:ok, _count} ->
         conn
-        |> put_flash(:info, "آمار شب با مجموع #{total_count} دستگاه ثبت شد.")
-        |> redirect(to: ~p"/manager/evening")
+        |> put_flash(:info, "آمار شب با مجموع #{total_count} دستگاه ثبت شد. آیا دستگاهی را برای حمل‌ونقل می‌برید؟")
+        |> redirect(to: ~p"/manager/transports?after_evening=1")
 
       {:error, changeset} ->
         conn
@@ -463,12 +554,24 @@ defmodule BeroonWeb.PageController do
     end
   end
 
+  def admin_device_locations(conn, params) do
+    query = params |> Map.get("q", "") |> String.trim()
+
+    render(conn, :admin_device_locations,
+      query: query,
+      result: Logistics.find_scooter_location(query),
+      recent_transports: Logistics.list_recent_transports()
+    )
+  end
+
   def admin_reports(conn, _params) do
-    date = Date.utc_today()
+    date = Reports.iran_today()
+    branches = Operations.list_active_transport_branches()
 
     render(conn, :admin_reports,
       scooter_counts: admin_scooter_counts(),
-      location_alerts: Reports.list_open_location_alerts_for_date(date)
+      location_alerts: Reports.list_open_location_alerts_for_date(date),
+      branch_report_statuses: Reports.branch_report_statuses(branches, date)
     )
   end
 
@@ -591,7 +694,7 @@ defmodule BeroonWeb.PageController do
   def admin_checklist_branches(conn, _params) do
     render(conn, :admin_checklist_branches,
       branches: Operations.list_branches(),
-      date: Date.utc_today()
+      date: Reports.iran_today()
     )
   end
 
@@ -700,13 +803,13 @@ defmodule BeroonWeb.PageController do
     |> Phoenix.HTML.safe_to_string()
   end
 
-  defp parse_date(nil), do: Date.utc_today()
-  defp parse_date(""), do: Date.utc_today()
+  defp parse_date(nil), do: Reports.iran_today()
+  defp parse_date(""), do: Reports.iran_today()
 
   defp parse_date(date) do
     case Date.from_iso8601(date) do
       {:ok, parsed} -> parsed
-      _ -> Date.utc_today()
+      _ -> Reports.iran_today()
     end
   end
 
@@ -760,6 +863,21 @@ defmodule BeroonWeb.PageController do
     }
   end
 
+
+  defp group_scooters_by_device_type(scooters) do
+    scooters
+    |> Enum.group_by(fn scooter ->
+      case scooter.device_type do
+        nil -> {nil, "بدون نوع دستگاه"}
+        device_type -> {device_type.id, BeroonWeb.PageHTML.device_type_label(device_type)}
+      end
+    end)
+    |> Enum.map(fn {{_device_type_id, label}, grouped_scooters} ->
+      %{label: label, scooters: Enum.sort_by(grouped_scooters, &String.downcase(&1.plate || ""))}
+    end)
+    |> Enum.sort_by(fn group -> String.downcase(group.label) end)
+  end
+
   defp manager_scooters_for_status(branch_id, "workshop"),
     do: Fleet.list_scooters_for_branch_by_statuses(branch_id, @manager_workshop_statuses)
 
@@ -782,7 +900,7 @@ defmodule BeroonWeb.PageController do
              reported_by_manager_name: manager_name(branch),
              reported_by_manager_phone: conn.assigns.current_user_phone,
              notes: notes,
-             reported_on: Date.utc_today(),
+             reported_on: Reports.iran_today(),
              reported_at: now
            }) do
         {:ok, _report} -> updated_scooter

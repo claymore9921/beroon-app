@@ -52,7 +52,7 @@
             <.icon :if={@morning_submitted} name="hero-check-circle" class="size-9" />
             <.icon :if={!@morning_submitted} name="hero-x-circle" class="size-9" />
           </p>
-          <small>{if @morning_submitted, do: "امروز انجام شده", else: "در انتظار ثبت"}</small>
+          <small>{if @morning_submitted, do: "انجام شده", else: "در انتظار ثبت"}</small>
         </div>
       </article>
 
@@ -67,7 +67,7 @@
             <.icon :if={@evening_submitted} name="hero-check-circle" class="size-9" />
             <.icon :if={!@evening_submitted} name="hero-x-circle" class="size-9" />
           </p>
-          <small>{if @evening_submitted, do: "امروز انجام شده", else: "در انتظار ثبت"}</small>
+          <small>{if @evening_submitted, do: "انجام شده", else: "در انتظار ثبت"}</small>
         </div>
       </article>
 

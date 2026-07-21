@@ -31,6 +31,13 @@ defmodule Beroon.Operations do
     |> Repo.all()
   end
 
+  def list_active_transport_branches do
+    Branch
+    |> where([b], b.active == true and b.kind == "branch")
+    |> order_by([b], asc: b.name)
+    |> Repo.all()
+  end
+
   def get_branch_for_manager_phone(phone) when is_binary(phone) do
     normalized_phone = String.trim(phone)
 
@@ -133,6 +140,18 @@ defmodule Beroon.Operations do
 
   """
   def get_branch!(id), do: Repo.get!(Branch, id)
+
+  def get_branch(nil), do: nil
+  def get_branch(id), do: Repo.get(Branch, id)
+
+  def get_bahonar_branch do
+    Branch
+    |> where([b], b.active == true and b.kind == "branch")
+    |> where([b], ilike(b.name, "%باهنر%") or ilike(b.code, "%bahonar%"))
+    |> order_by([b], asc: b.id)
+    |> limit(1)
+    |> Repo.one()
+  end
 
   @doc """
   Creates a branch.

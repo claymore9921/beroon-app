@@ -606,10 +606,57 @@ const bootScannerPages = () => {
     retryId: "manager-repair-receive-scan-retry",
     autoSubmit: false,
   })
+
+
+  setupSearchScanner({
+    buttonId: "manager-transport-scan",
+    inputId: "manager-transport-code",
+    formId: "manager-transport-form",
+    dialogId: "manager-transport-scan-dialog",
+    videoId: "manager-transport-scan-video",
+    statusId: "manager-transport-scan-status",
+    closeId: "manager-transport-scan-close",
+    retryId: "manager-transport-scan-retry",
+    autoSubmit: false,
+  })
+
+  setupSearchScanner({
+    buttonId: "admin-device-location-scan",
+    inputId: "admin-device-location-q",
+    formId: "admin-device-location-search",
+    dialogId: "admin-device-location-scan-dialog",
+    videoId: "admin-device-location-scan-video",
+    statusId: "admin-device-location-scan-status",
+    closeId: "admin-device-location-scan-close",
+    retryId: "admin-device-location-scan-retry",
+  })
+}
+
+const setupAdminMenu = () => {
+  const menu = document.querySelector(".beroon-mobile-menu")
+  if (!menu || menu.dataset.menuReady === "true") return
+
+  menu.dataset.menuReady = "true"
+
+  const closeMenu = () => menu.removeAttribute("open")
+
+  menu.querySelectorAll("[data-admin-menu-close]").forEach((button) => {
+    button.addEventListener("click", closeMenu)
+  })
+
+  menu.querySelectorAll(".beroon-menu-panel a").forEach((link) => {
+    link.addEventListener("click", closeMenu)
+  })
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menu.open) closeMenu()
+  })
 }
 
 window.addEventListener("DOMContentLoaded", bootScannerPages)
+window.addEventListener("DOMContentLoaded", setupAdminMenu)
 window.addEventListener("phx:page-loading-stop", bootScannerPages)
+window.addEventListener("phx:page-loading-stop", setupAdminMenu)
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

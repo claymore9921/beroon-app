@@ -40,8 +40,8 @@ defmodule Beroon.Reports.MorningInspection do
       :branch_id,
       :scooter_id
     ])
-    |> unique_constraint([:manager_phone, :checked_on, :scooter_id],
-      name: :morning_inspections_manager_day_scooter_index
+    |> unique_constraint([:branch_id, :checked_on, :scooter_id],
+      name: :morning_inspections_branch_day_scooter_index
     )
   end
 end

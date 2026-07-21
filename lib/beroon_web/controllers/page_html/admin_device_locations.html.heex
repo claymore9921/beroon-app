@@ -1,0 +1,93 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <div class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
+    <div>
+      <.link navigate={~p"/admin/reports"} class="text-sm text-orange-700">بازگشت</.link>
+      <h1 class="mt-1 text-2xl font-bold">موقعیت فعلی دستگاه</h1>
+      <p class="mt-1 text-sm text-zinc-500">پلاک یا بارکد را وارد کنید.</p>
+    </div>
+
+    <form action={~p"/admin/device-locations"} method="get" id="admin-device-location-search" class="mt-5 rounded-xl border border-zinc-200 bg-white p-4">
+      <div class="flex gap-2">
+        <input
+          id="admin-device-location-q"
+          name="q"
+          value={@query}
+          class="input input-bordered min-h-12 w-full"
+          placeholder="پلاک یا بارکد"
+          autocomplete="off"
+        />
+        <button id="admin-device-location-scan" type="button" class="btn btn-neutral min-h-12">اسکن</button>
+      </div>
+      <button class="btn btn-primary mt-3 min-h-12 w-full">جستجو</button>
+    </form>
+
+    <section :if={@query != "" and is_nil(@result)} class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+      دستگاهی با این پلاک یا بارکد پیدا نشد.
+    </section>
+
+    <section :if={@result} class="mt-5 rounded-xl border border-emerald-200 bg-white p-5">
+      <% scooter = @result.scooter %>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-sm text-zinc-500">پلاک دستگاه</p>
+          <h2 class="text-2xl font-black">{scooter.plate}</h2>
+          <p class="mt-1 text-sm text-zinc-500">بارکد: {scooter.barcode}</p>
+        </div>
+        <.icon name="hero-map-pin" class="size-9 text-emerald-600" />
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <div class="rounded-lg bg-zinc-50 p-3">
+          <p class="text-xs text-zinc-500">شعبه مالک</p>
+          <p class="mt-1 font-black">{scooter.branch.name}</p>
+        </div>
+        <div class="rounded-lg bg-emerald-50 p-3">
+          <p class="text-xs text-emerald-700">محل فعلی</p>
+          <p class="mt-1 font-black text-emerald-900">{scooter.current_branch.name}</p>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <h3 class="font-black">تاریخچه حمل‌ونقل</h3>
+        <p :if={@result.transports == []} class="mt-2 text-sm text-zinc-500">تاریخچه‌ای ثبت نشده است.</p>
+        <div class="mt-3 grid gap-2">
+          <article :for={transport <- @result.transports} class="rounded-lg border border-zinc-200 p-3 text-sm">
+            <p class="font-bold">{transport.origin_branch.name} ← {transport.destination_branch.name}</p>
+            <p class="mt-1 text-xs text-zinc-500">
+              تاریخ: {Calendar.strftime(transport_local_datetime(transport.transported_at), "%Y/%m/%d")} · ساعت: {Calendar.strftime(transport_local_datetime(transport.transported_at), "%H:%M")} · ثبت‌کننده: {transport.registered_by_name || transport.registered_by_phone}
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-5 rounded-xl border border-zinc-200 bg-white p-4">
+      <h2 class="font-black">آخرین حمل‌ونقل‌های ثبت‌شده</h2>
+      <div class="mt-3 grid gap-2">
+        <article :for={transport <- @recent_transports} class="rounded-lg border border-zinc-200 p-3 text-sm">
+          <div class="flex justify-between gap-2">
+            <p class="font-black">{transport.scooter.plate}</p>
+            <span class="text-xs font-semibold text-zinc-500">{Calendar.strftime(transport_local_datetime(transport.transported_at), "%Y/%m/%d")} · ساعت {Calendar.strftime(transport_local_datetime(transport.transported_at), "%H:%M")}</span>
+          </div>
+          <p class="mt-1">{transport.origin_branch.name} ← {transport.destination_branch.name}</p>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="admin-device-location-scan-dialog" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box w-[92vw] m-auto max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+      <div class="flex items-start justify-between gap-3">
+        <div><h2 class="text-lg font-black">اسکن دستگاه</h2><p class="mt-1 text-sm text-zinc-600">QR را مقابل دوربین بگیرید.</p></div>
+        <button id="admin-device-location-scan-close" type="button" class="btn btn-ghost btn-sm">بستن</button>
+      </div>
+      <video id="admin-device-location-scan-video" class="mt-4 max-h-[60vh] w-full rounded-xl bg-black object-cover" playsinline></video>
+      <div class="modal-action mt-4 justify-between">
+        <p id="admin-device-location-scan-status" class="text-sm text-zinc-600">دوربین را فعال کنید.</p>
+        <button id="admin-device-location-scan-retry" type="button" class="btn btn-neutral">شروع دوباره</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-label="بستن"></button></form>
+  </dialog>
+</main>

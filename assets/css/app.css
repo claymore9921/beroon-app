@@ -301,11 +301,12 @@ body {
   height: 58px;
 }
 
+/* Admin header menu */
 .beroon-mobile-menu {
   position: relative;
 }
 
-.beroon-mobile-menu summary {
+.beroon-mobile-menu > summary {
   display: grid;
   width: 46px;
   height: 46px;
@@ -320,47 +321,91 @@ body {
   transition: transform 160ms ease, background-color 160ms ease;
 }
 
-.beroon-mobile-menu summary::-webkit-details-marker {
+.beroon-mobile-menu > summary::-webkit-details-marker {
   display: none;
 }
 
-.beroon-mobile-menu summary:hover {
+.beroon-mobile-menu > summary:hover {
   transform: translateY(-1px);
   background: rgba(255, 255, 255, 0.16);
 }
 
-.beroon-mobile-menu[open] summary {
+.beroon-mobile-menu[open] > summary {
   background: #14b8a6;
 }
 
+.beroon-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: none;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: rgba(2, 6, 23, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.beroon-mobile-menu[open] .beroon-menu-backdrop {
+  display: block;
+}
+
 .beroon-menu-panel {
-  position: absolute;
-  top: 58px;
-  right: 0;
-  width: min(82vw, 330px);
-  max-height: calc(100vh - 96px);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 90;
+  width: min(92vw, 680px);
+  max-height: min(86vh, 760px);
   overflow: auto;
-  padding: 12px;
-  border: 1px solid rgba(204, 241, 238, 0.22);
-  border-radius: 22px;
+  padding: 16px;
+  border: 1px solid rgba(204, 241, 238, 0.24);
+  border-radius: 28px;
   background:
-    linear-gradient(180deg, rgba(17, 24, 39, 0.97), rgba(15, 58, 61, 0.96)),
-    #111827;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
-  backdrop-filter: blur(18px);
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.2), transparent 34%),
+    linear-gradient(160deg, rgba(17, 24, 39, 0.99), rgba(9, 48, 52, 0.98));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.52);
+  transform: translate(-50%, -50%);
+  animation: beroon-menu-in 180ms ease-out;
+  scrollbar-width: thin;
+}
+
+@keyframes beroon-menu-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -47%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .beroon-menu-head {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px -4px 10px;
+  padding: 10px 10px 14px;
+  border-bottom: 1px solid rgba(204, 241, 238, 0.13);
+  background: rgba(15, 42, 47, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.beroon-menu-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 8px 14px;
-  border-bottom: 1px solid rgba(204, 241, 238, 0.13);
 }
 
 .beroon-menu-head img {
-  width: 82px;
-  height: 64px;
+  width: 70px;
+  height: 54px;
   object-fit: contain;
 }
 
@@ -378,10 +423,28 @@ body {
   font-weight: 600;
 }
 
+.beroon-menu-close {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  cursor: pointer;
+  place-items: center;
+  border: 1px solid rgba(204, 241, 238, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+.beroon-menu-close:hover {
+  background: rgba(20, 184, 166, 0.22);
+}
+
 .beroon-menu-list {
   display: grid;
-  gap: 7px;
-  padding: 12px 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  padding: 6px 0 14px;
 }
 
 .beroon-menu-list a,
@@ -389,10 +452,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 46px;
-  padding: 0 12px;
+  min-height: 54px;
+  padding: 7px 12px;
   border: 1px solid rgba(204, 241, 238, 0.12);
-  border-radius: 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.065);
   color: #f8fafc !important;
   font-weight: 700;
@@ -402,15 +465,16 @@ body {
 
 .beroon-menu-list a:hover,
 .beroon-menu-logout:hover {
-  transform: translateX(-2px);
-  border-color: rgba(20, 184, 166, 0.48);
+  transform: translateY(-2px);
+  border-color: rgba(20, 184, 166, 0.5);
   background: rgba(20, 184, 166, 0.18);
 }
 
 .beroon-menu-list svg,
 .beroon-menu-logout svg {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
   color: #5eead4;
 }
 
@@ -420,6 +484,29 @@ body {
   border-color: rgba(20, 184, 166, 0.38);
   background: linear-gradient(180deg, #19c5b6, #14b8a6);
   box-shadow: 0 14px 30px rgba(20, 184, 166, 0.22);
+}
+
+@media (max-width: 560px) {
+  .beroon-menu-panel {
+    width: min(94vw, 440px);
+    max-height: 84vh;
+    padding: 12px;
+    border-radius: 24px;
+  }
+
+  .beroon-menu-head {
+    top: -12px;
+  }
+
+  .beroon-menu-list {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .beroon-menu-list a,
+  .beroon-menu-logout {
+    min-height: 48px;
+  }
 }
 
 .manager-device-card {

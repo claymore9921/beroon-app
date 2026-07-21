@@ -29,7 +29,7 @@
             "manager-scan-state",
             if(@morning_submitted, do: "is-success", else: "is-danger")
           ]}>
-            {if @morning_submitted, do: "امروز ثبت شده", else: "در انتظار ثبت"}
+            {if @morning_submitted, do: "ثبت شده", else: "در انتظار ثبت"}
           </span>
         </div>
         <.icon class="size-9 manager-scan-arrow" name="hero-chevron-left" />
@@ -46,7 +46,7 @@
             "manager-scan-state",
             if(@evening_submitted, do: "is-success", else: "is-danger")
           ]}>
-            {if @evening_submitted, do: "امروز ثبت شده", else: "در انتظار ثبت"}
+            {if @evening_submitted, do: "ثبت شده", else: "در انتظار ثبت"}
           </span>
         </div>
         <.icon class="size-9 manager-scan-arrow" name="hero-chevron-left" />

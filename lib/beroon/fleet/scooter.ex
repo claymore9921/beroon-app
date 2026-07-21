@@ -23,6 +23,7 @@ defmodule Beroon.Fleet.Scooter do
     field :status, :string
     field :notes, :string
     belongs_to :branch, Branch
+    belongs_to :current_branch, Branch
     belongs_to :device_type, DeviceType
 
     timestamps(type: :utc_datetime)
@@ -38,13 +39,23 @@ defmodule Beroon.Fleet.Scooter do
       :status,
       :notes,
       :branch_id,
+      :current_branch_id,
       :device_type_id
     ])
-    |> validate_required([:plate, :barcode, :status, :branch_id, :device_type_id])
+    |> default_current_branch()
+    |> validate_required([:plate, :barcode, :status, :branch_id, :current_branch_id, :device_type_id])
     |> validate_inclusion(:status, @statuses)
     |> validate_notes_for_repair_status()
     |> unique_constraint(:plate)
     |> unique_constraint(:barcode)
+  end
+
+  defp default_current_branch(changeset) do
+    if is_nil(get_field(changeset, :current_branch_id)) do
+      put_change(changeset, :current_branch_id, get_field(changeset, :branch_id))
+    else
+      changeset
+    end
   end
 
   defp validate_notes_for_repair_status(changeset) do

@@ -18,6 +18,17 @@ defmodule Beroon.Reports do
 
   alias Beroon.Reports.EveningCount
 
+  @iran_utc_offset_seconds 12_600
+
+  @doc """
+  Returns the current calendar date in Iran time (UTC+03:30).
+  """
+  def iran_today(now \\ DateTime.utc_now()) do
+    now
+    |> DateTime.add(@iran_utc_offset_seconds, :second)
+    |> DateTime.to_date()
+  end
+
   def create_branch_notification(attrs, branch_ids) do
     branch_ids =
       branch_ids
@@ -337,11 +348,34 @@ defmodule Beroon.Reports do
         |> Repo.insert!()
       end)
 
+      normalize_scanned_scooters(evening_count, scanned_scooters)
       resolve_returned_location_alerts(evening_count, scanned_scooters)
       create_location_alerts(evening_count, attrs, scanned_scooters)
 
       evening_count
     end)
+  end
+
+
+  defp normalize_scanned_scooters(evening_count, scanned_scooters) do
+    scooter_ids =
+      scanned_scooters
+      |> Enum.uniq_by(& &1.id)
+      |> Enum.map(& &1.id)
+
+    if scooter_ids != [] do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      Scooter
+      |> where([s], s.id in ^scooter_ids)
+      |> Repo.update_all(
+        set: [
+          status: "active",
+          current_branch_id: evening_count.branch_id,
+          updated_at: now
+        ]
+      )
+    end
   end
 
   defp create_location_alerts(evening_count, attrs, scanned_scooters) do
@@ -659,22 +693,67 @@ defmodule Beroon.Reports do
     |> Repo.aggregate(:count, :id)
   end
 
-  def morning_submitted_today?(phone, date \\ Date.utc_today()) do
+  def morning_submitted_today?(branch_id, date \\ iran_today()) do
     MorningInspection
-    |> where([m], m.manager_phone == ^phone and m.checked_on == ^date)
+    |> where([m], m.branch_id == ^branch_id and m.checked_on == ^date)
     |> Repo.exists?()
   end
 
-  def morning_scooter_submitted_today?(phone, scooter_id, date \\ Date.utc_today()) do
+  def morning_scooter_submitted_today?(branch_id, scooter_id, date \\ iran_today()) do
     MorningInspection
     |> where(
       [m],
-      m.manager_phone == ^phone and m.scooter_id == ^scooter_id and m.checked_on == ^date
+      m.branch_id == ^branch_id and m.scooter_id == ^scooter_id and m.checked_on == ^date
     )
     |> Repo.exists?()
   end
 
-  def evening_submitted_today?(phone, date \\ Date.utc_today()) do
+  @evening_lock_hours 16
+
+  def branch_report_statuses(branches, date \\ iran_today()) do
+    branch_ids = Enum.map(branches, & &1.id)
+
+    morning_branch_ids =
+      MorningInspection
+      |> where([m], m.branch_id in ^branch_ids and m.checked_on == ^date)
+      |> distinct([m], m.branch_id)
+      |> select([m], m.branch_id)
+      |> Repo.all()
+      |> MapSet.new()
+
+    evening_cutoff = DateTime.add(DateTime.utc_now(), -@evening_lock_hours, :hour)
+
+    evening_branch_ids =
+      EveningCount
+      |> where([e], e.branch_id in ^branch_ids and e.counted_at > ^evening_cutoff)
+      |> distinct([e], e.branch_id)
+      |> select([e], e.branch_id)
+      |> Repo.all()
+      |> MapSet.new()
+
+    Enum.map(branches, fn branch ->
+      %{
+        branch: branch,
+        morning_submitted: MapSet.member?(morning_branch_ids, branch.id),
+        evening_submitted: MapSet.member?(evening_branch_ids, branch.id)
+      }
+    end)
+  end
+
+  def evening_submission_locked?(branch_id, now \\ DateTime.utc_now())
+
+  def evening_submission_locked?(nil, _now), do: false
+
+  def evening_submission_locked?(branch_id, %DateTime{} = now) do
+    cutoff = DateTime.add(now, -@evening_lock_hours, :hour)
+
+    EveningCount
+    |> where([e], e.branch_id == ^branch_id and e.counted_at > ^cutoff)
+    |> Repo.exists?()
+  end
+
+  # Kept for compatibility with older callers.
+  def evening_submitted_today?(phone, date \\ iran_today()) do
     EveningCount
     |> where([e], e.manager_phone == ^phone and e.counted_on == ^date)
     |> Repo.exists?()

@@ -435,4 +435,13 @@ defmodule Beroon.Fleet do
   def change_scooter(%Scooter{} = scooter, attrs \\ %{}) do
     Scooter.changeset(scooter, attrs)
   end
+  def update_current_locations([], _branch_id), do: {0, nil}
+
+  def update_current_locations(scooter_ids, branch_id) do
+    Scooter
+    |> where([s], s.id in ^scooter_ids)
+    |> Repo.update_all(set: [current_branch_id: branch_id, updated_at: DateTime.utc_now() |> DateTime.truncate(:second)])
+  end
+
+
 end

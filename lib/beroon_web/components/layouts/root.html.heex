@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="utf-8" />
@@ -60,13 +60,35 @@
             <summary aria-label="باز کردن منو">
               <.icon name="hero-bars-3" class="size-9" />
             </summary>
-            <nav class="beroon-menu-panel" aria-label="منوی اصلی">
+            <button
+              type="button"
+              class="beroon-menu-backdrop"
+              aria-label="بستن منو"
+              data-admin-menu-close
+            >
+            </button>
+            <nav
+              class="beroon-menu-panel"
+              aria-label="منوی اصلی"
+              aria-modal="true"
+              role="dialog"
+            >
               <div class="beroon-menu-head">
-                <img src={~p"/images/logo.svg"} alt="برون" />
-                <div>
-                  <p>برون</p>
-                  <span>پنل ادمین</span>
+                <div class="beroon-menu-brand">
+                  <img src={~p"/images/logo.svg"} alt="برون" />
+                  <div>
+                    <p>برون</p>
+                    <span>پنل مدیریت</span>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  class="beroon-menu-close"
+                  aria-label="بستن منو"
+                  data-admin-menu-close
+                >
+                  <.icon name="hero-x-mark" class="size-7" />
+                </button>
               </div>
 
               <div class="beroon-menu-list">
@@ -87,6 +109,9 @@
                 </.link>
                 <.link navigate={~p"/admin/location-alerts"}>
                   <.icon name="hero-map-pin" class="size-9" />گزارش جابجایی
+                </.link>
+                <.link navigate={~p"/admin/device-locations"}>
+                  <.icon name="hero-magnifying-glass" class="size-9" />موقعیت دستگاه‌ها
                 </.link>
                 <.link navigate={~p"/admin/managers"}>
                   <.icon name="hero-user-plus" class="size-9" />تایید مدیران
@@ -162,11 +187,11 @@
         <span>چک صبح</span>
       </.link>
       <.link
-        navigate={~p"/admin/location-alerts"}
-        class={[String.starts_with?(current_path, "/admin/location-alerts") && "is-active"]}
+        navigate={~p"/admin/device-locations"}
+        class={[String.starts_with?(current_path, "/admin/device-locations") && "is-active"]}
       >
         <.icon name="hero-map-pin" class="size-9" />
-        <span>جابجایی</span>
+        <span>موقعیت</span>
       </.link>
     </nav>
   </body>
