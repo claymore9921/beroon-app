@@ -17,7 +17,7 @@
 
   <.list>
     <:item title="Checked on">{@morning_inspection.checked_on}</:item>
-    <:item title="Checked at">{@morning_inspection.checked_at}</:item>
+    <:item title="Checked at">{Beroon.Calendar.persian_datetime(@morning_inspection.checked_at)}</:item>
     <:item title="Manager name">{@morning_inspection.manager_name}</:item>
     <:item title="Status">{@morning_inspection.status}</:item>
     <:item title="Notes">{@morning_inspection.notes}</:item>

@@ -27,7 +27,7 @@
           <div>
             <p class="font-bold text-zinc-950">{registration.phone}</p>
             <p class="mt-1 text-sm text-zinc-500">
-              درخواست در {Calendar.strftime(registration.requested_at, "%Y-%m-%d %H:%M")}
+              درخواست در {persian_datetime(registration.requested_at)}
             </p>
           </div>
           <span class="rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">

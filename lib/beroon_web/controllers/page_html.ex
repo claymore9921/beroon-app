@@ -85,6 +85,9 @@ defmodule BeroonWeb.PageHTML do
   def status_badge_class("out_of_service"), do: "bg-zinc-200 text-zinc-700"
   def status_badge_class(_status), do: "bg-zinc-100 text-zinc-700"
   def transport_local_datetime(nil), do: nil
-  def transport_local_datetime(datetime), do: DateTime.add(datetime, 12_600, :second)
+  def transport_local_datetime(datetime), do: Beroon.Calendar.tehran_datetime(datetime)
+  def persian_datetime(datetime), do: Beroon.Calendar.persian_datetime(datetime)
+  def persian_time(datetime), do: Beroon.Calendar.persian_time(datetime)
+  def persian_numeric_date(date), do: Beroon.Calendar.persian_numeric_date(date)
 
 end

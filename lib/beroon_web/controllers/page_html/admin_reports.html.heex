@@ -1,184 +1,97 @@
 <Layouts.flash_group flash={@flash} />
-<main class="manager-dashboard-shell min-h-screen text-zinc-950" dir="rtl">
-  <section class="manager-dashboard mx-auto min-h-screen w-full max-w-md px-4 pb-24 pt-6">
-    <section class="manager-hero">
-      <div class="manager-date-actions">
-        <p>{Beroon.Calendar.persian_date(Date.utc_today())}</p>
-        <.link href={~p"/logout"} method="delete" class="manager-logout">
-          <.icon name="hero-arrow-left-on-rectangle" class="size-9" /> خروج
-        </.link>
-      </div>
-
-      <div class="manager-greeting">
-        <p>برون</p>
-        <h1>گزارش ادمین</h1>
-        <span>نمای کلی وضعیت دستگاه‌ها</span>
-      </div>
-    </section>
-
-    <.link
-      navigate={~p"/admin/device-locations"}
-      class="mt-5 flex items-center justify-between rounded-xl border border-orange-200 bg-orange-50 p-4 text-orange-950"
-    >
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-3xl bg-stone-50 px-4 pb-24 pt-6">
+    <header class="flex items-start justify-between gap-4 border-b border-zinc-200 pb-5">
       <div>
-        <p class="font-black">جستجوی موقعیت دستگاه</p>
-        <p class="mt-1 text-sm">پلاک را وارد کنید و محل فعلی و شعبه مالک را ببینید.</p>
+        <p class="text-sm font-bold text-orange-700">برون</p>
+        <h1 class="mt-1 text-2xl font-black">داشبورد ادمین</h1>
+        <p class="mt-1 text-sm text-zinc-500">برای ورود به هر بخش، گزینه موردنظر را انتخاب کنید.</p>
       </div>
-      <.icon name="hero-map-pin" class="size-9" />
-    </.link>
-
-    <section class="manager-status-grid">
-      <.link navigate={~p"/scooters?q=active"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-bolt" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>فعال</h2>
-          <strong>{@scooter_counts.active}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-
-      <.link navigate={~p"/scooters?q=needs_service"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-exclamation-triangle" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>خراب</h2>
-          <strong>{@scooter_counts.needs_service}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-
-      <.link navigate={~p"/scooters?q=awaiting_repair"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-clock" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>در انتظار تعمیر</h2>
-          <strong>{@scooter_counts.awaiting_repair}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-
-      <.link navigate={~p"/scooters?q=repairing"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-wrench" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>در حال تعمیر</h2>
-          <strong>{@scooter_counts.repairing}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-
-      <.link navigate={~p"/scooters?q=waiting_for_part"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-wrench-screwdriver" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>در انتظار قطعه</h2>
-          <strong>{@scooter_counts.waiting_for_part}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-
-      <.link navigate={~p"/scooters?q=ready_for_pickup"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-check-circle" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>آماده تحویل</h2>
-          <strong>{@scooter_counts.ready_for_pickup}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-
-      <.link navigate={~p"/scooters?q=out_of_service"} class="manager-stat-card">
-        <div class="manager-card-icon">
-          <.icon name="hero-no-symbol" class="size-9" />
-        </div>
-        <div class="manager-card-body">
-          <h2>از مدار خارج شده</h2>
-          <strong>{@scooter_counts.out_of_service}</strong>
-          <span>دستگاه</span>
-        </div>
-      </.link>
-    </section>
-
-    <section class="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm" aria-label="وضعیت گزارش شعبه‌ها">
-      <div class="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-black text-zinc-950">وضعیت امروز شعبه‌ها</h2>
-          <p class="mt-1 text-sm text-zinc-500">چک‌لیست صبح امروز و وضعیت فعال آمار شب</p>
-        </div>
-        <.icon name="hero-building-storefront" class="size-8 text-orange-600" />
+      <div class="text-left">
+        <p class="text-sm font-bold text-zinc-700">{Beroon.Calendar.persian_date(Beroon.Reports.iran_today())}</p>
+        <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm mt-2">خروج</.link>
       </div>
+    </header>
 
-      <div class="grid gap-3">
-        <article
-          :for={status <- @branch_report_statuses}
-          class="rounded-xl border border-zinc-200 bg-zinc-50 p-3"
-        >
-          <p class="mb-3 font-black text-zinc-950">شعبه {status.branch.name}</p>
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <div class={[
-              "rounded-lg border p-3",
-              if(status.morning_submitted,
-                do: "border-emerald-200 bg-emerald-50 text-emerald-800",
-                else: "border-red-200 bg-red-50 text-red-800"
-              )
-            ]}>
-              <div class="flex items-center gap-2 font-bold">
-                <.icon
-                  name={if status.morning_submitted, do: "hero-check-circle", else: "hero-x-circle"}
-                  class="size-5"
-                />
-                <span>چک‌لیست صبح</span>
-              </div>
-              <p class="mt-1 text-xs font-semibold">
-                {if status.morning_submitted, do: "انجام شده", else: "انجام نشده"}
-              </p>
-            </div>
-
-            <div class={[
-              "rounded-lg border p-3",
-              if(status.evening_submitted,
-                do: "border-emerald-200 bg-emerald-50 text-emerald-800",
-                else: "border-red-200 bg-red-50 text-red-800"
-              )
-            ]}>
-              <div class="flex items-center gap-2 font-bold">
-                <.icon
-                  name={if status.evening_submitted, do: "hero-check-circle", else: "hero-x-circle"}
-                  class="size-5"
-                />
-                <span>آمار شب</span>
-              </div>
-              <p class="mt-1 text-xs font-semibold">
-                {if status.evening_submitted, do: "انجام شده", else: "انجام نشده"}
-              </p>
-            </div>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section
-      :if={@location_alerts != []}
-      class="manager-alert-card"
-      aria-label="هشدار جابجایی دستگاه"
-    >
-      <h2>هشدار جابجایی دستگاه</h2>
-      <article :for={alert <- @location_alerts}>
-        <p class="font-bold">پلاک {alert.plate}</p>
-        <p>
-          این دستگاه متعلق به شعبه {alert.home_branch_name} است، اما در آمار شعبه {alert.detected_branch_name} اسکن شده.
-        </p>
-        <span>
-          بارکد {alert.barcode} · ساعت {Calendar.strftime(alert.detected_at, "%H:%M")}
-        </span>
-      </article>
+    <section class="mt-6 grid grid-cols-2 gap-3" aria-label="منوی مدیریت">
+      <.link navigate={~p"/admin/evening-reports"} class="admin-menu-card">
+        <.icon name="hero-clipboard-document-check" class="size-8" />
+        <span>آمارگیری شبانه</span>
+      </.link>
+      <.link navigate={~p"/admin/checklists"} class="admin-menu-card">
+        <.icon name="hero-list-bullet" class="size-8" />
+        <span>چک‌لیست صبح</span>
+      </.link>
+      <.link navigate={~p"/scooters"} class="admin-menu-card">
+        <.icon name="hero-squares-2x2" class="size-8" />
+        <span>مدیریت دستگاه‌ها</span>
+      </.link>
+      <.link navigate={~p"/device_types"} class="admin-menu-card">
+        <.icon name="hero-tag" class="size-8" />
+        <span>انواع دستگاه</span>
+      </.link>
+      <.link navigate={~p"/branches"} class="admin-menu-card">
+        <.icon name="hero-building-storefront" class="size-8" />
+        <span>مدیریت شعبه‌ها</span>
+      </.link>
+      <.link navigate={~p"/admin/managers"} class="admin-menu-card">
+        <.icon name="hero-users" class="size-8" />
+        <span>مدیران شعب</span>
+      </.link>
+      <.link navigate={~p"/admin/device-locations"} class="admin-menu-card">
+        <.icon name="hero-map-pin" class="size-8" />
+        <span>موقعیت دستگاه</span>
+      </.link>
+      <.link navigate={~p"/admin/location-alerts"} class="admin-menu-card">
+        <.icon name="hero-exclamation-triangle" class="size-8" />
+        <span>هشدارهای جابه‌جایی</span>
+      </.link>
+      <.link navigate={~p"/admin/new-device-inventory"} class="admin-menu-card">
+        <.icon name="hero-archive-box" class="size-8" />
+        <span>انبار دستگاه‌های نو</span>
+      </.link>
+      <.link navigate={~p"/admin/new-device-sales"} class="admin-menu-card">
+        <.icon name="hero-banknotes" class="size-8" />
+        <span>فروش دستگاه</span>
+      </.link>
+      <.link navigate={~p"/admin/report-export"} class="admin-menu-card">
+        <.icon name="hero-arrow-down-tray" class="size-8" />
+        <span>خروجی گزارش Excel</span>
+      </.link>
+      <.link navigate={~p"/admin/notifications"} class="admin-menu-card">
+        <.icon name="hero-bell" class="size-8" />
+        <span>ارسال اعلان</span>
+      </.link>
+      <.link navigate={~p"/checklist_items"} class="admin-menu-card">
+        <.icon name="hero-adjustments-horizontal" class="size-8" />
+        <span>موارد چک‌لیست</span>
+      </.link>
+      <.link navigate={~p"/evening_counts"} class="admin-menu-card">
+        <.icon name="hero-document-text" class="size-8" />
+        <span>رکوردهای آمار شب</span>
+      </.link>
     </section>
   </section>
 </main>
+
+<style>
+  .admin-menu-card {
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px solid #e4e4e7;
+    border-radius: 16px;
+    background: #fff;
+    padding: 16px 10px;
+    text-align: center;
+    font-weight: 900;
+    color: #18181b;
+    box-shadow: 0 4px 14px rgba(24, 24, 27, 0.05);
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .admin-menu-card:hover { transform: translateY(-2px); border-color: #fdba74; background: #fff7ed; }
+  .admin-menu-card svg { color: #ea580c; }
+</style>

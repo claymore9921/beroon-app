@@ -8,7 +8,7 @@
       <p class="mt-2 text-sm font-semibold text-teal-700">{@branch.name}</p>
       <h1 class="mt-1 text-2xl font-bold">{@notification.subject}</h1>
       <p class="mt-1 text-sm text-zinc-500">
-        {Beroon.Calendar.persian_date(DateTime.to_date(@notification.sent_at))}
+        {persian_datetime(@notification.sent_at)}
       </p>
     </header>
 

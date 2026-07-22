@@ -91,6 +91,10 @@ defmodule BeroonWeb.Router do
     get "/admin/checklists", PageController, :admin_checklist_branches
     get "/admin/checklists/branches/:id", PageController, :admin_branch_checklists
     get "/admin/report-export", PageController, :admin_report_export
+    get "/admin/new-device-inventory", PageController, :admin_new_device_inventory
+    post "/admin/new-device-inventory/stocks", PageController, :update_new_device_stock
+    get "/admin/new-device-sales", PageController, :admin_new_device_sales
+    post "/admin/new-device-sales", PageController, :create_new_device_sale
     get "/admin/report-export/download", PageController, :download_admin_report_export
     get "/admin/evening-reports", PageController, :admin_evening_report_branches
     get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail

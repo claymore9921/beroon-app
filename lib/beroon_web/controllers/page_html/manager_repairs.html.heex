@@ -99,6 +99,13 @@
               placeholder="شرح خرابی دستگاه را وارد کنید"
             >{scooter.notes}</textarea>
           </label>
+          <label class="grid gap-2 text-sm font-bold text-zinc-700">
+            روش ارسال به تعمیرگاه
+            <select name="repair[delivery_method]" required class="select select-bordered min-h-12 w-full">
+              <option value="attendant">ارسال توسط متصدی</option>
+              <option value="van">ارسال با وانت</option>
+            </select>
+          </label>
           <button class="btn btn-primary min-h-12 w-full">ارسال به تعمیرگاه</button>
         </form>
       </details>

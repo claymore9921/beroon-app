@@ -14,7 +14,7 @@
     row_click={&JS.navigate(~p"/morning_inspections/#{&1}")}
   >
     <:col :let={morning_inspection} label="Checked on">{morning_inspection.checked_on}</:col>
-    <:col :let={morning_inspection} label="Checked at">{morning_inspection.checked_at}</:col>
+    <:col :let={morning_inspection} label="Checked at">{Beroon.Calendar.persian_datetime(morning_inspection.checked_at)}</:col>
     <:col :let={morning_inspection} label="Manager name">{morning_inspection.manager_name}</:col>
     <:col :let={morning_inspection} label="Status">{morning_inspection.status}</:col>
     <:col :let={morning_inspection} label="Notes">{morning_inspection.notes}</:col>

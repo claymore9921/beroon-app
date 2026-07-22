@@ -21,8 +21,8 @@
       <label class="form-control min-w-0">
         <span class="label-text">تاریخ جابجایی</span>
         <select name="date" class="select select-bordered min-h-11 w-full">
-          <option value={Date.to_iso8601(Date.utc_today())} selected={@date == Date.utc_today()}>
-            امروز - {Beroon.Calendar.persian_date(Date.utc_today())}
+          <option value={Date.to_iso8601(Beroon.Reports.iran_today())} selected={@date == Beroon.Reports.iran_today()}>
+            امروز - {Beroon.Calendar.persian_date(Beroon.Reports.iran_today())}
           </option>
           <option
             :for={date <- @alert_dates}
@@ -80,7 +80,7 @@
             )}
           </p>
           <p>ثبت توسط: {alert.detected_by_manager_name || "-"}</p>
-          <p>ساعت ثبت: {Calendar.strftime(alert.detected_at, "%H:%M")}</p>
+          <p>ساعت ثبت: {persian_time(alert.detected_at)}</p>
         </div>
       </article>
     </div>

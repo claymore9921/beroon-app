@@ -80,7 +80,7 @@
           <div class="flex items-center justify-between gap-2">
             <p class="font-black">پلاک {transport.scooter.plate}</p>
             <span class="rounded bg-zinc-100 px-2 py-1 text-xs">
-              {Calendar.strftime(transport.transported_at, "%Y/%m/%d %H:%M")}
+              {persian_datetime(transport.transported_at)}
             </span>
           </div>
           <p class="mt-2 text-sm">

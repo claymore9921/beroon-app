@@ -17,6 +17,7 @@
     <section id="morning-workflow" class="grid gap-4">
       <form
         id="morning-scan-form"
+        data-branch-id={@branch.id}
         method="get"
         action={~p"/manager/morning"}
         class="rounded-lg border border-zinc-200 bg-white p-4"
@@ -44,6 +45,14 @@
         class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
       >
         دستگاهی با این پلاک در شعبه شما پیدا نشد.
+      </div>
+
+      <div :if={@selected_transport} class="rounded-lg border border-orange-300 bg-orange-50 p-4 text-sm font-bold text-orange-900">
+        این دستگاه متعلق به شعبه {@selected_scooter.branch.name} است و برای حمل‌ونقل در شعبه شما قرار دارد؛ در چک‌لیست صبح این شعبه ثبت نمی‌شود.
+      </div>
+
+      <div :if={@selected_foreign} class="rounded-lg border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-900">
+        این دستگاه متعلق به شعبه {@selected_scooter.branch.name} است و جزو دستگاه‌های این شعبه نیست؛ ثبت انجام نشد.
       </div>
 
       <div
@@ -78,13 +87,13 @@
           </div>
           <div class="rounded-md bg-zinc-50 p-3">
             <dt class="text-zinc-500">شعبه</dt>
-            <dd class="mt-1 truncate font-semibold">{@branch.name}</dd>
+            <dd class="mt-1 truncate font-semibold">{@selected_scooter.branch.name}</dd>
           </div>
         </dl>
       </article>
 
       <.form
-        :if={@selected_scooter && !@selected_submitted}
+        :if={@selected_scooter && !@selected_submitted && !@selected_transport && !@selected_foreign}
         for={%{}}
         as={:morning}
         action={~p"/manager/morning"}

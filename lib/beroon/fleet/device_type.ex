@@ -3,6 +3,7 @@ defmodule Beroon.Fleet.DeviceType do
   import Ecto.Changeset
 
   schema "device_types" do
+    has_one :new_device_stock, Beroon.Inventory.NewDeviceStock
     field :name, :string
     field :code, :string
     field :device_identifier, :string

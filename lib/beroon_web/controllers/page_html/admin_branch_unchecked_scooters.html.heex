@@ -5,7 +5,7 @@
       <div class="min-w-0">
         <.link
           navigate={
-            ~p"/admin/checklists/branches/#{@branch}?date=#{Date.to_iso8601(@date)}&q=#{@query}"
+            ~p"/admin/checklists/branches/#{@branch}?date=#{Beroon.Calendar.persian_date(@date)}&q=#{@query}"
           }
           class="text-sm font-semibold text-orange-700"
         >
@@ -25,9 +25,9 @@
     >
       <div class="grid grid-cols-[1fr_auto] gap-2">
         <input
-          type="date"
+          type="text"
           name="date"
-          value={Date.to_iso8601(@date)}
+          value={Beroon.Calendar.persian_numeric_date(@date)}
           class="input input-bordered min-h-11"
         />
         <button class="btn btn-neutral min-h-11">فیلتر</button>

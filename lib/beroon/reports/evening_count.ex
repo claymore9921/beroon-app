@@ -13,6 +13,7 @@ defmodule Beroon.Reports.EveningCount do
     field :damaged_count, :integer
     field :missing_count, :integer
     field :notes, :string
+    field :expected_scooter_ids, {:array, :integer}, default: []
     field :branch_id, :id
 
     timestamps(type: :utc_datetime)
@@ -32,6 +33,7 @@ defmodule Beroon.Reports.EveningCount do
       :damaged_count,
       :missing_count,
       :notes,
+      :expected_scooter_ids,
       :branch_id
     ])
     |> validate_required([

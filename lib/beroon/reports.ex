@@ -29,6 +29,23 @@ defmodule Beroon.Reports do
     |> DateTime.to_date()
   end
 
+  @doc """
+  Returns the operational date for an evening count.
+
+  In Tehran time, scans from midnight through 05:59 belong to the previous day.
+  Scans from 06:00 onward belong to the current day.
+  """
+  def evening_report_date(now \\ DateTime.utc_now()) do
+    tehran_now = DateTime.add(now, @iran_utc_offset_seconds, :second)
+    date = DateTime.to_date(tehran_now)
+
+    if tehran_now.hour < 6 do
+      Date.add(date, -1)
+    else
+      date
+    end
+  end
+
   def create_branch_notification(attrs, branch_ids) do
     branch_ids =
       branch_ids
@@ -169,13 +186,19 @@ defmodule Beroon.Reports do
       |> select([b], %{id: b.id, name: b.name})
       |> Repo.all()
 
+    # همه نوع‌های ثبت‌شده، حتی نوع‌های غیرفعال، باید در خروجی باقی بمانند.
     device_types =
       DeviceType
-      |> where([d], d.active == true)
       |> order_by([d], asc: d.category, asc: d.device_model, asc: d.device_identifier)
       |> select([d], %{
         id: d.id,
-        label: fragment("concat_ws(' ', ?, ?)", d.category, d.device_model)
+        label:
+          fragment(
+            "trim(concat_ws(' ', nullif(?, ''), nullif(?, ''), nullif(?, '')))",
+            d.category,
+            d.device_model,
+            d.device_identifier
+          )
       })
       |> Repo.all()
 
@@ -189,6 +212,23 @@ defmodule Beroon.Reports do
       |> Repo.all()
       |> Map.new()
 
+    workshop_counts = status_counts_by_device_type(["awaiting_repair", "repairing"])
+    waiting_for_part_counts = status_counts_by_device_type(["waiting_for_part"])
+
+    new_stock_counts =
+      Beroon.Inventory.NewDeviceStock
+      |> group_by([stock], stock.device_type_id)
+      |> select([stock], {stock.device_type_id, sum(stock.quantity)})
+      |> Repo.all()
+      |> Map.new()
+
+    sold_counts =
+      Beroon.Inventory.Sale
+      |> group_by([sale], sale.device_type_id)
+      |> select([sale], {sale.device_type_id, sum(sale.quantity)})
+      |> Repo.all()
+      |> Map.new()
+
     rows =
       Enum.map(device_types, fn device_type ->
         branch_counts =
@@ -196,10 +236,44 @@ defmodule Beroon.Reports do
             {branch.id, Map.get(counts, {device_type.id, branch.id}, 0)}
           end)
 
-        %{device_type: device_type, branch_counts: branch_counts}
+        %{
+          device_type: device_type,
+          branch_counts: branch_counts,
+          workshop_count: Map.get(workshop_counts, device_type.id, 0),
+          waiting_for_part_count: Map.get(waiting_for_part_counts, device_type.id, 0),
+          new_stock_count: Map.get(new_stock_counts, device_type.id, 0) || 0,
+          sold_count: Map.get(sold_counts, device_type.id, 0) || 0
+        }
       end)
 
-    %{date: date, branches: branches, rows: rows}
+    branch_totals =
+      Map.new(branches, fn branch ->
+        total = Enum.reduce(rows, 0, fn row, acc -> acc + Map.get(row.branch_counts, branch.id, 0) end)
+        {branch.id, total}
+      end)
+
+    totals = %{
+      branch_counts: branch_totals,
+      workshop_count: Enum.reduce(rows, 0, &(&1.workshop_count + &2)),
+      waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
+      new_stock_count: Enum.reduce(rows, 0, &(&1.new_stock_count + &2)),
+      sold_count: Enum.reduce(rows, 0, &(&1.sold_count + &2))
+    }
+
+    grand_total =
+      Enum.sum(Map.values(totals.branch_counts)) + totals.workshop_count +
+        totals.waiting_for_part_count + totals.new_stock_count + totals.sold_count
+
+    %{date: date, branches: branches, rows: rows, totals: totals, grand_total: grand_total}
+  end
+
+  defp status_counts_by_device_type(statuses) do
+    Scooter
+    |> where([s], s.status in ^statuses and not is_nil(s.device_type_id))
+    |> group_by([s], s.device_type_id)
+    |> select([s], {s.device_type_id, count(s.id)})
+    |> Repo.all()
+    |> Map.new()
   end
 
   def list_evening_report_dates_for_branch(branch_id) do
@@ -252,7 +326,8 @@ defmodule Beroon.Reports do
         missing_count: e.missing_count,
         counted_on: e.counted_on,
         counted_at: e.counted_at,
-        notes: e.notes
+        notes: e.notes,
+        expected_scooter_ids: e.expected_scooter_ids
       })
       |> Repo.one!()
 
@@ -260,6 +335,7 @@ defmodule Beroon.Reports do
     |> List.wrap()
     |> attach_evening_count_items()
     |> List.first()
+    |> attach_evening_audit()
   end
 
   defp maybe_filter_counted_on(query, nil), do: query
@@ -286,12 +362,48 @@ defmodule Beroon.Reports do
         branch_name: b.name,
         device_type_name: d.device_model,
         device_type_identifier: d.device_identifier,
-        device_type_category: d.category
+        device_type_category: d.category,
+        scan_result: i.scan_result,
+        home_branch_id: i.home_branch_id,
+        current_branch_id: i.current_branch_id
       })
       |> Repo.all()
       |> Enum.group_by(& &1.evening_count_id)
 
     Enum.map(counts, &Map.put(&1, :items, Map.get(items_by_count, &1.id, [])))
+  end
+
+  defp attach_evening_audit(report) do
+    expected =
+      Scooter
+      |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
+      |> where([s], s.id in ^List.wrap(report.expected_scooter_ids))
+      |> order_by([s], asc: s.plate)
+      |> select([s, d], %{
+        scooter_id: s.id,
+        plate: s.plate,
+        barcode: s.barcode,
+        device_type_identifier: d.device_identifier,
+        device_type_category: d.category,
+        device_type_name: d.device_model
+      })
+      |> Repo.all()
+
+    expected_scanned_ids =
+      report.items
+      |> Enum.filter(&(&1.scan_result in [nil, "expected"]))
+      |> MapSet.new(& &1.scooter_id)
+
+    missing = Enum.reject(expected, &MapSet.member?(expected_scanned_ids, &1.scooter_id))
+    foreign = Enum.filter(report.items, &(&1.scan_result in ["foreign", "transport"]))
+    scanned = Enum.filter(report.items, &(&1.scan_result in [nil, "expected"]))
+
+    report
+    |> Map.put(:expected_count, length(expected))
+    |> Map.put(:scanned_expected_count, length(scanned))
+    |> Map.put(:missing_items, missing)
+    |> Map.put(:foreign_items, foreign)
+    |> Map.put(:scanned_items, scanned)
   end
 
   @doc """
@@ -343,12 +455,14 @@ defmodule Beroon.Reports do
         |> EveningCountItem.changeset(%{
           evening_count_id: evening_count.id,
           scooter_id: scooter.id,
-          scanned_code: scooter.barcode || scooter.plate
+          scanned_code: scooter.barcode || scooter.plate,
+          scan_result: evening_scan_result(scooter, evening_count.branch_id),
+          home_branch_id: scooter.branch_id,
+          current_branch_id: scooter.current_branch_id
         })
         |> Repo.insert!()
       end)
 
-      normalize_scanned_scooters(evening_count, scanned_scooters)
       resolve_returned_location_alerts(evening_count, scanned_scooters)
       create_location_alerts(evening_count, attrs, scanned_scooters)
 
@@ -357,26 +471,14 @@ defmodule Beroon.Reports do
   end
 
 
-  defp normalize_scanned_scooters(evening_count, scanned_scooters) do
-    scooter_ids =
-      scanned_scooters
-      |> Enum.uniq_by(& &1.id)
-      |> Enum.map(& &1.id)
-
-    if scooter_ids != [] do
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-      Scooter
-      |> where([s], s.id in ^scooter_ids)
-      |> Repo.update_all(
-        set: [
-          status: "active",
-          current_branch_id: evening_count.branch_id,
-          updated_at: now
-        ]
-      )
+  defp evening_scan_result(scooter, branch_id) do
+    cond do
+      scooter.branch_id == branch_id -> "expected"
+      scooter.current_branch_id == branch_id -> "transport"
+      true -> "foreign"
     end
   end
+
 
   defp create_location_alerts(evening_count, attrs, scanned_scooters) do
     detected_branch_id = evening_count.branch_id
@@ -708,8 +810,6 @@ defmodule Beroon.Reports do
     |> Repo.exists?()
   end
 
-  @evening_lock_hours 16
-
   def branch_report_statuses(branches, date \\ iran_today()) do
     branch_ids = Enum.map(branches, & &1.id)
 
@@ -721,11 +821,11 @@ defmodule Beroon.Reports do
       |> Repo.all()
       |> MapSet.new()
 
-    evening_cutoff = DateTime.add(DateTime.utc_now(), -@evening_lock_hours, :hour)
+    evening_date = Date.add(date, -1)
 
     evening_branch_ids =
       EveningCount
-      |> where([e], e.branch_id in ^branch_ids and e.counted_at > ^evening_cutoff)
+      |> where([e], e.branch_id in ^branch_ids and e.counted_on == ^evening_date)
       |> distinct([e], e.branch_id)
       |> select([e], e.branch_id)
       |> Repo.all()
@@ -745,10 +845,10 @@ defmodule Beroon.Reports do
   def evening_submission_locked?(nil, _now), do: false
 
   def evening_submission_locked?(branch_id, %DateTime{} = now) do
-    cutoff = DateTime.add(now, -@evening_lock_hours, :hour)
+    report_date = evening_report_date(now)
 
     EveningCount
-    |> where([e], e.branch_id == ^branch_id and e.counted_at > ^cutoff)
+    |> where([e], e.branch_id == ^branch_id and e.counted_on == ^report_date)
     |> Repo.exists?()
   end
 

@@ -19,17 +19,8 @@
       class="mt-4 grid grid-cols-[1fr_auto] items-end gap-2 rounded-lg border border-zinc-200 bg-white p-3"
     >
       <label class="form-control min-w-0">
-        <span class="label-text">روز ثبت آمار</span>
-        <select name="date" class="select select-bordered min-h-11 w-full">
-          <option value="" selected={is_nil(@selected_date)}>همه روزها</option>
-          <option
-            :for={date <- @filter_dates}
-            value={Date.to_iso8601(date)}
-            selected={@selected_date == date}
-          >
-            {Beroon.Calendar.persian_date(date)}
-          </option>
-        </select>
+        <span class="label-text">تاریخ گزارش</span>
+        <input type="text" name="date" value={if @selected_date, do: Beroon.Calendar.persian_numeric_date(@selected_date), else: ""} class="input input-bordered min-h-11 w-full" />
       </label>
       <button class="btn btn-neutral min-h-11">فیلتر</button>
     </form>

@@ -28,7 +28,7 @@
         <span :if={is_nil(notification.read_at)} class="manager-notification-dot"></span>
         <div>
           <h2>{notification.subject}</h2>
-          <p>{Beroon.Calendar.persian_date(DateTime.to_date(notification.sent_at))}</p>
+          <p>{persian_datetime(notification.sent_at)}</p>
         </div>
         <.icon name="hero-chevron-left" class="size-9" />
       </.link>

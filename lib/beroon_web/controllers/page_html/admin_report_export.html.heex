@@ -24,10 +24,10 @@
         تاریخ گزارش شبانه
         <input
           id="admin-report-export-date"
-          type="date"
+          type="text"
           name="date"
-          value={Date.to_iso8601(@selected_date)}
-          class="input input-bordered min-h-12 w-full"
+          value={Beroon.Calendar.persian_numeric_date(@selected_date)}
+          placeholder="۱۴۰۵/۰۵/۰۱" inputmode="numeric" class="input input-bordered min-h-12 w-full"
         />
       </label>
 

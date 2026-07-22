@@ -14,7 +14,7 @@
     row_click={&JS.navigate(~p"/evening_counts/#{&1}")}
   >
     <:col :let={evening_count} label="Counted on">{evening_count.counted_on}</:col>
-    <:col :let={evening_count} label="Counted at">{evening_count.counted_at}</:col>
+    <:col :let={evening_count} label="Counted at">{Beroon.Calendar.persian_datetime(evening_count.counted_at)}</:col>
     <:col :let={evening_count} label="Manager name">{evening_count.manager_name}</:col>
     <:col :let={evening_count} label="Total count">{evening_count.total_count}</:col>
     <:col :let={evening_count} label="Available count">{evening_count.available_count}</:col>

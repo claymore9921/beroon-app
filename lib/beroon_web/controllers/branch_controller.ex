@@ -2,6 +2,7 @@ defmodule BeroonWeb.BranchController do
   use BeroonWeb, :controller
 
   alias Beroon.Operations
+  alias Beroon.Fleet
   alias Beroon.Operations.Branch
 
   def index(conn, _params) do
@@ -28,7 +29,7 @@ defmodule BeroonWeb.BranchController do
 
   def show(conn, %{"id" => id}) do
     branch = Operations.get_branch!(id)
-    render(conn, :show, branch: branch)
+    render(conn, :show, branch: branch, inventory_groups: Fleet.branch_inventory_groups(branch.id))
   end
 
   def edit(conn, %{"id" => id}) do

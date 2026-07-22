@@ -6,6 +6,7 @@ defmodule Beroon.Reports.ScooterRepairReport do
     field :reported_by_manager_name, :string
     field :reported_by_manager_phone, :string
     field :notes, :string
+    field :delivery_method, :string, default: "attendant"
     field :reported_on, :date
     field :reported_at, :utc_datetime
     field :scooter_id, :id
@@ -22,6 +23,7 @@ defmodule Beroon.Reports.ScooterRepairReport do
       :reported_by_manager_name,
       :reported_by_manager_phone,
       :notes,
+      :delivery_method,
       :reported_on,
       :reported_at
     ])
@@ -29,8 +31,10 @@ defmodule Beroon.Reports.ScooterRepairReport do
       :scooter_id,
       :branch_id,
       :notes,
+      :delivery_method,
       :reported_on,
       :reported_at
     ])
+    |> validate_inclusion(:delivery_method, ["attendant", "van"])
   end
 end

@@ -115,6 +115,35 @@ defmodule Beroon.Fleet do
     |> Enum.map(&elem(&1, 0))
   end
 
+
+  def expected_evening_scooters_for_branch(branch_id) do
+    Scooter
+    |> where(
+      [s],
+      s.branch_id == ^branch_id and s.current_branch_id == ^branch_id and
+        s.status not in ["awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service"]
+    )
+    |> order_by([s], asc: s.plate)
+    |> Repo.all()
+  end
+
+  def branch_inventory_groups(branch_id) do
+    Scooter
+    |> where([s], s.branch_id == ^branch_id)
+    |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
+    |> order_by([s, d], asc: d.category, asc: d.device_model, asc: s.plate)
+    |> preload([s, d], device_type: d)
+    |> Repo.all()
+    |> Enum.group_by(fn scooter ->
+      case scooter.device_type do
+        nil -> "بدون نوع دستگاه"
+        d -> Enum.reject([d.device_identifier, d.category, d.device_model], &(&1 in [nil, ""])) |> Enum.join(" - ")
+      end
+    end)
+    |> Enum.map(fn {label, scooters} -> %{label: label, count: length(scooters), scooters: scooters} end)
+    |> Enum.sort_by(& &1.label)
+  end
+
   def list_scooters_for_branch(branch_id) do
     Scooter
     |> where([s], s.branch_id == ^branch_id)
@@ -244,9 +273,10 @@ defmodule Beroon.Fleet do
 
     Scooter
     |> join(:left, [s], b in Beroon.Operations.Branch, on: b.id == s.branch_id)
-    |> join(:left, [s, b], d in DeviceType, on: d.id == s.device_type_id)
+    |> join(:left, [s, b], c in Beroon.Operations.Branch, on: c.id == s.current_branch_id)
+    |> join(:left, [s, b, c], d in DeviceType, on: d.id == s.device_type_id)
     |> where([s], s.barcode in ^codes or s.plate in ^codes)
-    |> select([s, b, d], %{
+    |> select([s, b, c, d], %{
       id: s.id,
       plate: s.plate,
       barcode: s.barcode,
@@ -254,11 +284,21 @@ defmodule Beroon.Fleet do
       status: s.status,
       branch_id: s.branch_id,
       branch_name: b.name,
+      current_branch_id: s.current_branch_id,
+      current_branch_name: c.name,
       device_type_id: s.device_type_id,
       device_type_identifier: d.device_identifier,
       device_type_category: d.category,
       device_type_name: d.device_model
     })
+    |> Repo.one()
+  end
+
+  def get_scooter_by_plate_or_barcode_with_details(code) when is_binary(code) do
+    codes = lookup_codes(code)
+    Scooter
+    |> where([s], s.barcode in ^codes or s.plate in ^codes)
+    |> preload([:branch, :current_branch, :device_type])
     |> Repo.one()
   end
 

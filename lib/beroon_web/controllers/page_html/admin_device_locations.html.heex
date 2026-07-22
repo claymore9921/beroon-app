@@ -55,7 +55,7 @@
           <article :for={transport <- @result.transports} class="rounded-lg border border-zinc-200 p-3 text-sm">
             <p class="font-bold">{transport.origin_branch.name} ← {transport.destination_branch.name}</p>
             <p class="mt-1 text-xs text-zinc-500">
-              تاریخ: {Calendar.strftime(transport_local_datetime(transport.transported_at), "%Y/%m/%d")} · ساعت: {Calendar.strftime(transport_local_datetime(transport.transported_at), "%H:%M")} · ثبت‌کننده: {transport.registered_by_name || transport.registered_by_phone}
+              تاریخ: {persian_datetime(transport.transported_at)} · ثبت‌کننده: {transport.registered_by_name || transport.registered_by_phone}
             </p>
           </article>
         </div>
@@ -68,7 +68,7 @@
         <article :for={transport <- @recent_transports} class="rounded-lg border border-zinc-200 p-3 text-sm">
           <div class="flex justify-between gap-2">
             <p class="font-black">{transport.scooter.plate}</p>
-            <span class="text-xs font-semibold text-zinc-500">{Calendar.strftime(transport_local_datetime(transport.transported_at), "%Y/%m/%d")} · ساعت {Calendar.strftime(transport_local_datetime(transport.transported_at), "%H:%M")}</span>
+            <span class="text-xs font-semibold text-zinc-500">{persian_datetime(transport.transported_at)}</span>
           </div>
           <p class="mt-1">{transport.origin_branch.name} ← {transport.destination_branch.name}</p>
         </article>
