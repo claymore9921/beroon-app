@@ -282,6 +282,7 @@ defmodule Beroon.Fleet do
       barcode: s.barcode,
       model: s.model,
       status: s.status,
+      transport_until: s.transport_until,
       branch_id: s.branch_id,
       branch_name: b.name,
       current_branch_id: s.current_branch_id,

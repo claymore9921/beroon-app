@@ -22,6 +22,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_home(conn, _params) do
+    Logistics.expire_transports!()
     today = Reports.iran_today()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
 
@@ -109,6 +110,22 @@ defmodule BeroonWeb.PageController do
         scooters: scooters,
         scooter_groups: group_scooters_by_device_type(scooters),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
+      )
+    end
+  end
+
+  def manager_unhealthy_scooters(conn, _params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      date = Reports.iran_today()
+
+      render(conn, :manager_unhealthy_scooters,
+        branch: branch,
+        date: date,
+        scooters: Reports.list_unhealthy_scooters_for_branch(date, branch.id)
       )
     end
   end
@@ -300,6 +317,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_morning(conn, params) do
+    Logistics.expire_transports!()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
     code = params |> Map.get("code", "") |> String.trim()
     selected_scooter = selected_morning_scooter(branch, code)
@@ -422,15 +440,23 @@ defmodule BeroonWeb.PageController do
     )
   end
 
-  def workshop_discharge_scooter(conn, %{"id" => id}) do
-    workshop_update_status(
-      conn,
-      id,
-      "ready_for_pickup",
-      "دستگاه آماده تحویل شد.",
-      %{},
-      ~p"/workshop/discharge"
-    )
+  def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
+    parts_used = params |> Map.get("repair_parts_used", "") |> String.trim()
+
+    if parts_used == "" do
+      conn
+      |> put_flash(:error, "ثبت قطعات مصرف‌شده برای ترخیص الزامی است.")
+      |> redirect(to: ~p"/workshop/discharge")
+    else
+      workshop_update_status(
+        conn,
+        id,
+        "ready_for_pickup",
+        "دستگاه آماده تحویل شد.",
+        %{repair_parts_used: parts_used},
+        ~p"/workshop/discharge"
+      )
+    end
   end
 
   def submit_morning(conn, %{"morning" => params}) do
@@ -461,6 +487,7 @@ defmodule BeroonWeb.PageController do
   end
 
   defp do_submit_morning(conn, params, branch, scooter) do
+    scooter = Logistics.activate_owner_return(scooter, branch.id)
     checklist_item_ids = List.wrap(params["checklist_item_ids"])
     checked_item_ids = List.wrap(params["checked_item_ids"])
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -494,6 +521,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_evening(conn, _params) do
+    Logistics.expire_transports!()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
 
     if is_nil(branch) do
@@ -531,7 +559,12 @@ defmodule BeroonWeb.PageController do
       params |> Map.get("scanned_codes", []) |> List.wrap() |> Enum.reject(&(&1 == ""))
 
     scanned_scooters =
-      Enum.map(scanned_codes, &Fleet.get_scooter_by_plate_or_barcode/1) |> Enum.reject(&is_nil/1)
+      scanned_codes
+      |> Enum.map(&Fleet.get_scooter_by_plate_or_barcode/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&Logistics.refresh_expired_transport/1)
+      |> Enum.reject(fn scooter -> scooter.status == "transport" and scooter.branch_id != branch.id end)
+      |> Enum.map(&Logistics.activate_owner_return(&1, branch.id))
 
     expected_scooters = Fleet.expected_evening_scooters_for_branch(branch.id)
 
@@ -613,6 +646,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def admin_branch_evening_reports(conn, %{"id" => id} = params) do
+    Logistics.expire_transports!()
     branch = Operations.get_branch!(id)
     filter_dates = Reports.list_evening_report_dates_for_branch(branch.id)
     selected_date = parse_optional_date(params["date"])
@@ -621,7 +655,8 @@ defmodule BeroonWeb.PageController do
       branch: branch,
       filter_dates: filter_dates,
       selected_date: selected_date,
-      reports: Reports.list_evening_counts_for_branch(branch.id, selected_date)
+      reports: Reports.list_evening_counts_for_branch(branch.id, selected_date),
+      transport_scooters: Logistics.list_active_transports_for_branch(branch.id)
     )
   end
 

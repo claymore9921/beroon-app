@@ -63,6 +63,16 @@
             action={~p"/workshop/scooters/#{scooter}/discharge"}
           >
             <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <label class="form-control mb-3">
+              <span class="label-text font-bold">قطعات مصرف‌شده</span>
+              <textarea
+                name="discharge[repair_parts_used]"
+                required
+                minlength="2"
+                class="textarea textarea-bordered min-h-24 w-full"
+                placeholder="مثلاً: تعویض دسته ترمز، لنت جلو و کابل گاز"
+              ></textarea>
+            </label>
             <button class="btn btn-primary min-h-11 w-full">ترخیص</button>
           </form>
         </div>

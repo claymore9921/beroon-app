@@ -97,6 +97,7 @@ const addScannedScooter = (scooter) => {
 
   list.prepend(buildScannedCard(scooter))
   count.textContent = String(list.querySelectorAll('input[name="evening[scanned_codes][]"]').length)
+  document.dispatchEvent(new CustomEvent("evening:scan-added", {detail: scooter}))
 }
 
 const setupEveningScanner = () => {
@@ -118,7 +119,34 @@ const setupEveningScanner = () => {
   let stream = null
   let scanning = false
   const seenPlates = new Set()
-  const managerBranchId = Number(document.getElementById("count-form")?.dataset.branchId || 0)
+  const form = document.getElementById("count-form")
+  const managerBranchId = Number(form?.dataset.branchId || 0)
+  const reportDate = form?.dataset.reportDate || "current"
+  const storageKey = `beroon-evening-draft-${managerBranchId}-${reportDate}`
+
+  const saveDraft = () => {
+    const codes = Array.from(document.querySelectorAll('input[name="evening[scanned_codes][]"]')).map(el => el.value)
+    localStorage.setItem(storageKey, JSON.stringify(codes))
+  }
+
+  const restoreDraft = async () => {
+    let codes = []
+    try { codes = JSON.parse(localStorage.getItem(storageKey) || "[]") } catch (_e) { codes = [] }
+    for (const code of codes) {
+      const scooter = await lookupScooter(code)
+      if (scooter && !seenPlates.has(scooter.plate)) {
+        seenPlates.add(scooter.plate)
+        addScannedScooter(scooter)
+      }
+    }
+    if (codes.length > 0) {
+      startPanel.classList.add("hidden")
+      form?.classList.remove("hidden")
+    }
+  }
+
+  document.addEventListener("evening:scan-added", saveDraft)
+  restoreDraft()
 
   startButton.addEventListener("click", () => {
     startPanel.classList.add("hidden")
@@ -161,12 +189,14 @@ const setupEveningScanner = () => {
     if (code?.data) {
       const scooter = await lookupScooter(code.data)
       if (scooter) {
+        if (scooter.status === "transport" && scooter.branch_id !== managerBranchId) {
+          alert("این دستگاه برای حمل‌ونقل انتخاب شده و نباید جزو آمار این شعبه ثبت شود.")
+          input.value = ""
+          stopScanner()
+          return
+        }
         if (scooter.branch_id !== managerBranchId) {
-          if (scooter.current_branch_id === managerBranchId) {
-            alert("این دستگاه برای حمل‌ونقل در شعبه شماست و جزو آمار اصلی شعبه محاسبه نمی‌شود؛ ولی در ریز گزارش ثبت خواهد شد.")
-          } else {
-            alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و جزو آمار اصلی شعبه شما محاسبه نمی‌شود.`)
-          }
+          alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و جزو آمار اصلی شعبه شما محاسبه نمی‌شود.`)
         }
         if (!seenPlates.has(scooter.plate)) {
           seenPlates.add(scooter.plate)
@@ -207,12 +237,13 @@ const setupEveningScanner = () => {
   manualAdd.addEventListener("click", async () => {
     const scooter = await lookupScooter(input.value)
     if (!scooter) return
+    if (scooter.status === "transport" && scooter.branch_id !== managerBranchId) {
+      alert("این دستگاه برای حمل‌ونقل انتخاب شده و نباید جزو آمار این شعبه ثبت شود.")
+      input.value = ""
+      return
+    }
     if (scooter.branch_id !== managerBranchId) {
-      if (scooter.current_branch_id === managerBranchId) {
-        alert("این دستگاه برای حمل‌ونقل در شعبه شماست و جزو آمار اصلی شعبه محاسبه نمی‌شود؛ ولی در ریز گزارش ثبت خواهد شد.")
-      } else {
-        alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و جزو آمار اصلی شعبه شما محاسبه نمی‌شود.`)
-      }
+      alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و جزو آمار اصلی شعبه شما محاسبه نمی‌شود.`)
     }
     addScannedScooter(scooter)
     input.value = ""
@@ -288,8 +319,8 @@ const setupMorningChecklist = () => {
       const scooter = await lookupScooter(code.data)
       if (scooter) {
         const managerBranchId = Number(form.dataset.branchId || 0)
-        if (scooter.branch_id !== managerBranchId && scooter.current_branch_id === managerBranchId) {
-          alert("این دستگاه برای حمل‌ونقل در شعبه شماست و در چک‌لیست صبح ثبت نمی‌شود.")
+        if (scooter.status === "transport" && scooter.branch_id !== managerBranchId) {
+          alert("این دستگاه برای حمل‌ونقل انتخاب شده و در چک‌لیست این شعبه ثبت نمی‌شود.")
           input.value = ""
           stopScanner()
           return

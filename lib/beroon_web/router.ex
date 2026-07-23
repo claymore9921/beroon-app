@@ -56,6 +56,7 @@ defmodule BeroonWeb.Router do
     get "/manager/scan", PageController, :manager_scan
     get "/manager/scooters", PageController, :manager_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
+    get "/manager/unhealthy-scooters", PageController, :manager_unhealthy_scooters
     get "/manager/transports", PageController, :manager_transports
     post "/manager/transports", PageController, :create_manager_transport
     get "/manager/repairs", PageController, :manager_repairs

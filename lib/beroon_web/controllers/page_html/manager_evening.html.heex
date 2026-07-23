@@ -39,6 +39,7 @@
       action={~p"/manager/evening"}
       id="count-form"
       data-branch-id={List.first(@branches).id}
+      data-report-date={Beroon.Reports.evening_report_date(DateTime.utc_now())}
       class="mt-5 hidden rounded-lg border border-zinc-200 bg-white p-5"
     >
       <div class="grid gap-4">

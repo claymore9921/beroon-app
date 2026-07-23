@@ -729,6 +729,17 @@ defmodule Beroon.Reports do
     Enum.map(inspections, &Map.put(&1, :items, Map.get(items_by_inspection, &1.id, [])))
   end
 
+  def list_unhealthy_scooters_for_branch(date, branch_id) do
+    list_morning_inspections_for_branch(date, branch_id)
+    |> Enum.filter(fn inspection ->
+      inspection.scooter_status not in ["needs_service", "awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service"] and
+        Enum.any?(inspection.items, fn item -> not item.checked end)
+    end)
+    |> Enum.map(fn inspection ->
+      Map.put(inspection, :unchecked_items, Enum.filter(inspection.items, fn item -> not item.checked end))
+    end)
+  end
+
   def count_unchecked_scooters_for_branch(date, branch_id) do
     date
     |> unchecked_scooters_query(branch_id)

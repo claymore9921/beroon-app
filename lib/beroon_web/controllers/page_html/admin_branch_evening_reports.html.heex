@@ -12,6 +12,22 @@
       <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
     </header>
 
+
+    <section class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="font-black text-amber-900">دستگاه‌های در حال حمل‌ونقل</h2>
+        <span class="rounded bg-amber-900 px-2 py-1 text-xs font-bold text-white">{length(@transport_scooters)}</span>
+      </div>
+      <p :if={@transport_scooters == []} class="mt-3 text-sm text-amber-800">دستگاهی در وضعیت حمل‌ونقل نیست.</p>
+      <div :if={@transport_scooters != []} class="mt-3 grid gap-2">
+        <article :for={scooter <- @transport_scooters} class="rounded-lg border border-amber-200 bg-white p-3">
+          <p class="font-bold">پلاک {scooter.plate}</p>
+          <p class="mt-1 text-xs text-zinc-500">مالک: {if scooter.branch, do: scooter.branch.name, else: "-"} · مقصد فعلی: {if scooter.current_branch, do: scooter.current_branch.name, else: "-"}</p>
+          <p class="mt-1 text-xs text-amber-700">اعتبار حمل تا {Beroon.Calendar.persian_datetime(scooter.transport_until)}</p>
+        </article>
+      </div>
+    </section>
+
     <form
       id="admin-branch-evening-filter"
       method="get"

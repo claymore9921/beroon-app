@@ -7,9 +7,15 @@
         </.link>
         <h1 class="mt-1 truncate text-2xl font-bold text-zinc-950">پلاک {@scooter.plate}</h1>
       </div>
-      <.link navigate={~p"/scooters/#{@scooter}/edit"} class="btn btn-primary min-h-12 shrink-0">
-        ویرایش
-      </.link>
+      <div class="flex shrink-0 gap-2">
+        <.link navigate={~p"/scooters/#{@scooter}/edit"} class="btn btn-primary min-h-12">ویرایش</.link>
+        <.link
+          href={~p"/scooters/#{@scooter}"}
+          method="delete"
+          data-confirm="آیا از حذف این دستگاه مطمئن هستید؟"
+          class="btn btn-error min-h-12"
+        >حذف</.link>
+      </div>
     </header>
 
     <article class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
