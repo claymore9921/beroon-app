@@ -341,6 +341,8 @@ defmodule BeroonWeb.PageController do
               branch.id,
               selected_scooter.id
             ),
+        scanned_scooters: Reports.list_morning_scanned_scooters(branch.id, Reports.iran_today()),
+        unscanned_scooters: Reports.list_unchecked_scooters_for_branch(Reports.iran_today(), branch.id),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
@@ -601,6 +603,12 @@ defmodule BeroonWeb.PageController do
         |> put_flash(:error, "آمار ثبت نشد: #{first_error(changeset)}")
         |> redirect(to: ~p"/manager/evening")
     end
+  end
+
+  def admin_stale_unscanned_scooters(conn, _params) do
+    render(conn, :admin_stale_unscanned_scooters,
+      scooters: Reports.list_scooters_not_scanned_since(48)
+    )
   end
 
   def admin_device_locations(conn, params) do

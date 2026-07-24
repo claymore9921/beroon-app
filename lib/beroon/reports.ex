@@ -800,6 +800,59 @@ defmodule Beroon.Reports do
     )
   end
 
+
+  def list_morning_scanned_scooters(branch_id, date \\ iran_today()) do
+    MorningInspection
+    |> join(:inner, [m], s in Scooter, on: s.id == m.scooter_id)
+    |> join(:left, [m, s], d in DeviceType, on: d.id == s.device_type_id)
+    |> where([m], m.branch_id == ^branch_id and m.checked_on == ^date)
+    |> order_by([m, s], desc: m.checked_at, asc: s.plate)
+    |> select([m, s, d], %{
+      id: s.id,
+      plate: s.plate,
+      barcode: s.barcode,
+      status: s.status,
+      checked_at: m.checked_at,
+      device_type: d
+    })
+    |> Repo.all()
+  end
+
+  def list_scooters_not_scanned_since(hours \\ 48) do
+    cutoff = DateTime.utc_now() |> DateTime.add(-hours * 3600, :second)
+
+    morning_scans =
+      MorningInspection
+      |> group_by([m], m.scooter_id)
+      |> select([m], {m.scooter_id, max(m.checked_at)})
+      |> Repo.all()
+      |> Map.new()
+
+    evening_scans =
+      EveningCountItem
+      |> group_by([i], i.scooter_id)
+      |> select([i], {i.scooter_id, max(i.inserted_at)})
+      |> Repo.all()
+      |> Map.new()
+
+    Scooter
+    |> preload([:branch, :current_branch, :device_type])
+    |> Repo.all()
+    |> Enum.map(fn scooter ->
+      last_scan = latest_datetime(Map.get(morning_scans, scooter.id), Map.get(evening_scans, scooter.id))
+      Map.put(scooter, :last_scan_at, last_scan)
+    end)
+    |> Enum.filter(fn scooter -> is_nil(scooter.last_scan_at) or DateTime.compare(scooter.last_scan_at, cutoff) == :lt end)
+    |> Enum.sort_by(fn scooter -> scooter.last_scan_at || ~U[1970-01-01 00:00:00Z] end, DateTime)
+  end
+
+  defp latest_datetime(nil, nil), do: nil
+  defp latest_datetime(%DateTime{} = value, nil), do: value
+  defp latest_datetime(nil, %DateTime{} = value), do: value
+  defp latest_datetime(%DateTime{} = first, %DateTime{} = second) do
+    if DateTime.compare(first, second) in [:gt, :eq], do: first, else: second
+  end
+
   def count_morning_inspections_for_date(date) do
     MorningInspection
     |> where([m], m.checked_on == ^date)

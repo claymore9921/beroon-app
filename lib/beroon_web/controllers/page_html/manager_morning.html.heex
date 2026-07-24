@@ -40,6 +40,48 @@
         <button class="btn mt-2 min-h-12 w-full">نمایش چک‌لیست دستگاه</button>
       </form>
 
+      <section class="grid grid-cols-2 gap-3">
+        <details class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+          <summary class="cursor-pointer list-none">
+            <p class="text-sm font-bold text-emerald-800">اسکن‌شده‌ها</p>
+            <p class="mt-1 text-3xl font-black text-emerald-950">{length(@scanned_scooters)}</p>
+            <p class="mt-1 text-xs text-emerald-700">مشاهده QRها</p>
+          </summary>
+          <div class="mt-4 grid gap-2 text-right">
+            <p :if={@scanned_scooters == []} class="text-xs text-zinc-500">هنوز دستگاهی اسکن نشده است.</p>
+            <article :for={scooter <- @scanned_scooters} class="rounded-lg border border-emerald-200 bg-white p-3">
+              <div class="flex items-center gap-2">
+                <.icon name="hero-qr-code" class="size-8 shrink-0" />
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-bold">{scooter.plate}</p>
+                  <p class="break-all text-xs text-zinc-500">QR: {scooter.barcode}</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </details>
+
+        <details class="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+          <summary class="cursor-pointer list-none">
+            <p class="text-sm font-bold text-red-800">اسکن‌نشده‌ها</p>
+            <p class="mt-1 text-3xl font-black text-red-950">{length(@unscanned_scooters)}</p>
+            <p class="mt-1 text-xs text-red-700">مشاهده QRها</p>
+          </summary>
+          <div class="mt-4 grid gap-2 text-right">
+            <p :if={@unscanned_scooters == []} class="text-xs text-zinc-500">همه دستگاه‌ها اسکن شده‌اند.</p>
+            <article :for={scooter <- @unscanned_scooters} class="rounded-lg border border-red-200 bg-white p-3">
+              <div class="flex items-center gap-2">
+                <.icon name="hero-qr-code" class="size-8 shrink-0" />
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-bold">{scooter.plate}</p>
+                  <p class="break-all text-xs text-zinc-500">QR: {scooter.barcode}</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </details>
+      </section>
+
       <div
         :if={@selected_code != "" && is_nil(@selected_scooter)}
         class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
@@ -124,7 +166,6 @@
               type="checkbox"
               name="morning[checked_item_ids][]"
               value={item.id}
-              class="checkbox checkbox-sm mt-1 morning-check-item"
             />
             <span class="min-w-0">
               <span class="block font-semibold">{item.title}</span>
