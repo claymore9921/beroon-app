@@ -465,6 +465,40 @@ defmodule Beroon.Fleet do
   end
 
   @doc """
+  Permanently deletes scooters and every database record directly related to them.
+
+  This operation is intentionally destructive and is used only by the admin bulk-cleanup page.
+  """
+  def permanently_delete_scooters(ids) when is_list(ids) do
+    ids =
+      ids
+      |> Enum.map(fn
+        id when is_integer(id) -> id
+        id when is_binary(id) ->
+          case Integer.parse(id) do
+            {value, ""} -> value
+            _ -> nil
+          end
+        _ -> nil
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if ids == [] do
+      {:error, :no_scooters_selected}
+    else
+      Ecto.Multi.new()
+      |> Ecto.Multi.delete_all(:location_alerts, from(a in "scooter_location_alerts", where: field(a, :scooter_id) in ^ids))
+      |> Ecto.Multi.delete_all(:repair_reports, from(r in "scooter_repair_reports", where: field(r, :scooter_id) in ^ids))
+      |> Ecto.Multi.delete_all(:evening_items, from(i in "evening_count_items", where: field(i, :scooter_id) in ^ids))
+      |> Ecto.Multi.delete_all(:morning_inspections, from(i in "morning_inspections", where: field(i, :scooter_id) in ^ids))
+      |> Ecto.Multi.delete_all(:transports, from(t in "scooter_transports", where: field(t, :scooter_id) in ^ids))
+      |> Ecto.Multi.delete_all(:scooters, from(s in Scooter, where: s.id in ^ids))
+      |> Repo.transaction()
+    end
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking scooter changes.
 
   ## Examples

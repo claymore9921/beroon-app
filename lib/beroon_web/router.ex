@@ -84,6 +84,7 @@ defmodule BeroonWeb.Router do
 
     get "/admin/reports", PageController, :admin_reports
     get "/admin/unscanned-devices", PageController, :admin_stale_unscanned_scooters
+    delete "/admin/unscanned-devices", PageController, :bulk_delete_stale_unscanned_scooters
     get "/admin/notifications", PageController, :admin_notifications
     post "/admin/notifications", PageController, :send_admin_notification
     get "/admin/location-alerts", PageController, :admin_location_alerts

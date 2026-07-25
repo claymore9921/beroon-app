@@ -611,6 +611,41 @@ defmodule BeroonWeb.PageController do
     )
   end
 
+  def bulk_delete_stale_unscanned_scooters(conn, params) do
+    scooter_ids = List.wrap(params["scooter_ids"])
+    confirmation = params["confirmation"] |> to_string() |> String.trim()
+
+    cond do
+      scooter_ids == [] ->
+        conn
+        |> put_flash(:error, "حداقل یک دستگاه را انتخاب کنید.")
+        |> redirect(to: ~p"/admin/unscanned-devices")
+
+      confirmation != "حذف کامل" ->
+        conn
+        |> put_flash(:error, "برای تأیید حذف، عبارت «حذف کامل» را دقیق وارد کنید.")
+        |> redirect(to: ~p"/admin/unscanned-devices")
+
+      true ->
+        case Fleet.permanently_delete_scooters(scooter_ids) do
+          {:ok, %{scooters: {deleted_count, _}}} ->
+            conn
+            |> put_flash(:info, "#{deleted_count} دستگاه و تمام سوابق وابسته آن‌ها برای همیشه حذف شد.")
+            |> redirect(to: ~p"/admin/unscanned-devices")
+
+          {:error, _step, reason, _changes} ->
+            conn
+            |> put_flash(:error, "حذف کامل انجام نشد: #{inspect(reason)}")
+            |> redirect(to: ~p"/admin/unscanned-devices")
+
+          {:error, :no_scooters_selected} ->
+            conn
+            |> put_flash(:error, "هیچ دستگاه معتبری برای حذف انتخاب نشد.")
+            |> redirect(to: ~p"/admin/unscanned-devices")
+        end
+    end
+  end
+
   def admin_device_locations(conn, params) do
     query = params |> Map.get("q", "") |> String.trim()
 

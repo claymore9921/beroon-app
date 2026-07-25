@@ -74,6 +74,42 @@ const buildScannedCard = (scooter) => {
   return card
 }
 
+
+const attachTorchControl = (dialog, stream) => {
+  if (!dialog || !stream) return
+
+  let button = dialog.querySelector("[data-qr-torch-button]")
+  if (!button) {
+    button = document.createElement("button")
+    button.type = "button"
+    button.dataset.qrTorchButton = "true"
+    button.className = "btn btn-sm mt-3 w-full"
+    button.textContent = "روشن کردن فلش"
+    const video = dialog.querySelector("video")
+    video?.insertAdjacentElement("afterend", button)
+  }
+
+  const track = stream.getVideoTracks()[0]
+  const capabilities = track?.getCapabilities?.() || {}
+  let enabled = false
+
+  button.disabled = !capabilities.torch
+  button.textContent = capabilities.torch ? "روشن کردن فلش" : "فلش در این گوشی پشتیبانی نمی‌شود"
+  button.onclick = async () => {
+    if (!capabilities.torch) return
+    enabled = !enabled
+    try {
+      await track.applyConstraints({advanced: [{torch: enabled}]})
+      button.textContent = enabled ? "خاموش کردن فلش" : "روشن کردن فلش"
+    } catch (error) {
+      console.error("Camera torch error:", error)
+      enabled = false
+      button.textContent = "روشن کردن فلش"
+      alert("فعال‌کردن فلش دوربین در این مرورگر ممکن نشد.")
+    }
+  }
+}
+
 const lookupScooter = async (code) => {
   const clean = (code || "").trim()
   if (!clean) return null
@@ -225,6 +261,7 @@ const setupEveningScanner = () => {
       stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
       video.srcObject = stream
       await video.play()
+      attachTorchControl(dialog, stream)
       status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
       scanFrame()
     } catch (_error) {
@@ -263,7 +300,7 @@ const setupMorningChecklist = () => {
   const checkAll = document.getElementById("check-all-morning-items")
   if (checkAll) {
     checkAll.addEventListener("click", () => {
-      document.querySelectorAll(".morning-check-item").forEach(item => item.checked = true)
+      document.querySelectorAll('input[type="checkbox"][name="morning[checked_item_ids][]"]').forEach(item => { item.checked = true; item.dispatchEvent(new Event("change", {bubbles: true})) })
     })
   }
 
@@ -332,7 +369,10 @@ const setupMorningChecklist = () => {
           return
         }
         input.value = scooter.barcode || scooter.plate || code.data
+        input.blur()
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
         stopScanner()
+        window.scrollTo({top: 0, behavior: "auto"})
         form.requestSubmit()
         return
       }
@@ -358,6 +398,7 @@ const setupMorningChecklist = () => {
       stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
       video.srcObject = stream
       await video.play()
+      attachTorchControl(dialog, stream)
       status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
       scanFrame()
     } catch (_error) {
@@ -453,6 +494,7 @@ const setupScooterFormScanner = () => {
       stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}})
       video.srcObject = stream
       await video.play()
+      attachTorchControl(dialog, stream)
       status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
       scanFrame()
     } catch (_error) {
@@ -586,6 +628,7 @@ const setupSearchScanner = ({
       })
       video.srcObject = stream
       await video.play()
+      attachTorchControl(dialog, stream)
       status.textContent = "دوربین فعال است. QR را مقابل دوربین بگیرید."
       animationFrameId = requestAnimationFrame(scanFrame)
     } catch (error) {
@@ -677,6 +720,17 @@ const bootScannerPages = () => {
     closeId: "manager-transport-scan-close",
     retryId: "manager-transport-scan-retry",
     autoSubmit: false,
+  })
+
+  setupSearchScanner({
+    buttonId: "admin-scooter-search-scan",
+    inputId: "scooter-search",
+    formId: "scooter-search-form",
+    dialogId: "admin-scooter-search-scan-dialog",
+    videoId: "admin-scooter-search-scan-video",
+    statusId: "admin-scooter-search-scan-status",
+    closeId: "admin-scooter-search-scan-close",
+    retryId: "admin-scooter-search-scan-retry",
   })
 
   setupSearchScanner({

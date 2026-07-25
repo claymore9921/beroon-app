@@ -9,8 +9,11 @@ defmodule BeroonWeb.ScooterController do
   def index(conn, params) do
     query = params |> Map.get("q", "") |> String.trim()
 
+    scooters = Fleet.list_scooters_with_details(query)
+
     render(conn, :index,
-      scooters: Fleet.list_scooters_with_details(query),
+      scooters: scooters,
+      displayed_count: length(scooters),
       query: query
     )
   end
