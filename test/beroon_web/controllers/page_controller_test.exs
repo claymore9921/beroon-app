@@ -840,6 +840,56 @@ defmodule BeroonWeb.PageControllerTest do
         plate: "H-B-1"
       })
 
+    scooter_fixture(%{
+      branch_id: hafez.id,
+      device_type_id: scooter_type.id,
+      barcode: "pending-workshop",
+      plate: "PENDING-WORKSHOP",
+      status: "needs_service",
+      notes: "ارسال به تعمیرگاه"
+    })
+
+    scooter_fixture(%{
+      branch_id: hafez.id,
+      device_type_id: scooter_type.id,
+      barcode: "accepted-workshop",
+      plate: "ACCEPTED-WORKSHOP",
+      status: "awaiting_repair"
+    })
+
+    scooter_fixture(%{
+      branch_id: hafez.id,
+      device_type_id: scooter_type.id,
+      barcode: "repairing-workshop",
+      plate: "REPAIRING-WORKSHOP",
+      status: "repairing"
+    })
+
+    scooter_fixture(%{
+      branch_id: hafez.id,
+      device_type_id: scooter_type.id,
+      barcode: "ready-workshop",
+      plate: "READY-WORKSHOP",
+      status: "ready_for_pickup"
+    })
+
+    scooter_fixture(%{
+      branch_id: hafez.id,
+      device_type_id: scooter_type.id,
+      barcode: "waiting-part",
+      plate: "WAITING-PART",
+      status: "waiting_for_part",
+      notes: "در انتظار قطعه"
+    })
+
+    scooter_fixture(%{
+      branch_id: hafez.id,
+      device_type_id: scooter_type.id,
+      barcode: "loaned-scooter",
+      plate: "LOANED-SCOOTER",
+      status: "loaned"
+    })
+
     {:ok, _report} =
       Beroon.Reports.create_evening_count_with_items(
         %{
@@ -895,6 +945,17 @@ defmodule BeroonWeb.PageControllerTest do
     assert response =~ "سپه"
     assert response =~ "اسکوتر سبز x9"
     assert response =~ "دوچرخه برقی سبز h1"
+    assert response =~ "جمع کل شعب"
+    assert response =~ "ارسال‌شده؛ در انتظار پذیرش تعمیرگاه"
+    assert response =~ "پذیرش‌شده؛ در انتظار تعمیر"
+    assert response =~ "ترخیص‌شده؛ تحویل شعبه نشده"
+    assert response =~ "جمع تعمیرگاه"
+    assert response =~ "دستگاه‌های امانی"
+    assert response =~ "جمع کل روزانه ناوگان"
+    assert response =~ "جمع کل دستگاه‌های تعمیرگاهی: 4"
+    assert response =~ "تعداد کل دستگاه‌های در انتظار قطعه: 1"
+    assert response =~ "تعداد کل دستگاه‌های امانی: 1"
+    assert response =~ "جمع کل روزانه ناوگان (شعب + تعمیرگاه + در انتظار قطعه + امانی): 10"
     assert response =~ "<td>2</td>"
     assert response =~ "<td>1</td>"
   end

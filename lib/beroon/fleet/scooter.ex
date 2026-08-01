@@ -13,7 +13,8 @@ defmodule Beroon.Fleet.Scooter do
     "waiting_for_part",
     "ready_for_pickup",
     "out_of_service",
-    "transport"
+    "transport",
+    "loaned"
   ]
   @note_required_statuses ["needs_service", "waiting_for_part"]
 

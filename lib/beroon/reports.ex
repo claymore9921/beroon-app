@@ -186,7 +186,8 @@ defmodule Beroon.Reports do
       |> select([b], %{id: b.id, name: b.name})
       |> Repo.all()
 
-    # همه نوع‌های ثبت‌شده، حتی نوع‌های غیرفعال، باید در خروجی باقی بمانند.
+    # همه نوع‌های ثبت‌شده، حتی نوع‌های غیرفعال و نوع‌هایی که مقدارشان صفر است،
+    # باید در خروجی کنترل روزانه باقی بمانند.
     device_types =
       DeviceType
       |> order_by([d], asc: d.category, asc: d.device_model, asc: d.device_identifier)
@@ -202,18 +203,45 @@ defmodule Beroon.Reports do
       })
       |> Repo.all()
 
-    counts =
+    # فقط اسکن‌های صحیح همان شعبه در آمار شعب محاسبه می‌شوند. اسکن دستگاه شعبه دیگر
+    # و اسکن حمل‌ونقل در گزارش جزئیات باقی می‌مانند، اما نباید جمع شعبه را افزایش دهند.
+    # دستگاهی که اکنون در تعمیرگاه، در انتظار قطعه یا امانی است از ستون شعب حذف می‌شود
+    # تا در جمع نهایی دوبار شمرده نشود.
+    branch_scan_counts =
       EveningCountItem
       |> join(:inner, [i], e in EveningCount, on: e.id == i.evening_count_id)
       |> join(:inner, [i, e], s in Scooter, on: s.id == i.scooter_id)
-      |> where([i, e, s], e.counted_on == ^date and not is_nil(s.device_type_id))
+      |> where(
+        [i, e, s],
+        e.counted_on == ^date and
+          (i.scan_result == "expected" or is_nil(i.scan_result)) and
+          s.status not in [
+            "needs_service",
+            "awaiting_repair",
+            "repairing",
+            "ready_for_pickup",
+            "waiting_for_part",
+            "loaned",
+            "out_of_service"
+          ] and
+          not is_nil(s.device_type_id)
+      )
       |> group_by([i, e, s], [e.branch_id, s.device_type_id])
       |> select([i, e, s], {{s.device_type_id, e.branch_id}, count(i.id)})
       |> Repo.all()
       |> Map.new()
 
-    workshop_counts = status_counts_by_device_type(["awaiting_repair", "repairing"])
+    # چرخه تعمیرگاه در پروژه به این وضعیت‌ها نگاشت شده است:
+    # needs_service: ارسال‌شده و در انتظار پذیرش تعمیرگاه
+    # awaiting_repair: پذیرش‌شده و در انتظار شروع تعمیر
+    # repairing: در حال تعمیر
+    # ready_for_pickup: ترخیص‌شده و هنوز توسط شعبه تحویل گرفته نشده
+    pending_acceptance_counts = status_counts_by_device_type(["needs_service"])
+    accepted_waiting_repair_counts = status_counts_by_device_type(["awaiting_repair"])
+    repairing_counts = status_counts_by_device_type(["repairing"])
+    ready_for_pickup_counts = status_counts_by_device_type(["ready_for_pickup"])
     waiting_for_part_counts = status_counts_by_device_type(["waiting_for_part"])
+    loaned_counts = status_counts_by_device_type(["loaned"])
 
     new_stock_counts =
       Beroon.Inventory.NewDeviceStock
@@ -233,38 +261,95 @@ defmodule Beroon.Reports do
       Enum.map(device_types, fn device_type ->
         branch_counts =
           Map.new(branches, fn branch ->
-            {branch.id, Map.get(counts, {device_type.id, branch.id}, 0)}
+            {branch.id, Map.get(branch_scan_counts, {device_type.id, branch.id}, 0)}
           end)
+
+        branches_total_count = Enum.sum(Map.values(branch_counts))
+        pending_acceptance_count = Map.get(pending_acceptance_counts, device_type.id, 0)
+
+        accepted_waiting_repair_count =
+          Map.get(accepted_waiting_repair_counts, device_type.id, 0)
+
+        repairing_count = Map.get(repairing_counts, device_type.id, 0)
+        ready_for_pickup_count = Map.get(ready_for_pickup_counts, device_type.id, 0)
+
+        workshop_total_count =
+          pending_acceptance_count + accepted_waiting_repair_count + repairing_count +
+            ready_for_pickup_count
+
+        waiting_for_part_count = Map.get(waiting_for_part_counts, device_type.id, 0)
+        loaned_count = Map.get(loaned_counts, device_type.id, 0)
+
+        # جمع ناوگان روز فقط از دستگاه‌های موجود در چرخه عملیاتی تشکیل می‌شود؛
+        # انبار نو و فروش برای اطلاع در ستون‌های جدا نمایش داده می‌شوند.
+        operational_total_count =
+          branches_total_count + workshop_total_count + waiting_for_part_count + loaned_count
 
         %{
           device_type: device_type,
           branch_counts: branch_counts,
-          workshop_count: Map.get(workshop_counts, device_type.id, 0),
-          waiting_for_part_count: Map.get(waiting_for_part_counts, device_type.id, 0),
+          branches_total_count: branches_total_count,
+          pending_acceptance_count: pending_acceptance_count,
+          accepted_waiting_repair_count: accepted_waiting_repair_count,
+          repairing_count: repairing_count,
+          ready_for_pickup_count: ready_for_pickup_count,
+          workshop_total_count: workshop_total_count,
+          waiting_for_part_count: waiting_for_part_count,
+          loaned_count: loaned_count,
           new_stock_count: Map.get(new_stock_counts, device_type.id, 0) || 0,
-          sold_count: Map.get(sold_counts, device_type.id, 0) || 0
+          sold_count: Map.get(sold_counts, device_type.id, 0) || 0,
+          operational_total_count: operational_total_count
         }
       end)
 
     branch_totals =
       Map.new(branches, fn branch ->
-        total = Enum.reduce(rows, 0, fn row, acc -> acc + Map.get(row.branch_counts, branch.id, 0) end)
+        total =
+          Enum.reduce(rows, 0, fn row, acc ->
+            acc + Map.get(row.branch_counts, branch.id, 0)
+          end)
+
         {branch.id, total}
       end)
 
     totals = %{
       branch_counts: branch_totals,
-      workshop_count: Enum.reduce(rows, 0, &(&1.workshop_count + &2)),
+      branches_total_count: Enum.sum(Map.values(branch_totals)),
+      pending_acceptance_count: Enum.reduce(rows, 0, &(&1.pending_acceptance_count + &2)),
+      accepted_waiting_repair_count:
+        Enum.reduce(rows, 0, &(&1.accepted_waiting_repair_count + &2)),
+      repairing_count: Enum.reduce(rows, 0, &(&1.repairing_count + &2)),
+      ready_for_pickup_count: Enum.reduce(rows, 0, &(&1.ready_for_pickup_count + &2)),
+      workshop_total_count: Enum.reduce(rows, 0, &(&1.workshop_total_count + &2)),
       waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
+      loaned_count: Enum.reduce(rows, 0, &(&1.loaned_count + &2)),
       new_stock_count: Enum.reduce(rows, 0, &(&1.new_stock_count + &2)),
-      sold_count: Enum.reduce(rows, 0, &(&1.sold_count + &2))
+      sold_count: Enum.reduce(rows, 0, &(&1.sold_count + &2)),
+      operational_total_count: Enum.reduce(rows, 0, &(&1.operational_total_count + &2))
     }
 
-    grand_total =
-      Enum.sum(Map.values(totals.branch_counts)) + totals.workshop_count +
-        totals.waiting_for_part_count + totals.new_stock_count + totals.sold_count
-
-    %{date: date, branches: branches, rows: rows, totals: totals, grand_total: grand_total}
+    %{
+      date: date,
+      branches: branches,
+      rows: rows,
+      totals: totals,
+      # این همان عدد کنترل روزانه است و دقیقاً برابر جمع شعب + تعمیرگاه +
+      # در انتظار قطعه + امانی است.
+      grand_total: totals.operational_total_count,
+      summary: %{
+        branch_evening_total_count: totals.branches_total_count,
+        pending_acceptance_total_count: totals.pending_acceptance_count,
+        accepted_waiting_repair_total_count: totals.accepted_waiting_repair_count,
+        repairing_total_count: totals.repairing_count,
+        ready_for_pickup_total_count: totals.ready_for_pickup_count,
+        workshop_total_count: totals.workshop_total_count,
+        waiting_for_part_total_count: totals.waiting_for_part_count,
+        loaned_total_count: totals.loaned_count,
+        new_stock_total_count: totals.new_stock_count,
+        sold_total_count: totals.sold_count,
+        operational_total: totals.operational_total_count
+      }
+    }
   end
 
   defp status_counts_by_device_type(statuses) do
@@ -765,7 +850,7 @@ defmodule Beroon.Reports do
 
     Scooter
     |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
-    |> where([s], s.branch_id == ^branch_id)
+    |> where([s], s.branch_id == ^branch_id and s.status != "loaned")
     |> where([s], s.id not in subquery(checked_scooter_ids))
   end
 
@@ -1027,4 +1112,40 @@ defmodule Beroon.Reports do
   def change_morning_inspection(%MorningInspection{} = morning_inspection, attrs \\ %{}) do
     MorningInspection.changeset(morning_inspection, attrs)
   end
+
+  alias Beroon.Reports.{DailyRevenue, WorkshopEvent}
+
+  def get_daily_revenue(branch_id, date) do
+    Repo.get_by(DailyRevenue, branch_id: branch_id, reported_on: date)
+  end
+
+  def upsert_daily_revenue(attrs) do
+    branch_id = attrs[:branch_id] || attrs["branch_id"]
+    date = attrs[:reported_on] || attrs["reported_on"]
+
+    case get_daily_revenue(branch_id, date) do
+      nil -> %DailyRevenue{} |> DailyRevenue.changeset(attrs) |> Repo.insert()
+      revenue -> revenue |> DailyRevenue.changeset(attrs) |> Repo.update()
+    end
+  end
+
+  def create_workshop_event(attrs) do
+    %WorkshopEvent{} |> WorkshopEvent.changeset(attrs) |> Repo.insert()
+  end
+
+  def workshop_stats(from_date, to_date) do
+    WorkshopEvent
+    |> where([e], e.event_on >= ^from_date and e.event_on <= ^to_date)
+    |> group_by([e], [e.event_on, e.event_type])
+    |> select([e], {e.event_on, e.event_type, count(e.id)})
+    |> Repo.all()
+    |> Enum.group_by(fn {date, _type, _count} -> date end)
+    |> Enum.map(fn {date, rows} ->
+      counts = Map.new(rows, fn {_date, type, count} -> {type, count} end)
+      %{date: date, accepted: Map.get(counts, "accepted", 0), repair_started: Map.get(counts, "repair_started", 0), discharged: Map.get(counts, "discharged", 0)}
+    end)
+    |> Enum.sort_by(& &1.date, Date)
+    |> Enum.reverse()
+  end
+
 end

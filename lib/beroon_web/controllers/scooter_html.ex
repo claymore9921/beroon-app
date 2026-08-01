@@ -37,6 +37,7 @@ defmodule BeroonWeb.ScooterHTML do
   def status_label("waiting_for_part"), do: "در انتظار قطعه"
   def status_label("ready_for_pickup"), do: "آماده تحویل"
   def status_label("out_of_service"), do: "از مدار خارج شده"
+  def status_label("loaned"), do: "امانی"
   def status_label(status), do: status || "-"
 
   def status_options do
@@ -47,7 +48,8 @@ defmodule BeroonWeb.ScooterHTML do
       {"در حال تعمیر", "repairing"},
       {"در انتظار قطعه", "waiting_for_part"},
       {"آماده تحویل", "ready_for_pickup"},
-      {"از مدار خارج شده", "out_of_service"}
+      {"از مدار خارج شده", "out_of_service"},
+      {"امانی", "loaned"}
     ]
   end
 end

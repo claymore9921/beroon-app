@@ -67,6 +67,7 @@ defmodule BeroonWeb.Router do
     post "/manager/morning", PageController, :submit_morning
     get "/manager/evening", PageController, :manager_evening
     post "/manager/evening", PageController, :submit_evening
+    post "/manager/daily-revenue", PageController, :submit_daily_revenue
 
     get "/workshop", PageController, :workshop_home
     get "/workshop/info", PageController, :workshop_info
@@ -83,6 +84,11 @@ defmodule BeroonWeb.Router do
     pipe_through [:browser, :require_admin]
 
     get "/admin/reports", PageController, :admin_reports
+    get "/admin/repair-stats", PageController, :admin_repair_stats
+    get "/admin/repair-stats/download", PageController, :download_admin_repair_stats
+    get "/admin/loaned-scooters", PageController, :admin_loaned_scooters
+    post "/admin/loaned-scooters", PageController, :create_admin_scooter_loan
+    post "/admin/loaned-scooters/:id/return", PageController, :return_admin_scooter_loan
     get "/admin/unscanned-devices", PageController, :admin_stale_unscanned_scooters
     delete "/admin/unscanned-devices", PageController, :bulk_delete_stale_unscanned_scooters
     get "/admin/notifications", PageController, :admin_notifications
@@ -94,11 +100,13 @@ defmodule BeroonWeb.Router do
     get "/admin/checklists", PageController, :admin_checklist_branches
     get "/admin/checklists/branches/:id", PageController, :admin_branch_checklists
     get "/admin/report-export", PageController, :admin_report_export
+    get "/report-export", PageController, :admin_report_export
     get "/admin/new-device-inventory", PageController, :admin_new_device_inventory
     post "/admin/new-device-inventory/stocks", PageController, :update_new_device_stock
     get "/admin/new-device-sales", PageController, :admin_new_device_sales
     post "/admin/new-device-sales", PageController, :create_new_device_sale
     get "/admin/report-export/download", PageController, :download_admin_report_export
+    get "/report-export/download", PageController, :download_admin_report_export
     get "/admin/evening-reports", PageController, :admin_evening_report_branches
     get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail
     get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports

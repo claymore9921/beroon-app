@@ -183,4 +183,50 @@ defmodule Beroon.Logistics do
     |> preload([:origin_branch, :destination_branch, :registered_by_branch])
     |> Repo.all()
   end
+
+  alias Beroon.Logistics.ScooterLoan
+
+  def list_open_loans do
+    ScooterLoan
+    |> where([l], is_nil(l.returned_at))
+    |> order_by([l], desc: l.loaned_at)
+    |> preload([:scooter])
+    |> Repo.all()
+  end
+
+  def loan_scooter(scooter, attrs) do
+    Repo.transaction(fn ->
+      loan_attrs = Map.merge(%{
+        scooter_id: scooter.id,
+        previous_status: scooter.status,
+        loaned_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      }, attrs)
+
+      loan = case %ScooterLoan{} |> ScooterLoan.changeset(loan_attrs) |> Repo.insert() do
+        {:ok, loan} -> loan
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+
+      case Beroon.Fleet.update_scooter(scooter, %{status: "loaned", transport_until: nil}) do
+        {:ok, _} -> loan
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  def return_loan(%ScooterLoan{} = loan) do
+    Repo.transaction(fn ->
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      case loan |> ScooterLoan.changeset(%{returned_at: now}) |> Repo.update() do
+        {:ok, updated} ->
+          scooter = Beroon.Fleet.get_scooter!(loan.scooter_id)
+          case Beroon.Fleet.update_scooter(scooter, %{status: loan.previous_status || "active"}) do
+            {:ok, _} -> updated
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
 end

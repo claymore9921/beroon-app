@@ -23,7 +23,7 @@ defmodule BeroonWeb.PageHTML do
         <span class="manager-scan-bubble">
           <.icon class="size-9" name="hero-qr-code" />
         </span>
-        <span>اسکن</span>
+        <span>گزارش روزانه</span>
       </.link>
       <.link navigate={~p"/manager/morning"} class={[@active == "checklists" && "is-active"]}>
         <.icon class="size-9" name="hero-clipboard-document-check" />
@@ -70,6 +70,7 @@ defmodule BeroonWeb.PageHTML do
   def status_label("waiting_for_part"), do: "در انتظار قطعه"
   def status_label("ready_for_pickup"), do: "آماده تحویل"
   def status_label("out_of_service"), do: "از مدار خارج شده"
+  def status_label("loaned"), do: "امانی"
   def status_label(status), do: status || "-"
 
   def morning_status_label("ready"), do: "سالم"
@@ -83,6 +84,7 @@ defmodule BeroonWeb.PageHTML do
   def status_badge_class("waiting_for_part"), do: "bg-purple-100 text-purple-700"
   def status_badge_class("ready_for_pickup"), do: "bg-teal-100 text-teal-700"
   def status_badge_class("out_of_service"), do: "bg-zinc-200 text-zinc-700"
+  def status_badge_class("loaned"), do: "bg-red-600 text-white"
   def status_badge_class(_status), do: "bg-zinc-100 text-zinc-700"
   def transport_local_datetime(nil), do: nil
   def transport_local_datetime(datetime), do: Beroon.Calendar.tehran_datetime(datetime)

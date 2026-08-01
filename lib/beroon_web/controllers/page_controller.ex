@@ -86,11 +86,31 @@ defmodule BeroonWeb.PageController do
         branch: branch,
         manager_name: manager_name(branch),
         persian_today: Beroon.Calendar.persian_date(today),
-        morning_submitted:
-          Reports.morning_submitted_today?(branch.id, today),
-        evening_submitted:
-          Reports.evening_submission_locked?(branch.id)
+        daily_revenue: Reports.get_daily_revenue(branch.id, today),
+        morning_submitted: Reports.morning_submitted_today?(branch.id, today),
+        evening_submitted: Reports.evening_submission_locked?(branch.id)
       )
+    end
+  end
+
+  def submit_daily_revenue(conn, %{"revenue" => params}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    cash = parse_money(params["cash_amount"])
+    card = parse_money(params["card_to_card_amount"])
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      case Reports.upsert_daily_revenue(%{
+             branch_id: branch.id,
+             reported_on: Reports.iran_today(),
+             cash_amount: cash,
+             card_to_card_amount: card,
+             registered_by_phone: conn.assigns.current_user_phone
+           }) do
+        {:ok, _} -> conn |> put_flash(:info, "گزارش درآمد امروز ثبت شد.") |> redirect(to: ~p"/manager/scan")
+        {:error, _} -> conn |> put_flash(:error, "ثبت درآمد انجام نشد.") |> redirect(to: ~p"/manager/scan")
+      end
     end
   end
 
@@ -406,6 +426,7 @@ defmodule BeroonWeb.PageController do
          scooter <- Fleet.get_scooter_with_details!(id),
          true <- scooter.status == "needs_service",
          {:ok, _scooter} <- Fleet.update_scooter(scooter, %{status: "awaiting_repair"}) do
+      record_workshop_event(scooter.id, "accepted", conn.assigns.current_user_phone)
       conn
       |> put_flash(:info, "پذیرش دستگاه در #{workshop.name} ثبت شد.")
       |> redirect(to: ~p"/workshop/acceptance")
@@ -418,14 +439,13 @@ defmodule BeroonWeb.PageController do
   end
 
   def workshop_start_repair(conn, %{"id" => id}) do
-    workshop_update_status(
-      conn,
-      id,
-      "repairing",
-      "دستگاه وارد مرحله تعمیر شد.",
-      %{},
-      ~p"/workshop/repairing"
-    )
+    scooter = Fleet.get_scooter!(id)
+    case Fleet.update_scooter(scooter, %{status: "repairing"}) do
+      {:ok, _} ->
+        record_workshop_event(scooter.id, "repair_started", conn.assigns.current_user_phone)
+        conn |> put_flash(:info, "دستگاه وارد مرحله تعمیر شد.") |> redirect(to: ~p"/workshop/repairing")
+      {:error, _} -> conn |> put_flash(:error, "تغییر وضعیت دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/repairing")
+    end
   end
 
   def workshop_waiting_part(conn, %{"id" => id}) do
@@ -444,20 +464,18 @@ defmodule BeroonWeb.PageController do
 
   def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
     parts_used = params |> Map.get("repair_parts_used", "") |> String.trim()
+    scooter = Fleet.get_scooter!(id)
 
-    if parts_used == "" do
-      conn
-      |> put_flash(:error, "ثبت قطعات مصرف‌شده برای ترخیص الزامی است.")
-      |> redirect(to: ~p"/workshop/discharge")
-    else
-      workshop_update_status(
-        conn,
-        id,
-        "ready_for_pickup",
-        "دستگاه آماده تحویل شد.",
-        %{repair_parts_used: parts_used},
-        ~p"/workshop/discharge"
-      )
+    cond do
+      parts_used == "" ->
+        conn |> put_flash(:error, "ثبت قطعات مصرف‌شده برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
+      true ->
+        case Fleet.update_scooter(scooter, %{status: "ready_for_pickup", repair_parts_used: parts_used}) do
+          {:ok, _} ->
+            record_workshop_event(scooter.id, "discharged", conn.assigns.current_user_phone)
+            conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop/discharge")
+          {:error, _} -> conn |> put_flash(:error, "ترخیص دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/discharge")
+        end
     end
   end
 
@@ -809,6 +827,48 @@ defmodule BeroonWeb.PageController do
     end
   end
 
+  def admin_repair_stats(conn, params) do
+    from_date = parse_date(params["from"])
+    to_date = parse_date(params["to"] || params["from"])
+    render(conn, :admin_repair_stats, from_date: from_date, to_date: to_date, rows: Reports.workshop_stats(from_date, to_date))
+  end
+
+  def download_admin_repair_stats(conn, params) do
+    from_date = parse_date(params["from"])
+    to_date = parse_date(params["to"] || params["from"])
+    rows = Reports.workshop_stats(from_date, to_date)
+    html = repair_stats_xls(rows)
+    conn |> put_resp_content_type("application/vnd.ms-excel; charset=utf-8") |> put_resp_header("content-disposition", ~s(attachment; filename="repair-stats.xls")) |> send_resp(200, html)
+  end
+
+  def admin_loaned_scooters(conn, _params) do
+    render(conn, :admin_loaned_scooters, loans: Logistics.list_open_loans())
+  end
+
+  def create_admin_scooter_loan(conn, %{"loan" => params}) do
+    code = params |> Map.get("code", "") |> String.trim()
+    unit = params |> Map.get("unit_name", "") |> String.trim()
+    scooter = Fleet.get_scooter_by_plate_or_barcode_with_details(code)
+    cond do
+      is_nil(scooter) -> conn |> put_flash(:error, "دستگاه پیدا نشد.") |> redirect(to: ~p"/admin/loaned-scooters")
+      unit == "" -> conn |> put_flash(:error, "نام واحد امانت‌گیرنده اجباری است.") |> redirect(to: ~p"/admin/loaned-scooters")
+      scooter.status == "loaned" -> conn |> put_flash(:error, "این دستگاه قبلاً امانی شده است.") |> redirect(to: ~p"/admin/loaned-scooters")
+      true ->
+        case Logistics.loan_scooter(scooter, %{unit_name: unit, notes: params["notes"], registered_by_phone: conn.assigns.current_user_phone}) do
+          {:ok, _} -> conn |> put_flash(:info, "دستگاه امانی ثبت شد.") |> redirect(to: ~p"/admin/loaned-scooters")
+          {:error, _} -> conn |> put_flash(:error, "ثبت دستگاه امانی انجام نشد.") |> redirect(to: ~p"/admin/loaned-scooters")
+        end
+    end
+  end
+
+  def return_admin_scooter_loan(conn, %{"id" => id}) do
+    loan = Repo.get!(Beroon.Logistics.ScooterLoan, id)
+    case Logistics.return_loan(loan) do
+      {:ok, _} -> conn |> put_flash(:info, "بازگشت دستگاه ثبت شد.") |> redirect(to: ~p"/admin/loaned-scooters")
+      {:error, _} -> conn |> put_flash(:error, "ثبت بازگشت انجام نشد.") |> redirect(to: ~p"/admin/loaned-scooters")
+    end
+  end
+
   def download_admin_report_export(conn, params) do
     date = parse_date(params["date"])
     export = Reports.evening_inventory_export(date)
@@ -877,11 +937,17 @@ defmodule BeroonWeb.PageController do
       [
         "<th>نوع دستگاه</th>",
         Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
-        "<th>داخل تعمیرگاه (پذیرش‌شده + در حال تعمیر)</th>",
+        "<th>جمع کل شعب</th>",
+        "<th>ارسال‌شده؛ در انتظار پذیرش تعمیرگاه</th>",
+        "<th>پذیرش‌شده؛ در انتظار تعمیر</th>",
+        "<th>در حال تعمیر</th>",
+        "<th>ترخیص‌شده؛ تحویل شعبه نشده</th>",
+        "<th>جمع تعمیرگاه</th>",
         "<th>در انتظار قطعه</th>",
+        "<th>دستگاه‌های امانی</th>",
         "<th>انبار دستگاه‌های نو</th>",
         "<th>فروش‌رفته</th>",
-        "<th>جمع ردیف</th>"
+        "<th>جمع ناوگان روز</th>"
       ]
 
     body_rows =
@@ -891,21 +957,23 @@ defmodule BeroonWeb.PageController do
             Map.get(row.branch_counts, branch.id, 0)
           end)
 
-        row_total =
-          Enum.sum(branch_values) + row.workshop_count + row.waiting_for_part_count +
-            row.new_stock_count + row.sold_count
-
         branch_cells = Enum.map(branch_values, &"<td>#{&1}</td>")
 
         [
           "<tr>",
           "<td>#{escape_html(row.device_type.label)}</td>",
           branch_cells,
-          "<td>#{row.workshop_count}</td>",
+          ~s(<td class="branches-total"><strong>#{row.branches_total_count}</strong></td>),
+          "<td>#{row.pending_acceptance_count}</td>",
+          "<td>#{row.accepted_waiting_repair_count}</td>",
+          "<td>#{row.repairing_count}</td>",
+          "<td>#{row.ready_for_pickup_count}</td>",
+          ~s(<td class="workshop-total"><strong>#{row.workshop_total_count}</strong></td>),
           "<td>#{row.waiting_for_part_count}</td>",
+          "<td>#{row.loaned_count}</td>",
           "<td>#{row.new_stock_count}</td>",
           "<td>#{row.sold_count}</td>",
-          "<td><strong>#{row_total}</strong></td>",
+          ~s(<td class="operational-total-cell"><strong>#{row.operational_total_count}</strong></td>),
           "</tr>"
         ]
       end)
@@ -919,15 +987,22 @@ defmodule BeroonWeb.PageController do
       ~s(<tr class="total-row">),
       "<td><strong>جمع هر ستون</strong></td>",
       total_branch_cells,
-      "<td><strong>#{export.totals.workshop_count}</strong></td>",
+      "<td><strong>#{export.totals.branches_total_count}</strong></td>",
+      "<td><strong>#{export.totals.pending_acceptance_count}</strong></td>",
+      "<td><strong>#{export.totals.accepted_waiting_repair_count}</strong></td>",
+      "<td><strong>#{export.totals.repairing_count}</strong></td>",
+      "<td><strong>#{export.totals.ready_for_pickup_count}</strong></td>",
+      "<td><strong>#{export.totals.workshop_total_count}</strong></td>",
       "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
+      "<td><strong>#{export.totals.loaned_count}</strong></td>",
       "<td><strong>#{export.totals.new_stock_count}</strong></td>",
       "<td><strong>#{export.totals.sold_count}</strong></td>",
-      "<td><strong>#{export.grand_total}</strong></td>",
+      "<td><strong>#{export.totals.operational_total_count}</strong></td>",
       "</tr>"
     ]
 
-    column_count = length(export.branches) + 7
+    # نوع دستگاه + شعب + یازده ستون تجمیعی/وضعیتی
+    column_count = length(export.branches) + 12
 
     [
       "\uFEFF",
@@ -940,13 +1015,21 @@ defmodule BeroonWeb.PageController do
             table { border-collapse: collapse; direction: rtl; }
             th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; }
             th { background: #ccf1ee; font-weight: bold; }
-            td:first-child, th:first-child { text-align: right; min-width: 210px; }
+            td:first-child, th:first-child { text-align: right; min-width: 220px; }
+            .branches-total { background: #eef7ff; }
+            .workshop-total { background: #fff2de; }
+            .operational-total-cell { background: #e7f7e7; }
             .total-row td { background: #e9f7f5; border-top: 3px solid #287f78; }
-            .grand-total td { background: #fff4cc; font-size: 15px; border-top: 2px solid #a77b00; }
+            .summary-title td { background: #dfe9f7; font-size: 16px; border-top: 4px solid #365f91; text-align: right; }
+            .summary-row td { background: #f7f7f7; text-align: right; }
+            .workshop-summary td { background: #fff8e8; text-align: right; }
+            .operational-total td { background: #dff4df; font-size: 17px; border-top: 4px solid #2d7a2d; text-align: right; }
+            .reference-row td { background: #f2f2f2; color: #444; text-align: right; }
           </style>
         </head>
         <body>
-          <h3>خروجی گزارش آمار شبانه - #{escape_html(Beroon.Calendar.persian_date(export.date))}</h3>
+          <h3>خروجی کنترل روزانه ناوگان - #{escape_html(Beroon.Calendar.persian_date(export.date))}</h3>
+          <p>آمار شعب فقط شامل اسکن‌های صحیح آمار شبانه همان تاریخ است؛ دستگاه شعبه دیگر و حمل‌ونقل در جمع شعب محاسبه نمی‌شوند.</p>
           <table>
             <thead>
               <tr>#{IO.iodata_to_binary(header_cells)}</tr>
@@ -954,8 +1037,39 @@ defmodule BeroonWeb.PageController do
             <tbody>
               #{IO.iodata_to_binary(body_rows)}
               #{IO.iodata_to_binary(total_row)}
-              <tr class="grand-total">
-                <td colspan="#{column_count}"><strong>جمع کل همه دستگاه‌ها: #{export.grand_total}</strong></td>
+
+              <tr class="summary-title">
+                <td colspan="#{column_count}"><strong>جمع‌بندی کنترل روزانه</strong></td>
+              </tr>
+              <tr class="summary-row">
+                <td colspan="#{column_count}"><strong>جمع کل دستگاه‌های ثبت‌شده در آمار شبانه تمام شعب: #{export.summary.branch_evening_total_count}</strong></td>
+              </tr>
+              <tr class="workshop-summary">
+                <td colspan="#{column_count}"><strong>ارسال‌شده و در انتظار پذیرش تعمیرگاه: #{export.summary.pending_acceptance_total_count}</strong></td>
+              </tr>
+              <tr class="workshop-summary">
+                <td colspan="#{column_count}"><strong>پذیرش‌شده و در انتظار شروع تعمیر: #{export.summary.accepted_waiting_repair_total_count}</strong></td>
+              </tr>
+              <tr class="workshop-summary">
+                <td colspan="#{column_count}"><strong>در حال تعمیر: #{export.summary.repairing_total_count}</strong></td>
+              </tr>
+              <tr class="workshop-summary">
+                <td colspan="#{column_count}"><strong>ترخیص‌شده و هنوز تحویل شعبه نشده: #{export.summary.ready_for_pickup_total_count}</strong></td>
+              </tr>
+              <tr class="workshop-summary">
+                <td colspan="#{column_count}"><strong>جمع کل دستگاه‌های تعمیرگاهی: #{export.summary.workshop_total_count}</strong></td>
+              </tr>
+              <tr class="summary-row">
+                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های در انتظار قطعه: #{export.summary.waiting_for_part_total_count}</strong></td>
+              </tr>
+              <tr class="summary-row">
+                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های امانی: #{export.summary.loaned_total_count}</strong></td>
+              </tr>
+              <tr class="operational-total">
+                <td colspan="#{column_count}"><strong>جمع کل روزانه ناوگان (شعب + تعمیرگاه + در انتظار قطعه + امانی): #{export.summary.operational_total}</strong></td>
+              </tr>
+              <tr class="reference-row">
+                <td colspan="#{column_count}">موجودی انبار دستگاه‌های نو: #{export.summary.new_stock_total_count} | تعداد فروش ثبت‌شده: #{export.summary.sold_total_count}</td>
               </tr>
             </tbody>
           </table>
@@ -1000,6 +1114,31 @@ defmodule BeroonWeb.PageController do
       |> DateTime.to_time()
 
     Time.compare(time, ~T[11:00:00]) in [:lt, :eq]
+  end
+
+  defp parse_money(value) do
+    normalized = value |> to_string() |> String.replace(",", "") |> String.trim()
+
+    case Integer.parse(normalized) do
+      {number, ""} when number >= 0 -> number
+      {number, _rest} when number >= 0 -> number
+      _ -> 0
+    end
+  end
+
+  defp record_workshop_event(scooter_id, event_type, phone) do
+    Reports.create_workshop_event(%{scooter_id: scooter_id, event_type: event_type, event_on: Reports.iran_today(), event_at: DateTime.utc_now() |> DateTime.truncate(:second), registered_by_phone: phone})
+  end
+
+  defp repair_stats_xls(rows) do
+    body =
+      rows
+      |> Enum.map(fn row ->
+        "<tr><td>#{Beroon.Calendar.persian_numeric_date(row.date)}</td><td>#{row.accepted}</td><td>#{row.repair_started}</td><td>#{row.discharged}</td></tr>"
+      end)
+      |> Enum.join()
+
+    "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><table border=\"1\"><thead><tr><th>تاریخ</th><th>پذیرش</th><th>شروع تعمیر</th><th>ترخیص</th></tr></thead><tbody>#{body}</tbody></table></body></html>"
   end
 
   defp first_error(changeset) do
