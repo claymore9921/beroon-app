@@ -8,6 +8,7 @@ defmodule BeroonWeb.PageController do
   alias Beroon.Operations
   alias Beroon.Repo
   alias Beroon.Reports
+  alias Beroon.Thefts
 
   @manager_workshop_statuses ["awaiting_repair", "repairing"]
 
@@ -496,6 +497,16 @@ defmodule BeroonWeb.PageController do
         |> put_flash(:error, message)
         |> redirect(to: ~p"/manager/morning")
 
+      scooter.status == "stolen" ->
+        conn
+        |> put_flash(:error, "این دستگاه به‌عنوان سرقتی ثبت شده و در چک‌لیست صبح محاسبه نمی‌شود.")
+        |> redirect(to: ~p"/manager/morning")
+
+      scooter.status == "loaned" ->
+        conn
+        |> put_flash(:error, "این دستگاه امانی است و در چک‌لیست صبح محاسبه نمی‌شود.")
+        |> redirect(to: ~p"/manager/morning")
+
       Reports.morning_scooter_submitted_today?(branch.id, scooter.id) ->
         conn
         |> put_flash(:error, "چک‌لیست این دستگاه امروز قبلا ثبت شده است.")
@@ -583,6 +594,7 @@ defmodule BeroonWeb.PageController do
       |> Enum.map(&Fleet.get_scooter_by_plate_or_barcode/1)
       |> Enum.reject(&is_nil/1)
       |> Enum.map(&Logistics.refresh_expired_transport/1)
+      |> Enum.reject(fn scooter -> scooter.status in ["loaned", "stolen"] end)
       |> Enum.reject(fn scooter -> scooter.status == "transport" and scooter.branch_id != branch.id end)
       |> Enum.map(&Logistics.activate_owner_return(&1, branch.id))
 
@@ -853,6 +865,7 @@ defmodule BeroonWeb.PageController do
       is_nil(scooter) -> conn |> put_flash(:error, "دستگاه پیدا نشد.") |> redirect(to: ~p"/admin/loaned-scooters")
       unit == "" -> conn |> put_flash(:error, "نام واحد امانت‌گیرنده اجباری است.") |> redirect(to: ~p"/admin/loaned-scooters")
       scooter.status == "loaned" -> conn |> put_flash(:error, "این دستگاه قبلاً امانی شده است.") |> redirect(to: ~p"/admin/loaned-scooters")
+      scooter.status == "stolen" -> conn |> put_flash(:error, "دستگاه سرقتی را نمی‌توان امانی ثبت کرد.") |> redirect(to: ~p"/admin/loaned-scooters")
       true ->
         case Logistics.loan_scooter(scooter, %{unit_name: unit, notes: params["notes"], registered_by_phone: conn.assigns.current_user_phone}) do
           {:ok, _} -> conn |> put_flash(:info, "دستگاه امانی ثبت شد.") |> redirect(to: ~p"/admin/loaned-scooters")
@@ -866,6 +879,125 @@ defmodule BeroonWeb.PageController do
     case Logistics.return_loan(loan) do
       {:ok, _} -> conn |> put_flash(:info, "بازگشت دستگاه ثبت شد.") |> redirect(to: ~p"/admin/loaned-scooters")
       {:error, _} -> conn |> put_flash(:error, "ثبت بازگشت انجام نشد.") |> redirect(to: ~p"/admin/loaned-scooters")
+    end
+  end
+
+  def admin_stolen_devices(conn, _params) do
+    records = Thefts.list_open_stolen_devices()
+
+    branch_totals =
+      records
+      |> Enum.group_by(& &1.branch.name)
+      |> Enum.map(fn {branch_name, items} ->
+        %{branch_name: branch_name, quantity: Enum.reduce(items, 0, &(&1.quantity + &2))}
+      end)
+      |> Enum.sort_by(& &1.branch_name)
+
+    render(conn, :admin_stolen_devices,
+      records: records,
+      total_count: Enum.reduce(records, 0, &(&1.quantity + &2)),
+      branch_totals: branch_totals,
+      branches: Operations.list_active_transport_branches(),
+      device_types: Fleet.list_device_types()
+    )
+  end
+
+  def create_admin_stolen_device(conn, %{"theft" => params}) do
+    mode = params |> Map.get("mode", "") |> String.trim()
+    branch_id = params |> Map.get("branch_id", "") |> String.trim()
+    notes = params |> Map.get("notes", "") |> String.trim()
+
+    result =
+      case mode do
+        "plated" ->
+          code = params |> Map.get("code", "") |> String.trim()
+          scooter = Fleet.get_scooter_by_plate_or_barcode_with_details(code)
+
+          cond do
+            branch_id == "" -> {:error, :branch_required}
+            code == "" -> {:error, :code_required}
+            is_nil(scooter) -> {:error, :scooter_not_found}
+            true ->
+              Thefts.register_plated_scooter(scooter, branch_id, %{
+                notes: notes,
+                registered_by_phone: conn.assigns.current_user_phone
+              })
+          end
+
+        "unplated" ->
+          Thefts.register_unplated_devices(%{
+            branch_id: branch_id,
+            device_type_id: params["device_type_id"],
+            quantity: params["quantity"],
+            notes: notes,
+            registered_by_phone: conn.assigns.current_user_phone
+          })
+
+        _ ->
+          {:error, :invalid_mode}
+      end
+
+    case result do
+      {:ok, _record} ->
+        conn
+        |> put_flash(:info, "آمار دستگاه سرقتی ثبت شد.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, :already_stolen} ->
+        conn
+        |> put_flash(:error, "این دستگاه قبلاً به‌عنوان سرقتی ثبت شده است.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, :scooter_not_found} ->
+        conn
+        |> put_flash(:error, "دستگاهی با این پلاک یا QR پیدا نشد.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, :code_required} ->
+        conn
+        |> put_flash(:error, "واردکردن پلاک یا QR دستگاه الزامی است.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, :branch_required} ->
+        conn
+        |> put_flash(:error, "انتخاب شعبه الزامی است.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, :device_type_missing} ->
+        conn
+        |> put_flash(:error, "نوع دستگاه برای این پلاک مشخص نشده است.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_flash(:error, "ثبت آمار سرقتی انجام نشد: #{first_error(changeset)}")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, _reason} ->
+        conn
+        |> put_flash(:error, "اطلاعات واردشده کامل یا معتبر نیست.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+    end
+  end
+
+  def recover_admin_stolen_device(conn, %{"id" => id}) do
+    record = Thefts.get_stolen_device!(id)
+
+    case Thefts.recover(record) do
+      {:ok, _record} ->
+        conn
+        |> put_flash(:info, "پیداشدن یا بازگشت دستگاه ثبت شد.")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, _step, reason, _changes} ->
+        conn
+        |> put_flash(:error, "ثبت بازگشت انجام نشد: #{inspect(reason)}")
+        |> redirect(to: ~p"/admin/stolen-devices")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, "ثبت بازگشت انجام نشد: #{inspect(reason)}")
+        |> redirect(to: ~p"/admin/stolen-devices")
     end
   end
 
@@ -945,6 +1077,7 @@ defmodule BeroonWeb.PageController do
         "<th>جمع تعمیرگاه</th>",
         "<th>در انتظار قطعه</th>",
         "<th>دستگاه‌های امانی</th>",
+        "<th>دستگاه‌های سرقتی</th>",
         "<th>انبار دستگاه‌های نو</th>",
         "<th>فروش‌رفته</th>",
         "<th>جمع ناوگان روز</th>"
@@ -971,6 +1104,7 @@ defmodule BeroonWeb.PageController do
           ~s(<td class="workshop-total"><strong>#{row.workshop_total_count}</strong></td>),
           "<td>#{row.waiting_for_part_count}</td>",
           "<td>#{row.loaned_count}</td>",
+          "<td>#{row.stolen_count}</td>",
           "<td>#{row.new_stock_count}</td>",
           "<td>#{row.sold_count}</td>",
           ~s(<td class="operational-total-cell"><strong>#{row.operational_total_count}</strong></td>),
@@ -995,14 +1129,26 @@ defmodule BeroonWeb.PageController do
       "<td><strong>#{export.totals.workshop_total_count}</strong></td>",
       "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
       "<td><strong>#{export.totals.loaned_count}</strong></td>",
+      "<td><strong>#{export.totals.stolen_count}</strong></td>",
       "<td><strong>#{export.totals.new_stock_count}</strong></td>",
       "<td><strong>#{export.totals.sold_count}</strong></td>",
       "<td><strong>#{export.totals.operational_total_count}</strong></td>",
       "</tr>"
     ]
 
-    # نوع دستگاه + شعب + یازده ستون تجمیعی/وضعیتی
-    column_count = length(export.branches) + 12
+    # نوع دستگاه + شعب + دوازده ستون تجمیعی/وضعیتی
+    column_count = length(export.branches) + 13
+
+    stolen_breakdown_rows =
+      Enum.map(export.stolen_breakdown, fn item ->
+        label =
+          [item.device_identifier, item.category, item.device_model]
+          |> Enum.reject(&(&1 in [nil, ""]))
+          |> Enum.join(" - ")
+
+        "<tr><td>#{escape_html(item.branch_name)}</td><td>#{escape_html(label)}</td><td>#{item.quantity}</td></tr>"
+      end)
+      |> IO.iodata_to_binary()
 
     [
       "\uFEFF",
@@ -1065,11 +1211,25 @@ defmodule BeroonWeb.PageController do
               <tr class="summary-row">
                 <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های امانی: #{export.summary.loaned_total_count}</strong></td>
               </tr>
+              <tr class="summary-row">
+                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های سرقتی: #{export.summary.stolen_total_count}</strong></td>
+              </tr>
               <tr class="operational-total">
-                <td colspan="#{column_count}"><strong>جمع کل روزانه ناوگان (شعب + تعمیرگاه + در انتظار قطعه + امانی): #{export.summary.operational_total}</strong></td>
+                <td colspan="#{column_count}"><strong>جمع کل روزانه ناوگان (شعب + تعمیرگاه + در انتظار قطعه + امانی + سرقتی): #{export.summary.operational_total}</strong></td>
               </tr>
               <tr class="reference-row">
                 <td colspan="#{column_count}">موجودی انبار دستگاه‌های نو: #{export.summary.new_stock_total_count} | تعداد فروش ثبت‌شده: #{export.summary.sold_total_count}</td>
+              </tr>
+              <tr class="summary-title">
+                <td colspan="#{column_count}"><strong>جزئیات دستگاه‌های سرقتی به تفکیک شعبه و نوع</strong></td>
+              </tr>
+              <tr>
+                <td colspan="#{column_count}" style="padding: 0;">
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr><th>شعبه</th><th>نوع دستگاه</th><th>تعداد سرقتی</th></tr></thead>
+                    <tbody>#{if stolen_breakdown_rows == "", do: "<tr><td colspan='3'>موردی ثبت نشده است.</td></tr>", else: stolen_breakdown_rows}</tbody>
+                  </table>
+                </td>
               </tr>
             </tbody>
           </table>

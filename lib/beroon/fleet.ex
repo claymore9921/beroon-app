@@ -108,7 +108,8 @@ defmodule Beroon.Fleet do
       {"waiting_for_part", "در انتظار قطعه"},
       {"ready_for_pickup", "آماده تحویل"},
       {"out_of_service", "از مدار خارج شده"},
-      {"loaned", "امانی"}
+      {"loaned", "امانی"},
+      {"stolen", "سرقتی"}
     ]
     |> Enum.filter(fn {value, label} ->
       String.contains?(value, normalized) or String.contains?(String.downcase(label), normalized)
@@ -122,7 +123,7 @@ defmodule Beroon.Fleet do
     |> where(
       [s],
       s.branch_id == ^branch_id and s.current_branch_id == ^branch_id and
-        s.status not in ["awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service", "loaned"]
+        s.status not in ["awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service", "loaned", "stolen"]
     )
     |> order_by([s], asc: s.plate)
     |> Repo.all()
@@ -232,7 +233,8 @@ defmodule Beroon.Fleet do
               "waiting_for_part",
               "ready_for_pickup",
               "out_of_service",
-              "loaned"
+              "loaned",
+              "stolen"
             ] do
     where(query, [s], s.status == ^status)
   end

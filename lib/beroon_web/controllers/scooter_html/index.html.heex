@@ -91,7 +91,8 @@
               scooter.status == "waiting_for_part" && "bg-purple-100 text-purple-700",
               scooter.status == "ready_for_pickup" && "bg-teal-100 text-teal-700",
               scooter.status == "out_of_service" && "bg-zinc-200 text-zinc-700",
-              scooter.status == "loaned" && "bg-red-600 text-white"
+              scooter.status == "loaned" && "bg-red-600 text-white",
+              scooter.status == "stolen" && "bg-rose-950 text-white"
             ]}>
               {status_label(scooter.status)}
             </span>

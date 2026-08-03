@@ -89,6 +89,9 @@ defmodule BeroonWeb.Router do
     get "/admin/loaned-scooters", PageController, :admin_loaned_scooters
     post "/admin/loaned-scooters", PageController, :create_admin_scooter_loan
     post "/admin/loaned-scooters/:id/return", PageController, :return_admin_scooter_loan
+    get "/admin/stolen-devices", PageController, :admin_stolen_devices
+    post "/admin/stolen-devices", PageController, :create_admin_stolen_device
+    post "/admin/stolen-devices/:id/recover", PageController, :recover_admin_stolen_device
     get "/admin/unscanned-devices", PageController, :admin_stale_unscanned_scooters
     delete "/admin/unscanned-devices", PageController, :bulk_delete_stale_unscanned_scooters
     get "/admin/notifications", PageController, :admin_notifications

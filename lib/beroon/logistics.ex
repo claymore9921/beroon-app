@@ -69,7 +69,8 @@ defmodule Beroon.Logistics do
     ScooterTransport
     |> order_by([t], desc: t.transported_at)
     |> limit(^limit)
-    |> preload([:scooter, :origin_branch, :destination_branch, :registered_by_branch])
+    |> preload([:origin_branch, :destination_branch, :registered_by_branch])
+    |> preload(scooter: :device_type)
     |> Repo.all()
   end
 
@@ -167,6 +168,7 @@ defmodule Beroon.Logistics do
       |> order_by([s], asc: s.plate)
       |> limit(1)
       |> preload([s, owner, current], branch: owner, current_branch: current)
+      |> preload(:device_type)
       |> Repo.one()
       |> case do
         nil -> nil
@@ -190,7 +192,7 @@ defmodule Beroon.Logistics do
     ScooterLoan
     |> where([l], is_nil(l.returned_at))
     |> order_by([l], desc: l.loaned_at)
-    |> preload([:scooter])
+    |> preload([scooter: [:branch, :device_type]])
     |> Repo.all()
   end
 

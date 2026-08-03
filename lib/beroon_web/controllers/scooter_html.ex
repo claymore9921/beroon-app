@@ -38,6 +38,7 @@ defmodule BeroonWeb.ScooterHTML do
   def status_label("ready_for_pickup"), do: "آماده تحویل"
   def status_label("out_of_service"), do: "از مدار خارج شده"
   def status_label("loaned"), do: "امانی"
+  def status_label("stolen"), do: "سرقتی"
   def status_label(status), do: status || "-"
 
   def status_options do

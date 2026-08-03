@@ -15,6 +15,7 @@ defmodule Beroon.Reports do
   alias Beroon.Reports.MorningInspectionItem
   alias Beroon.Reports.ScooterLocationAlert
   alias Beroon.Reports.ScooterRepairReport
+  alias Beroon.Thefts
 
   alias Beroon.Reports.EveningCount
 
@@ -222,6 +223,7 @@ defmodule Beroon.Reports do
             "ready_for_pickup",
             "waiting_for_part",
             "loaned",
+            "stolen",
             "out_of_service"
           ] and
           not is_nil(s.device_type_id)
@@ -242,6 +244,8 @@ defmodule Beroon.Reports do
     ready_for_pickup_counts = status_counts_by_device_type(["ready_for_pickup"])
     waiting_for_part_counts = status_counts_by_device_type(["waiting_for_part"])
     loaned_counts = status_counts_by_device_type(["loaned"])
+    stolen_counts = Thefts.open_counts_by_device_type()
+    stolen_breakdown = Thefts.open_breakdown()
 
     new_stock_counts =
       Beroon.Inventory.NewDeviceStock
@@ -279,11 +283,13 @@ defmodule Beroon.Reports do
 
         waiting_for_part_count = Map.get(waiting_for_part_counts, device_type.id, 0)
         loaned_count = Map.get(loaned_counts, device_type.id, 0)
+        stolen_count = Map.get(stolen_counts, device_type.id, 0) || 0
 
         # جمع ناوگان روز فقط از دستگاه‌های موجود در چرخه عملیاتی تشکیل می‌شود؛
         # انبار نو و فروش برای اطلاع در ستون‌های جدا نمایش داده می‌شوند.
         operational_total_count =
-          branches_total_count + workshop_total_count + waiting_for_part_count + loaned_count
+          branches_total_count + workshop_total_count + waiting_for_part_count + loaned_count +
+            stolen_count
 
         %{
           device_type: device_type,
@@ -296,6 +302,7 @@ defmodule Beroon.Reports do
           workshop_total_count: workshop_total_count,
           waiting_for_part_count: waiting_for_part_count,
           loaned_count: loaned_count,
+          stolen_count: stolen_count,
           new_stock_count: Map.get(new_stock_counts, device_type.id, 0) || 0,
           sold_count: Map.get(sold_counts, device_type.id, 0) || 0,
           operational_total_count: operational_total_count
@@ -323,6 +330,7 @@ defmodule Beroon.Reports do
       workshop_total_count: Enum.reduce(rows, 0, &(&1.workshop_total_count + &2)),
       waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
       loaned_count: Enum.reduce(rows, 0, &(&1.loaned_count + &2)),
+      stolen_count: Enum.reduce(rows, 0, &(&1.stolen_count + &2)),
       new_stock_count: Enum.reduce(rows, 0, &(&1.new_stock_count + &2)),
       sold_count: Enum.reduce(rows, 0, &(&1.sold_count + &2)),
       operational_total_count: Enum.reduce(rows, 0, &(&1.operational_total_count + &2))
@@ -333,8 +341,9 @@ defmodule Beroon.Reports do
       branches: branches,
       rows: rows,
       totals: totals,
+      stolen_breakdown: stolen_breakdown,
       # این همان عدد کنترل روزانه است و دقیقاً برابر جمع شعب + تعمیرگاه +
-      # در انتظار قطعه + امانی است.
+      # در انتظار قطعه + امانی + سرقتی است.
       grand_total: totals.operational_total_count,
       summary: %{
         branch_evening_total_count: totals.branches_total_count,
@@ -345,6 +354,7 @@ defmodule Beroon.Reports do
         workshop_total_count: totals.workshop_total_count,
         waiting_for_part_total_count: totals.waiting_for_part_count,
         loaned_total_count: totals.loaned_count,
+        stolen_total_count: totals.stolen_count,
         new_stock_total_count: totals.new_stock_count,
         sold_total_count: totals.sold_count,
         operational_total: totals.operational_total_count
@@ -817,7 +827,7 @@ defmodule Beroon.Reports do
   def list_unhealthy_scooters_for_branch(date, branch_id) do
     list_morning_inspections_for_branch(date, branch_id)
     |> Enum.filter(fn inspection ->
-      inspection.scooter_status not in ["needs_service", "awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service"] and
+      inspection.scooter_status not in ["needs_service", "awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service", "loaned", "stolen"] and
         Enum.any?(inspection.items, fn item -> not item.checked end)
     end)
     |> Enum.map(fn inspection ->
@@ -850,7 +860,7 @@ defmodule Beroon.Reports do
 
     Scooter
     |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
-    |> where([s], s.branch_id == ^branch_id and s.status != "loaned")
+    |> where([s], s.branch_id == ^branch_id and s.status not in ["loaned", "stolen"])
     |> where([s], s.id not in subquery(checked_scooter_ids))
   end
 
@@ -921,6 +931,7 @@ defmodule Beroon.Reports do
       |> Map.new()
 
     Scooter
+    |> where([s], s.status != "stolen")
     |> preload([:branch, :current_branch, :device_type])
     |> Repo.all()
     |> Enum.map(fn scooter ->
