@@ -7,42 +7,34 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
   alias Beroon.Repo
   alias Beroon.Reports
 
-  @excluded_branch_statuses [
-    "needs_service",
-    "awaiting_repair",
-    "repairing",
-    "ready_for_pickup",
-    "waiting_for_part",
-    "loaned",
-    "stolen",
-    "out_of_service"
-  ]
-
   def run do
     date = Reports.iran_today()
 
     export =
       date
       |> Reports.evening_inventory_export()
-      |> replace_evening_counts_with_assigned_counts()
+      |> replace_evening_counts_with_all_assigned_counts()
 
     output_dir = Path.expand("exports", File.cwd!())
     File.mkdir_p!(output_dir)
 
     persian_date = Beroon.Calendar.persian_numeric_date(date)
     safe_date = String.replace(persian_date, "/", "-")
-    output_path = Path.join(output_dir, "beroon-assigned-inventory-#{safe_date}.xls")
+    output_path = Path.join(output_dir, "beroon-all-assigned-inventory-#{safe_date}.xls")
 
     File.write!(output_path, render_xls(export))
 
     IO.puts("\nگزارش با موفقیت ساخته شد:")
     IO.puts(output_path)
     IO.puts("تاریخ گزارش: #{persian_date}")
-    IO.puts("جمع دستگاه‌های تخصیص‌یافته به شعب: #{export.totals.branches_total_count}")
-    IO.puts("جمع کل ناوگان: #{export.totals.operational_total_count}\n")
+    IO.puts("جمع همه دستگاه‌های تخصیص‌یافته به شعب با هر وضعیت: #{export.totals.branches_total_count}\n")
   end
 
-  defp replace_evening_counts_with_assigned_counts(export) do
+  # ستون هر شعبه از خود جدول scooters و branch_id ساخته می‌شود.
+  # هیچ فیلتری بر اساس status اعمال نمی‌شود؛ بنابراین دستگاه فعال، خراب،
+  # تعمیرگاهی، در انتظار قطعه، آماده تحویل، امانی، سرقتی و ... همگی
+  # زیر شعبه مالک خود شمرده می‌شوند.
+  defp replace_evening_counts_with_all_assigned_counts(export) do
     assigned_counts = assigned_counts_by_device_type_and_branch()
 
     rows =
@@ -53,19 +45,13 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
             {branch.id, count}
           end)
 
-        branches_total_count = Enum.sum(Map.values(branch_counts))
-
-        operational_total_count =
-          branches_total_count +
-            row.workshop_total_count +
-            row.waiting_for_part_count +
-            row.loaned_count +
-            row.stolen_count
+        assigned_total_count = Enum.sum(Map.values(branch_counts))
 
         row
         |> Map.put(:branch_counts, branch_counts)
-        |> Map.put(:branches_total_count, branches_total_count)
-        |> Map.put(:operational_total_count, operational_total_count)
+        |> Map.put(:branches_total_count, assigned_total_count)
+        # این مقدار فقط برای سازگاری با ساختار داده خروجی اصلی نگه داشته می‌شود.
+        |> Map.put(:operational_total_count, assigned_total_count)
       end)
 
     branch_totals =
@@ -78,35 +64,29 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
         {branch.id, total}
       end)
 
-    branches_total_count = Enum.sum(Map.values(branch_totals))
-    operational_total_count = Enum.reduce(rows, 0, &(&1.operational_total_count + &2))
+    assigned_total_count = Enum.sum(Map.values(branch_totals))
 
     totals =
       export.totals
       |> Map.put(:branch_counts, branch_totals)
-      |> Map.put(:branches_total_count, branches_total_count)
-      |> Map.put(:operational_total_count, operational_total_count)
+      |> Map.put(:branches_total_count, assigned_total_count)
+      |> Map.put(:operational_total_count, assigned_total_count)
 
     summary =
       export.summary
-      |> Map.put(:branch_evening_total_count, branches_total_count)
-      |> Map.put(:operational_total, operational_total_count)
+      |> Map.put(:branch_evening_total_count, assigned_total_count)
+      |> Map.put(:operational_total, assigned_total_count)
 
     export
     |> Map.put(:rows, rows)
     |> Map.put(:totals, totals)
     |> Map.put(:summary, summary)
-    |> Map.put(:grand_total, operational_total_count)
+    |> Map.put(:grand_total, assigned_total_count)
   end
 
   defp assigned_counts_by_device_type_and_branch do
     Scooter
-    |> where(
-      [s],
-      not is_nil(s.branch_id) and
-        not is_nil(s.device_type_id) and
-        s.status not in ^@excluded_branch_statuses
-    )
+    |> where([s], not is_nil(s.branch_id) and not is_nil(s.device_type_id))
     |> group_by([s], [s.device_type_id, s.branch_id])
     |> select([s], {{s.device_type_id, s.branch_id}, count(s.id)})
     |> Repo.all()
@@ -118,18 +98,12 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
       [
         "<th>نوع دستگاه</th>",
         Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
-        "<th>جمع کل شعب</th>",
-        "<th>ارسال‌شده؛ در انتظار پذیرش تعمیرگاه</th>",
-        "<th>پذیرش‌شده؛ در انتظار تعمیر</th>",
-        "<th>در حال تعمیر</th>",
-        "<th>ترخیص‌شده؛ تحویل شعبه نشده</th>",
-        "<th>جمع تعمیرگاه</th>",
-        "<th>در انتظار قطعه</th>",
-        "<th>دستگاه‌های امانی</th>",
-        "<th>دستگاه‌های سرقتی</th>",
+        "<th>جمع کل دستگاه‌های تخصیص‌یافته</th>",
+        "<th>در انتظار قطعه (از مجموع تخصیص‌یافته)</th>",
+        "<th>امانی (از مجموع تخصیص‌یافته)</th>",
+        "<th>سرقتی</th>",
         "<th>انبار دستگاه‌های نو</th>",
-        "<th>فروش‌رفته</th>",
-        "<th>جمع ناوگان روز</th>"
+        "<th>فروش‌رفته</th>"
       ]
 
     body_rows =
@@ -143,18 +117,12 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
           "<tr>",
           "<td>#{escape_html(row.device_type.label)}</td>",
           branch_cells,
-          ~s(<td class="branches-total"><strong>#{row.branches_total_count}</strong></td>),
-          "<td>#{row.pending_acceptance_count}</td>",
-          "<td>#{row.accepted_waiting_repair_count}</td>",
-          "<td>#{row.repairing_count}</td>",
-          "<td>#{row.ready_for_pickup_count}</td>",
-          ~s(<td class="workshop-total"><strong>#{row.workshop_total_count}</strong></td>),
+          ~s(<td class="assigned-total"><strong>#{row.branches_total_count}</strong></td>),
           "<td>#{row.waiting_for_part_count}</td>",
           "<td>#{row.loaned_count}</td>",
           "<td>#{row.stolen_count}</td>",
           "<td>#{row.new_stock_count}</td>",
           "<td>#{row.sold_count}</td>",
-          ~s(<td class="operational-total-cell"><strong>#{row.operational_total_count}</strong></td>),
           "</tr>"
         ]
       end)
@@ -169,21 +137,15 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
       "<td><strong>جمع هر ستون</strong></td>",
       total_branch_cells,
       "<td><strong>#{export.totals.branches_total_count}</strong></td>",
-      "<td><strong>#{export.totals.pending_acceptance_count}</strong></td>",
-      "<td><strong>#{export.totals.accepted_waiting_repair_count}</strong></td>",
-      "<td><strong>#{export.totals.repairing_count}</strong></td>",
-      "<td><strong>#{export.totals.ready_for_pickup_count}</strong></td>",
-      "<td><strong>#{export.totals.workshop_total_count}</strong></td>",
       "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
       "<td><strong>#{export.totals.loaned_count}</strong></td>",
       "<td><strong>#{export.totals.stolen_count}</strong></td>",
       "<td><strong>#{export.totals.new_stock_count}</strong></td>",
       "<td><strong>#{export.totals.sold_count}</strong></td>",
-      "<td><strong>#{export.totals.operational_total_count}</strong></td>",
       "</tr>"
     ]
 
-    column_count = length(export.branches) + 13
+    column_count = length(export.branches) + 7
 
     stolen_breakdown_rows =
       export.stolen_breakdown
@@ -209,20 +171,22 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
             th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; }
             th { background: #ccf1ee; font-weight: bold; }
             td:first-child, th:first-child { text-align: right; min-width: 220px; }
-            .branches-total { background: #eef7ff; }
-            .workshop-total { background: #fff2de; }
-            .operational-total-cell { background: #e7f7e7; }
+            .assigned-total { background: #eef7ff; }
             .total-row td { background: #e9f7f5; border-top: 3px solid #287f78; }
             .summary-title td { background: #dfe9f7; font-size: 16px; border-top: 4px solid #365f91; text-align: right; }
             .summary-row td { background: #f7f7f7; text-align: right; }
-            .workshop-summary td { background: #fff8e8; text-align: right; }
-            .operational-total td { background: #dff4df; font-size: 17px; border-top: 4px solid #2d7a2d; text-align: right; }
+            .grand-total td { background: #dff4df; font-size: 17px; border-top: 4px solid #2d7a2d; text-align: right; }
             .reference-row td { background: #f2f2f2; color: #444; text-align: right; }
+            .warning-row td { background: #fff8e8; color: #5b4700; text-align: right; }
           </style>
         </head>
         <body>
-          <h3>گزارش موجودی تخصیص‌یافته ناوگان - #{escape_html(Beroon.Calendar.persian_date(export.date))}</h3>
-          <p>ستون هر شعبه بر اساس دستگاه‌های متعلق به همان شعبه در جدول دستگاه‌ها محاسبه شده است و به ثبت آمار شبانه وابسته نیست.</p>
+          <h3>گزارش همه دستگاه‌های تخصیص‌یافته به شعب - #{escape_html(Beroon.Calendar.persian_date(export.date))}</h3>
+          <p>
+            ستون هر شعبه مستقیماً از <strong>branch_id</strong> دستگاه‌ها محاسبه شده است.
+            وضعیت دستگاه در شمارش تأثیری ندارد و دستگاه‌های فعال، خراب، تعمیرگاهی، در انتظار قطعه،
+            آماده تحویل، امانی، سرقتی و سایر وضعیت‌ها همگی زیر شعبه مالک خود شمرده می‌شوند.
+          </p>
           <table>
             <thead>
               <tr>#{IO.iodata_to_binary(header_cells)}</tr>
@@ -234,35 +198,14 @@ defmodule Beroon.Scripts.ExportAssignedInventoryReport do
               <tr class="summary-title">
                 <td colspan="#{column_count}"><strong>جمع‌بندی موجودی تخصیص‌یافته</strong></td>
               </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>جمع کل دستگاه‌های متعلق به تمام شعب: #{export.summary.branch_evening_total_count}</strong></td>
+              <tr class="grand-total">
+                <td colspan="#{column_count}"><strong>جمع کل همه دستگاه‌های تخصیص‌یافته به تمام شعب با هر وضعیت: #{export.totals.branches_total_count}</strong></td>
               </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>ارسال‌شده و در انتظار پذیرش تعمیرگاه: #{export.summary.pending_acceptance_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>پذیرش‌شده و در انتظار شروع تعمیر: #{export.summary.accepted_waiting_repair_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>در حال تعمیر: #{export.summary.repairing_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>ترخیص‌شده و هنوز تحویل شعبه نشده: #{export.summary.ready_for_pickup_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>جمع کل دستگاه‌های تعمیرگاهی: #{export.summary.workshop_total_count}</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های در انتظار قطعه: #{export.summary.waiting_for_part_total_count}</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های امانی: #{export.summary.loaned_total_count}</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های سرقتی: #{export.summary.stolen_total_count}</strong></td>
-              </tr>
-              <tr class="operational-total">
-                <td colspan="#{column_count}"><strong>جمع کل ناوگان (شعب + تعمیرگاه + در انتظار قطعه + امانی + سرقتی): #{export.summary.operational_total}</strong></td>
+              <tr class="warning-row">
+                <td colspan="#{column_count}">
+                  ستون‌های «در انتظار قطعه»، «امانی» و دستگاه‌های سرقتی دارای پلاک، اطلاعات تکمیلی وضعیت هستند
+                  و ممکن است بخشی از جمع دستگاه‌های تخصیص‌یافته باشند؛ بنابراین دوباره به جمع کل اضافه نشده‌اند.
+                </td>
               </tr>
               <tr class="reference-row">
                 <td colspan="#{column_count}">موجودی انبار دستگاه‌های نو: #{export.summary.new_stock_total_count} | تعداد فروش ثبت‌شده: #{export.summary.sold_total_count}</td>

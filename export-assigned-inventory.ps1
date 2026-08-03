@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "در حال ساخت گزارش موجودی تخصیص‌یافته شعب..." -ForegroundColor Cyan
+Write-Host "در حال ساخت گزارش همه دستگاه‌های تخصیص‌یافته به شعب با هر وضعیت..." -ForegroundColor Cyan
 mix run priv/scripts/export_assigned_inventory_report.exs
 
 if ($LASTEXITCODE -ne 0) {
