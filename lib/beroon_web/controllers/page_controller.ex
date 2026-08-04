@@ -1012,6 +1012,18 @@ defmodule BeroonWeb.PageController do
     |> send_resp(200, evening_inventory_xls(export))
   end
 
+  def download_admin_reference_export(conn, _params) do
+    export = Reports.reference_inventory_export()
+
+    filename =
+      "beroon-reference-inventory-#{String.replace(Beroon.Calendar.persian_numeric_date(export.date), "/", "-")}.xls"
+
+    conn
+    |> put_resp_content_type("application/vnd.ms-excel; charset=utf-8")
+    |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
+    |> send_resp(200, reference_inventory_xls(export))
+  end
+
   def admin_checklist_branches(conn, _params) do
     render(conn, :admin_checklist_branches,
       branches: Operations.list_branches(),
@@ -1064,50 +1076,35 @@ defmodule BeroonWeb.PageController do
     )
   end
 
-  defp evening_inventory_xls(export) do
-    header_cells =
-      [
-        "<th>نوع دستگاه</th>",
-        Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
-        "<th>جمع کل شعب</th>",
-        "<th>ارسال‌شده؛ در انتظار پذیرش تعمیرگاه</th>",
-        "<th>پذیرش‌شده؛ در انتظار تعمیر</th>",
-        "<th>در حال تعمیر</th>",
-        "<th>ترخیص‌شده؛ تحویل شعبه نشده</th>",
-        "<th>جمع تعمیرگاه</th>",
-        "<th>در انتظار قطعه</th>",
-        "<th>دستگاه‌های امانی</th>",
-        "<th>دستگاه‌های سرقتی</th>",
-        "<th>انبار دستگاه‌های نو</th>",
-        "<th>فروش‌رفته</th>",
-        "<th>جمع ناوگان روز</th>"
-      ]
+  defp reference_inventory_xls(export) do
+    header_cells = [
+      "<th>نوع دستگاه</th>",
+      Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
+      "<th>جمع شعب</th>",
+      "<th>در انتظار قطعه</th>",
+      "<th>انبار نو</th>",
+      "<th>امانی</th>",
+      "<th>سرقتی</th>",
+      "<th>جمع کل</th>"
+    ]
 
     body_rows =
       Enum.map(export.rows, fn row ->
-        branch_values =
+        branch_cells =
           Enum.map(export.branches, fn branch ->
-            Map.get(row.branch_counts, branch.id, 0)
+            "<td>#{Map.get(row.branch_counts, branch.id, 0)}</td>"
           end)
-
-        branch_cells = Enum.map(branch_values, &"<td>#{&1}</td>")
 
         [
           "<tr>",
           "<td>#{escape_html(row.device_type.label)}</td>",
           branch_cells,
-          ~s(<td class="branches-total"><strong>#{row.branches_total_count}</strong></td>),
-          "<td>#{row.pending_acceptance_count}</td>",
-          "<td>#{row.accepted_waiting_repair_count}</td>",
-          "<td>#{row.repairing_count}</td>",
-          "<td>#{row.ready_for_pickup_count}</td>",
-          ~s(<td class="workshop-total"><strong>#{row.workshop_total_count}</strong></td>),
+          "<td><strong>#{row.branches_total_count}</strong></td>",
           "<td>#{row.waiting_for_part_count}</td>",
+          "<td>#{row.new_stock_count}</td>",
           "<td>#{row.loaned_count}</td>",
           "<td>#{row.stolen_count}</td>",
-          "<td>#{row.new_stock_count}</td>",
-          "<td>#{row.sold_count}</td>",
-          ~s(<td class="operational-total-cell"><strong>#{row.operational_total_count}</strong></td>),
+          "<td><strong>#{row.grand_total_count}</strong></td>",
           "</tr>"
         ]
       end)
@@ -1119,37 +1116,101 @@ defmodule BeroonWeb.PageController do
 
     total_row = [
       ~s(<tr class="total-row">),
-      "<td><strong>جمع هر ستون</strong></td>",
+      "<td><strong>جمع همه دستگاه‌ها</strong></td>",
       total_branch_cells,
       "<td><strong>#{export.totals.branches_total_count}</strong></td>",
-      "<td><strong>#{export.totals.pending_acceptance_count}</strong></td>",
-      "<td><strong>#{export.totals.accepted_waiting_repair_count}</strong></td>",
-      "<td><strong>#{export.totals.repairing_count}</strong></td>",
-      "<td><strong>#{export.totals.ready_for_pickup_count}</strong></td>",
-      "<td><strong>#{export.totals.workshop_total_count}</strong></td>",
       "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
+      "<td><strong>#{export.totals.new_stock_count}</strong></td>",
       "<td><strong>#{export.totals.loaned_count}</strong></td>",
       "<td><strong>#{export.totals.stolen_count}</strong></td>",
-      "<td><strong>#{export.totals.new_stock_count}</strong></td>",
-      "<td><strong>#{export.totals.sold_count}</strong></td>",
-      "<td><strong>#{export.totals.operational_total_count}</strong></td>",
+      "<td><strong>#{export.totals.grand_total_count}</strong></td>",
       "</tr>"
     ]
 
-    # نوع دستگاه + شعب + دوازده ستون تجمیعی/وضعیتی
-    column_count = length(export.branches) + 13
+    report_table_xls(
+      "آمار مرجع ناوگان",
+      export.date,
+      header_cells,
+      body_rows,
+      total_row,
+      "تعداد هر نوع دستگاه بر اساس تخصیص مالکیتی شعبه نمایش داده شده است. وضعیت‌های دارای ستون مستقل برای جلوگیری از دوباره‌شماری از ستون شعبه خارج شده‌اند."
+    )
+  end
 
-    stolen_breakdown_rows =
-      Enum.map(export.stolen_breakdown, fn item ->
-        label =
-          [item.device_identifier, item.category, item.device_model]
-          |> Enum.reject(&(&1 in [nil, ""]))
-          |> Enum.join(" - ")
+  defp evening_inventory_xls(export) do
+    header_cells = [
+      "<th>نوع دستگاه</th>",
+      Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
+      "<th>جمع شعب</th>",
+      "<th>تعمیرگاه</th>",
+      "<th>در انتظار قطعه</th>",
+      "<th>انبار نو</th>",
+      "<th>امانی</th>",
+      "<th>سرقتی</th>",
+      "<th>جمع کل</th>"
+    ]
 
-        "<tr><td>#{escape_html(item.branch_name)}</td><td>#{escape_html(label)}</td><td>#{item.quantity}</td></tr>"
+    body_rows =
+      Enum.map(export.rows, fn row ->
+        branch_cells =
+          Enum.map(export.branches, fn branch ->
+            "<td>#{Map.get(row.branch_counts, branch.id, 0)}</td>"
+          end)
+
+        grand_total =
+          row.branches_total_count + row.workshop_total_count + row.waiting_for_part_count +
+            row.new_stock_count + row.loaned_count + row.stolen_count
+
+        [
+          "<tr>",
+          "<td>#{escape_html(row.device_type.label)}</td>",
+          branch_cells,
+          "<td><strong>#{row.branches_total_count}</strong></td>",
+          "<td>#{row.workshop_total_count}</td>",
+          "<td>#{row.waiting_for_part_count}</td>",
+          "<td>#{row.new_stock_count}</td>",
+          "<td>#{row.loaned_count}</td>",
+          "<td>#{row.stolen_count}</td>",
+          "<td><strong>#{grand_total}</strong></td>",
+          "</tr>"
+        ]
       end)
-      |> IO.iodata_to_binary()
 
+    total_branch_cells =
+      Enum.map(export.branches, fn branch ->
+        "<td><strong>#{Map.get(export.totals.branch_counts, branch.id, 0)}</strong></td>"
+      end)
+
+    grand_total =
+      export.totals.branches_total_count + export.totals.workshop_total_count +
+        export.totals.waiting_for_part_count + export.totals.new_stock_count +
+        export.totals.loaned_count + export.totals.stolen_count
+
+    total_row = [
+      ~s(<tr class="total-row">),
+      "<td><strong>جمع همه دستگاه‌ها</strong></td>",
+      total_branch_cells,
+      "<td><strong>#{export.totals.branches_total_count}</strong></td>",
+      "<td><strong>#{export.totals.workshop_total_count}</strong></td>",
+      "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
+      "<td><strong>#{export.totals.new_stock_count}</strong></td>",
+      "<td><strong>#{export.totals.loaned_count}</strong></td>",
+      "<td><strong>#{export.totals.stolen_count}</strong></td>",
+      "<td><strong>#{grand_total}</strong></td>",
+      "</tr>"
+    ]
+
+    report_table_xls(
+      "گزارش روزانه ناوگان",
+      export.date,
+      header_cells,
+      body_rows,
+      total_row,
+      "ستون شعب بر اساس اسکن‌های صحیح آمار شبانه تاریخ انتخاب‌شده و ستون تعمیرگاه بر اساس دستگاه‌های موجود در چرخه تعمیر نمایش داده می‌شود."
+    )
+  end
+
+  defp report_table_xls(title, date, header_cells, body_rows, total_row, description) do
     [
       "\uFEFF",
       """
@@ -1162,75 +1223,17 @@ defmodule BeroonWeb.PageController do
             th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; }
             th { background: #ccf1ee; font-weight: bold; }
             td:first-child, th:first-child { text-align: right; min-width: 220px; }
-            .branches-total { background: #eef7ff; }
-            .workshop-total { background: #fff2de; }
-            .operational-total-cell { background: #e7f7e7; }
             .total-row td { background: #e9f7f5; border-top: 3px solid #287f78; }
-            .summary-title td { background: #dfe9f7; font-size: 16px; border-top: 4px solid #365f91; text-align: right; }
-            .summary-row td { background: #f7f7f7; text-align: right; }
-            .workshop-summary td { background: #fff8e8; text-align: right; }
-            .operational-total td { background: #dff4df; font-size: 17px; border-top: 4px solid #2d7a2d; text-align: right; }
-            .reference-row td { background: #f2f2f2; color: #444; text-align: right; }
           </style>
         </head>
         <body>
-          <h3>خروجی کنترل روزانه ناوگان - #{escape_html(Beroon.Calendar.persian_date(export.date))}</h3>
-          <p>آمار شعب فقط شامل اسکن‌های صحیح آمار شبانه همان تاریخ است؛ دستگاه شعبه دیگر و حمل‌ونقل در جمع شعب محاسبه نمی‌شوند.</p>
+          <h3>#{escape_html(title)} - #{escape_html(Beroon.Calendar.persian_date(date))}</h3>
+          <p>#{escape_html(description)}</p>
           <table>
-            <thead>
-              <tr>#{IO.iodata_to_binary(header_cells)}</tr>
-            </thead>
+            <thead><tr>#{IO.iodata_to_binary(header_cells)}</tr></thead>
             <tbody>
               #{IO.iodata_to_binary(body_rows)}
               #{IO.iodata_to_binary(total_row)}
-
-              <tr class="summary-title">
-                <td colspan="#{column_count}"><strong>جمع‌بندی کنترل روزانه</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>جمع کل دستگاه‌های ثبت‌شده در آمار شبانه تمام شعب: #{export.summary.branch_evening_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>ارسال‌شده و در انتظار پذیرش تعمیرگاه: #{export.summary.pending_acceptance_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>پذیرش‌شده و در انتظار شروع تعمیر: #{export.summary.accepted_waiting_repair_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>در حال تعمیر: #{export.summary.repairing_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>ترخیص‌شده و هنوز تحویل شعبه نشده: #{export.summary.ready_for_pickup_total_count}</strong></td>
-              </tr>
-              <tr class="workshop-summary">
-                <td colspan="#{column_count}"><strong>جمع کل دستگاه‌های تعمیرگاهی: #{export.summary.workshop_total_count}</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های در انتظار قطعه: #{export.summary.waiting_for_part_total_count}</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های امانی: #{export.summary.loaned_total_count}</strong></td>
-              </tr>
-              <tr class="summary-row">
-                <td colspan="#{column_count}"><strong>تعداد کل دستگاه‌های سرقتی: #{export.summary.stolen_total_count}</strong></td>
-              </tr>
-              <tr class="operational-total">
-                <td colspan="#{column_count}"><strong>جمع کل روزانه ناوگان (شعب + تعمیرگاه + در انتظار قطعه + امانی + سرقتی): #{export.summary.operational_total}</strong></td>
-              </tr>
-              <tr class="reference-row">
-                <td colspan="#{column_count}">موجودی انبار دستگاه‌های نو: #{export.summary.new_stock_total_count} | تعداد فروش ثبت‌شده: #{export.summary.sold_total_count}</td>
-              </tr>
-              <tr class="summary-title">
-                <td colspan="#{column_count}"><strong>جزئیات دستگاه‌های سرقتی به تفکیک شعبه و نوع</strong></td>
-              </tr>
-              <tr>
-                <td colspan="#{column_count}" style="padding: 0;">
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <thead><tr><th>شعبه</th><th>نوع دستگاه</th><th>تعداد سرقتی</th></tr></thead>
-                    <tbody>#{if stolen_breakdown_rows == "", do: "<tr><td colspan='3'>موردی ثبت نشده است.</td></tr>", else: stolen_breakdown_rows}</tbody>
-                  </table>
-                </td>
-              </tr>
             </tbody>
           </table>
         </body>

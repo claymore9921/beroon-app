@@ -179,6 +179,105 @@ defmodule Beroon.Reports do
     attach_evening_count_items(counts)
   end
 
+  def reference_inventory_export do
+    branches =
+      Branch
+      |> where([b], b.active == true and b.kind == "branch")
+      |> order_by([b], asc: b.name)
+      |> select([b], %{id: b.id, name: b.name})
+      |> Repo.all()
+
+    device_types =
+      DeviceType
+      |> order_by([d], asc: d.category, asc: d.device_model, asc: d.device_identifier)
+      |> select([d], %{
+        id: d.id,
+        label:
+          fragment(
+            "trim(concat_ws(' ', nullif(?, ''), nullif(?, ''), nullif(?, '')))",
+            d.category,
+            d.device_model,
+            d.device_identifier
+          )
+      })
+      |> Repo.all()
+
+    # آمار مرجع بر اساس مالکیت/تخصیص دستگاه است، نه اسکن روزانه.
+    # وضعیت‌هایی که ستون مستقل دارند از ستون شعبه خارج می‌شوند تا دوباره‌شماری نشوند.
+    branch_counts =
+      Scooter
+      |> where(
+        [s],
+        not is_nil(s.branch_id) and not is_nil(s.device_type_id) and
+          s.status not in ["waiting_for_part", "loaned", "stolen"]
+      )
+      |> group_by([s], [s.device_type_id, s.branch_id])
+      |> select([s], {{s.device_type_id, s.branch_id}, count(s.id)})
+      |> Repo.all()
+      |> Map.new()
+
+    waiting_for_part_counts = status_counts_by_device_type(["waiting_for_part"])
+    loaned_counts = status_counts_by_device_type(["loaned"])
+    stolen_counts = Thefts.open_counts_by_device_type()
+
+    new_stock_counts =
+      Beroon.Inventory.NewDeviceStock
+      |> group_by([stock], stock.device_type_id)
+      |> select([stock], {stock.device_type_id, sum(stock.quantity)})
+      |> Repo.all()
+      |> Map.new()
+
+    rows =
+      Enum.map(device_types, fn device_type ->
+        per_branch =
+          Map.new(branches, fn branch ->
+            {branch.id, Map.get(branch_counts, {device_type.id, branch.id}, 0)}
+          end)
+
+        branches_total = Enum.sum(Map.values(per_branch))
+        waiting_for_part = Map.get(waiting_for_part_counts, device_type.id, 0) || 0
+        new_stock = Map.get(new_stock_counts, device_type.id, 0) || 0
+        loaned = Map.get(loaned_counts, device_type.id, 0) || 0
+        stolen = Map.get(stolen_counts, device_type.id, 0) || 0
+
+        %{
+          device_type: device_type,
+          branch_counts: per_branch,
+          branches_total_count: branches_total,
+          waiting_for_part_count: waiting_for_part,
+          new_stock_count: new_stock,
+          loaned_count: loaned,
+          stolen_count: stolen,
+          grand_total_count: branches_total + waiting_for_part + new_stock + loaned + stolen
+        }
+      end)
+
+    branch_totals =
+      Map.new(branches, fn branch ->
+        {branch.id,
+         Enum.reduce(rows, 0, fn row, acc ->
+           acc + Map.get(row.branch_counts, branch.id, 0)
+         end)}
+      end)
+
+    totals = %{
+      branch_counts: branch_totals,
+      branches_total_count: Enum.sum(Map.values(branch_totals)),
+      waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
+      new_stock_count: Enum.reduce(rows, 0, &(&1.new_stock_count + &2)),
+      loaned_count: Enum.reduce(rows, 0, &(&1.loaned_count + &2)),
+      stolen_count: Enum.reduce(rows, 0, &(&1.stolen_count + &2)),
+      grand_total_count: Enum.reduce(rows, 0, &(&1.grand_total_count + &2))
+    }
+
+    %{
+      date: iran_today(),
+      branches: branches,
+      rows: rows,
+      totals: totals
+    }
+  end
+
   def evening_inventory_export(%Date{} = date) do
     branches =
       Branch

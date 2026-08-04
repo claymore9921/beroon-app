@@ -109,6 +109,7 @@ defmodule BeroonWeb.Router do
     get "/admin/new-device-sales", PageController, :admin_new_device_sales
     post "/admin/new-device-sales", PageController, :create_new_device_sale
     get "/admin/report-export/download", PageController, :download_admin_report_export
+    get "/admin/report-export/reference", PageController, :download_admin_reference_export
     get "/report-export/download", PageController, :download_admin_report_export
     get "/admin/evening-reports", PageController, :admin_evening_report_branches
     get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail
