@@ -1004,24 +1004,24 @@ defmodule BeroonWeb.PageController do
   def download_admin_report_export(conn, params) do
     date = parse_date(params["date"])
     export = Reports.evening_inventory_export(date)
-    filename = "beroon-evening-inventory-#{String.replace(Beroon.Calendar.persian_numeric_date(date), "/", "-")}.xls"
+    filename = "beroon-evening-inventory-#{String.replace(Beroon.Calendar.persian_numeric_date(date), "/", "-")}.xlsx"
 
     conn
-    |> put_resp_content_type("application/vnd.ms-excel; charset=utf-8")
+    |> put_resp_content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
-    |> send_resp(200, evening_inventory_xls(export))
+    |> send_resp(200, evening_inventory_xlsx(export))
   end
 
   def download_admin_reference_export(conn, _params) do
     export = Reports.reference_inventory_export()
 
     filename =
-      "beroon-reference-inventory-#{String.replace(Beroon.Calendar.persian_numeric_date(export.date), "/", "-")}.xls"
+      "beroon-reference-inventory-#{String.replace(Beroon.Calendar.persian_numeric_date(export.date), "/", "-")}.xlsx"
 
     conn
-    |> put_resp_content_type("application/vnd.ms-excel; charset=utf-8")
+    |> put_resp_content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
-    |> send_resp(200, reference_inventory_xls(export))
+    |> send_resp(200, reference_inventory_xlsx(export))
   end
 
   def admin_checklist_branches(conn, _params) do
@@ -1076,178 +1076,434 @@ defmodule BeroonWeb.PageController do
     )
   end
 
-  defp reference_inventory_xls(export) do
-    header_cells = [
-      "<th>نوع دستگاه</th>",
-      Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
-      "<th>جمع شعب</th>",
-      "<th>در انتظار قطعه</th>",
-      "<th>انبار نو</th>",
-      "<th>امانی</th>",
-      "<th>سرقتی</th>",
-      "<th>جمع کل</th>"
-    ]
+  defp reference_inventory_xlsx(export) do
+    main_rows =
+      inventory_sheet_rows(
+        "آمار مرجع ناوگان",
+        export.date,
+        export.branches,
+        export.rows,
+        export.totals,
+        :reference
+      )
 
-    body_rows =
-      Enum.map(export.rows, fn row ->
-        branch_cells =
-          Enum.map(export.branches, fn branch ->
-            "<td>#{Map.get(row.branch_counts, branch.id, 0)}</td>"
-          end)
+    loan_rows = loan_details_sheet_rows(export.loan_details)
 
-        [
-          "<tr>",
-          "<td>#{escape_html(row.device_type.label)}</td>",
-          branch_cells,
-          "<td><strong>#{row.branches_total_count}</strong></td>",
-          "<td>#{row.waiting_for_part_count}</td>",
-          "<td>#{row.new_stock_count}</td>",
-          "<td>#{row.loaned_count}</td>",
-          "<td>#{row.stolen_count}</td>",
-          "<td><strong>#{row.grand_total_count}</strong></td>",
-          "</tr>"
-        ]
-      end)
+    summary_rows =
+      summary_sheet_rows("خلاصه مدیریتی آمار مرجع", export.date, [
+        {"تعداد کل دستگاه‌های شعب", export.totals.branches_total_count},
+        {"تعداد کل دستگاه‌های در انتظار قطعه", export.totals.waiting_for_part_count},
+        {"تعداد کل دستگاه‌های امانی", export.totals.loaned_count},
+        {"تعداد کل دستگاه‌های سرقتی", export.totals.stolen_count},
+        {"تعداد کل دستگاه‌های انبار نو", export.totals.new_stock_count},
+        {"جمع کل ناوگان", export.totals.grand_total_count}
+      ])
 
-    total_branch_cells =
-      Enum.map(export.branches, fn branch ->
-        "<td><strong>#{Map.get(export.totals.branch_counts, branch.id, 0)}</strong></td>"
-      end)
-
-    total_row = [
-      ~s(<tr class="total-row">),
-      "<td><strong>جمع همه دستگاه‌ها</strong></td>",
-      total_branch_cells,
-      "<td><strong>#{export.totals.branches_total_count}</strong></td>",
-      "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
-      "<td><strong>#{export.totals.new_stock_count}</strong></td>",
-      "<td><strong>#{export.totals.loaned_count}</strong></td>",
-      "<td><strong>#{export.totals.stolen_count}</strong></td>",
-      "<td><strong>#{export.totals.grand_total_count}</strong></td>",
-      "</tr>"
-    ]
-
-    report_table_xls(
-      "آمار مرجع ناوگان",
-      export.date,
-      header_cells,
-      body_rows,
-      total_row,
-      "تعداد هر نوع دستگاه بر اساس تخصیص مالکیتی شعبه نمایش داده شده است. وضعیت‌های دارای ستون مستقل برای جلوگیری از دوباره‌شماری از ستون شعبه خارج شده‌اند."
-    )
+    xlsx_workbook([
+      {"آمار مرجع", main_rows},
+      {"دستگاه‌های امانی", loan_rows},
+      {"خلاصه مدیریتی", summary_rows}
+    ])
   end
 
-  defp evening_inventory_xls(export) do
-    header_cells = [
-      "<th>نوع دستگاه</th>",
-      Enum.map(export.branches, fn branch -> "<th>#{escape_html(branch.name)}</th>" end),
-      "<th>جمع شعب</th>",
-      "<th>تعمیرگاه</th>",
-      "<th>در انتظار قطعه</th>",
-      "<th>انبار نو</th>",
-      "<th>امانی</th>",
-      "<th>سرقتی</th>",
-      "<th>جمع کل</th>"
-    ]
+  defp evening_inventory_xlsx(export) do
+    main_rows =
+      inventory_sheet_rows(
+        "گزارش روزانه ناوگان",
+        export.date,
+        export.branches,
+        export.rows,
+        export.totals,
+        :daily
+      )
 
-    body_rows =
-      Enum.map(export.rows, fn row ->
-        branch_cells =
-          Enum.map(export.branches, fn branch ->
-            "<td>#{Map.get(row.branch_counts, branch.id, 0)}</td>"
-          end)
+    loan_rows = loan_details_sheet_rows(export.loan_details)
 
-        grand_total =
-          row.branches_total_count + row.workshop_total_count + row.waiting_for_part_count +
-            row.new_stock_count + row.loaned_count + row.stolen_count
+    summary_rows =
+      summary_sheet_rows("خلاصه مدیریتی گزارش روزانه", export.date, [
+        {"تعداد دستگاه‌های اسکن‌شده همه شعب", export.totals.branches_total_count},
+        {"تعداد دستگاه‌های تعمیرگاه", export.totals.workshop_total_count},
+        {"تعداد دستگاه‌های در انتظار قطعه", export.totals.waiting_for_part_count},
+        {"تعداد دستگاه‌های امانی", export.totals.loaned_count},
+        {"تعداد دستگاه‌های سرقتی", export.totals.stolen_count},
+        {"تعداد دستگاه‌های انبار نو", export.totals.new_stock_count},
+        {"تعداد دستگاه‌های فروخته‌شده", export.totals.sold_count},
+        {"جمع کل گزارش روز", export.totals.operational_total_count}
+      ])
 
-        [
-          "<tr>",
-          "<td>#{escape_html(row.device_type.label)}</td>",
-          branch_cells,
-          "<td><strong>#{row.branches_total_count}</strong></td>",
-          "<td>#{row.workshop_total_count}</td>",
-          "<td>#{row.waiting_for_part_count}</td>",
-          "<td>#{row.new_stock_count}</td>",
-          "<td>#{row.loaned_count}</td>",
-          "<td>#{row.stolen_count}</td>",
-          "<td><strong>#{grand_total}</strong></td>",
-          "</tr>"
-        ]
-      end)
-
-    total_branch_cells =
-      Enum.map(export.branches, fn branch ->
-        "<td><strong>#{Map.get(export.totals.branch_counts, branch.id, 0)}</strong></td>"
-      end)
-
-    grand_total =
-      export.totals.branches_total_count + export.totals.workshop_total_count +
-        export.totals.waiting_for_part_count + export.totals.new_stock_count +
-        export.totals.loaned_count + export.totals.stolen_count
-
-    total_row = [
-      ~s(<tr class="total-row">),
-      "<td><strong>جمع همه دستگاه‌ها</strong></td>",
-      total_branch_cells,
-      "<td><strong>#{export.totals.branches_total_count}</strong></td>",
-      "<td><strong>#{export.totals.workshop_total_count}</strong></td>",
-      "<td><strong>#{export.totals.waiting_for_part_count}</strong></td>",
-      "<td><strong>#{export.totals.new_stock_count}</strong></td>",
-      "<td><strong>#{export.totals.loaned_count}</strong></td>",
-      "<td><strong>#{export.totals.stolen_count}</strong></td>",
-      "<td><strong>#{grand_total}</strong></td>",
-      "</tr>"
-    ]
-
-    report_table_xls(
-      "گزارش روزانه ناوگان",
-      export.date,
-      header_cells,
-      body_rows,
-      total_row,
-      "ستون شعب بر اساس اسکن‌های صحیح آمار شبانه تاریخ انتخاب‌شده و ستون تعمیرگاه بر اساس دستگاه‌های موجود در چرخه تعمیر نمایش داده می‌شود."
-    )
+    xlsx_workbook([
+      {"گزارش روزانه", main_rows},
+      {"دستگاه‌های امانی", loan_rows},
+      {"خلاصه مدیریتی", summary_rows}
+    ])
   end
 
-  defp report_table_xls(title, date, header_cells, body_rows, total_row, description) do
+  defp inventory_sheet_rows(title, date, branches, rows, totals, mode) do
+    fixed_headers =
+      case mode do
+        :reference -> ["جمع شعب", "در انتظار قطعه", "انبار نو", "امانی", "سرقتی", "جمع کل"]
+        :daily -> ["جمع شعب", "تعمیرگاه", "در انتظار قطعه", "انبار نو", "امانی", "سرقتی", "جمع کل"]
+      end
+
+    headers = ["نوع دستگاه"] ++ Enum.map(branches, & &1.name) ++ fixed_headers
+
+    data_rows =
+      Enum.map(rows, fn row ->
+        branch_values = Enum.map(branches, &Map.get(row.branch_counts, &1.id, 0))
+
+        fixed_values =
+          case mode do
+            :reference ->
+              [
+                row.branches_total_count,
+                row.waiting_for_part_count,
+                row.new_stock_count,
+                row.loaned_count,
+                row.stolen_count,
+                row.grand_total_count
+              ]
+
+            :daily ->
+              [
+                row.branches_total_count,
+                row.workshop_total_count,
+                row.waiting_for_part_count,
+                row.new_stock_count,
+                row.loaned_count,
+                row.stolen_count,
+                row.branches_total_count + row.workshop_total_count + row.waiting_for_part_count +
+                  row.new_stock_count + row.loaned_count + row.stolen_count
+              ]
+          end
+
+        [row.device_type.label] ++ branch_values ++ fixed_values
+      end)
+
+    total_branch_values = Enum.map(branches, &Map.get(totals.branch_counts, &1.id, 0))
+
+    total_fixed_values =
+      case mode do
+        :reference ->
+          [
+            totals.branches_total_count,
+            totals.waiting_for_part_count,
+            totals.new_stock_count,
+            totals.loaned_count,
+            totals.stolen_count,
+            totals.grand_total_count
+          ]
+
+        :daily ->
+          [
+            totals.branches_total_count,
+            totals.workshop_total_count,
+            totals.waiting_for_part_count,
+            totals.new_stock_count,
+            totals.loaned_count,
+            totals.stolen_count,
+            totals.branches_total_count + totals.workshop_total_count +
+              totals.waiting_for_part_count + totals.new_stock_count + totals.loaned_count +
+              totals.stolen_count
+          ]
+      end
+
     [
-      "\uFEFF",
-      """
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <style>
-            body { font-family: Tahoma, Arial, sans-serif; direction: rtl; }
-            table { border-collapse: collapse; direction: rtl; }
-            th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; }
-            th { background: #ccf1ee; font-weight: bold; }
-            td:first-child, th:first-child { text-align: right; min-width: 220px; }
-            .total-row td { background: #e9f7f5; border-top: 3px solid #287f78; }
-          </style>
-        </head>
-        <body>
-          <h3>#{escape_html(title)} - #{escape_html(Beroon.Calendar.persian_date(date))}</h3>
-          <p>#{escape_html(description)}</p>
-          <table>
-            <thead><tr>#{IO.iodata_to_binary(header_cells)}</tr></thead>
-            <tbody>
-              #{IO.iodata_to_binary(body_rows)}
-              #{IO.iodata_to_binary(total_row)}
-            </tbody>
-          </table>
-        </body>
-      </html>
-      """
-    ]
-    |> IO.iodata_to_binary()
+      [{title, "Title"}],
+      [{"تاریخ گزارش: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
+      [],
+      Enum.map(headers, &{&1, "Header"})
+    ] ++
+      data_rows ++
+      [[{"جمع همه دستگاه‌ها", "Total"}] ++ Enum.map(total_branch_values ++ total_fixed_values, &{&1, "Total"})]
   end
 
-  defp escape_html(value) do
+  defp loan_details_sheet_rows(loans) do
+    headers = [
+      "ردیف",
+      "نوع دستگاه",
+      "پلاک",
+      "QR Code",
+      "شعبه مالک",
+      "محل امانت",
+      "تاریخ امانت",
+      "توضیحات"
+    ]
+
+    rows =
+      loans
+      |> Enum.with_index(1)
+      |> Enum.map(fn {loan, index} ->
+        scooter = loan.scooter
+
+        [
+          index,
+          device_type_label(scooter.device_type),
+          scooter.plate || "-",
+          scooter.barcode || "-",
+          if(scooter.branch, do: scooter.branch.name, else: "-"),
+          loan.unit_name || "-",
+          Beroon.Calendar.persian_datetime(loan.loaned_at),
+          loan.notes || "-"
+        ]
+      end)
+
+    empty_rows =
+      if loans == [] do
+        [[{"در حال حاضر دستگاه امانی فعالی ثبت نشده است.", "Subtitle"}]]
+      else
+        []
+      end
+
+    [
+      [{"فهرست دستگاه‌های امانی", "Title"}],
+      [{"تاریخ تهیه گزارش: #{Beroon.Calendar.persian_datetime(DateTime.utc_now())}", "Subtitle"}],
+      [],
+      Enum.map(headers, &{&1, "Header"})
+    ] ++ rows ++ empty_rows
+  end
+
+  defp summary_sheet_rows(title, date, items) do
+    rows =
+      Enum.map(items, fn {label, value} ->
+        [{label, "Label"}, {value, "Number"}]
+      end)
+
+    [
+      [{title, "Title"}],
+      [{"تاریخ گزارش: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
+      [{"زمان تولید: #{Beroon.Calendar.persian_datetime(DateTime.utc_now())}", "Subtitle"}],
+      [],
+      [{"عنوان", "Header"}, {"مقدار", "Header"}]
+    ] ++ rows
+  end
+
+  # Generates a genuine XLSX package instead of SpreadsheetML disguised as .xls.
+  # This prevents broken columns, RTL issues and warning dialogs in modern Excel.
+  defp xlsx_workbook(worksheets) do
+    worksheet_entries =
+      worksheets
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{_name, rows}, index} ->
+        {"xl/worksheets/sheet#{index}.xml", xlsx_sheet_xml(rows)}
+      end)
+
+    entries =
+      [
+        {"[Content_Types].xml", xlsx_content_types_xml(length(worksheets))},
+        {"_rels/.rels", xlsx_root_rels_xml()},
+        {"xl/workbook.xml", xlsx_workbook_xml(worksheets)},
+        {"xl/_rels/workbook.xml.rels", xlsx_workbook_rels_xml(length(worksheets))},
+        {"xl/styles.xml", xlsx_styles_xml()}
+      ] ++ worksheet_entries
+
+    zip_entries =
+      Enum.map(entries, fn {name, content} ->
+        {String.to_charlist(name), IO.iodata_to_binary(content)}
+      end)
+
+    case :zip.create(~c"beroon-report.xlsx", zip_entries, [:memory]) do
+      {:ok, {_filename, binary}} -> binary
+      {:error, reason} -> raise "ساخت فایل Excel ناموفق بود: #{inspect(reason)}"
+    end
+  end
+
+  defp xlsx_sheet_xml(rows) do
+    max_columns = rows |> Enum.map(&length/1) |> Enum.max(fn -> 1 end)
+    max_rows = max(length(rows), 1)
+    last_cell = "#{xlsx_column_name(max_columns)}#{max_rows}"
+
+    row_xml =
+      rows
+      |> Enum.with_index(1)
+      |> Enum.map(fn {row, row_index} ->
+        cells =
+          row
+          |> Enum.with_index(1)
+          |> Enum.map(fn {cell, column_index} ->
+            xlsx_cell_xml(cell, "#{xlsx_column_name(column_index)}#{row_index}")
+          end)
+
+        ~s(<row r="#{row_index}">#{IO.iodata_to_binary(cells)}</row>)
+      end)
+
+    columns =
+      1..max_columns
+      |> Enum.map(fn index ->
+        width = if index == 1, do: 30, else: 16
+        ~s(<col min="#{index}" max="#{index}" width="#{width}" customWidth="1"/>)
+      end)
+
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <dimension ref="A1:#{last_cell}"/>
+      <sheetViews>
+        <sheetView workbookViewId="0" rightToLeft="1">
+          <pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/>
+        </sheetView>
+      </sheetViews>
+      <sheetFormatPr defaultRowHeight="18"/>
+      <cols>#{IO.iodata_to_binary(columns)}</cols>
+      <sheetData>#{IO.iodata_to_binary(row_xml)}</sheetData>
+      <autoFilter ref="A4:#{xlsx_column_name(max_columns)}#{max_rows}"/>
+    </worksheet>
+    """
+  end
+
+  defp xlsx_cell_xml({value, style}, reference) do
+    xlsx_cell_xml(value, reference, xlsx_style_index(style))
+  end
+
+  defp xlsx_cell_xml(value, reference) do
+    xlsx_cell_xml(value, reference, 0)
+  end
+
+  defp xlsx_cell_xml(value, reference, style_index) when is_number(value) do
+    ~s(<c r="#{reference}" s="#{style_index}"><v>#{value}</v></c>)
+  end
+
+  defp xlsx_cell_xml(value, reference, style_index) do
+    text = xml_escape(value)
+    ~s(<c r="#{reference}" s="#{style_index}" t="inlineStr"><is><t xml:space="preserve">#{text}</t></is></c>)
+  end
+
+  defp xlsx_style_index("Title"), do: 1
+  defp xlsx_style_index("Subtitle"), do: 2
+  defp xlsx_style_index("Header"), do: 3
+  defp xlsx_style_index("Total"), do: 4
+  defp xlsx_style_index("Label"), do: 5
+  defp xlsx_style_index("Number"), do: 6
+  defp xlsx_style_index(_), do: 0
+
+  defp xlsx_column_name(index) when index > 0 do
+    do_xlsx_column_name(index, "")
+  end
+
+  defp do_xlsx_column_name(0, acc), do: acc
+
+  defp do_xlsx_column_name(index, acc) do
+    remainder = rem(index - 1, 26)
+    letter = <<?A + remainder>>
+    do_xlsx_column_name(div(index - 1, 26), letter <> acc)
+  end
+
+  defp xlsx_content_types_xml(sheet_count) do
+    sheets =
+      Enum.map(1..sheet_count, fn index ->
+        ~s(<Override PartName="/xl/worksheets/sheet#{index}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>)
+      end)
+
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+      <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+      <Default Extension="xml" ContentType="application/xml"/>
+      <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+      <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+      #{IO.iodata_to_binary(sheets)}
+    </Types>
+    """
+  end
+
+  defp xlsx_root_rels_xml do
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+    </Relationships>
+    """
+  end
+
+  defp xlsx_workbook_xml(worksheets) do
+    sheets =
+      worksheets
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{name, _rows}, index} ->
+        ~s(<sheet name="#{xml_escape(name)}" sheetId="#{index}" r:id="rId#{index}"/>)
+      end)
+
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <bookViews><workbookView rightToLeft="1"/></bookViews>
+      <sheets>#{IO.iodata_to_binary(sheets)}</sheets>
+    </workbook>
+    """
+  end
+
+  defp xlsx_workbook_rels_xml(sheet_count) do
+    sheets =
+      Enum.map(1..sheet_count, fn index ->
+        ~s(<Relationship Id="rId#{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet#{index}.xml"/>)
+      end)
+
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      #{IO.iodata_to_binary(sheets)}
+      <Relationship Id="rId#{sheet_count + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+    </Relationships>
+    """
+  end
+
+  defp xlsx_styles_xml do
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <fonts count="3">
+        <font><sz val="10"/><name val="Tahoma"/></font>
+        <font><b/><sz val="14"/><name val="Tahoma"/></font>
+        <font><b/><sz val="10"/><name val="Tahoma"/></font>
+      </fonts>
+      <fills count="4">
+        <fill><patternFill patternType="none"/></fill>
+        <fill><patternFill patternType="gray125"/></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FFCCF1EE"/><bgColor indexed="64"/></patternFill></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FFE9F7F5"/><bgColor indexed="64"/></patternFill></fill>
+      </fills>
+      <borders count="3">
+        <border><left/><right/><top/><bottom/><diagonal/></border>
+        <border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border>
+        <border><left/><right/><top style="medium"/><bottom/><diagonal/></border>
+      </borders>
+      <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+      <cellXfs count="7">
+        <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+        <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+        <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+        <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+        <xf numFmtId="0" fontId="2" fillId="3" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+        <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+        <xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+      </cellXfs>
+      <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+    </styleSheet>
+    """
+  end
+
+  defp xml_escape(nil), do: ""
+
+  defp xml_escape(value) do
     value
     |> to_string()
-    |> Phoenix.HTML.html_escape()
-    |> Phoenix.HTML.safe_to_string()
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> String.replace("\"", "&quot;")
+    |> String.replace("'", "&apos;")
+  end
+
+  defp device_type_label(nil), do: "-"
+
+  defp device_type_label(device_type) do
+    [device_type.category, device_type.device_model, device_type.device_identifier]
+    |> Enum.map(&(to_string(&1 || "") |> String.trim()))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(" ")
+    |> case do
+      "" -> "-"
+      label -> label
+    end
   end
 
   defp parse_date(nil), do: Reports.iran_today()

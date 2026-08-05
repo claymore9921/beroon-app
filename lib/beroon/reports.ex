@@ -8,6 +8,7 @@ defmodule Beroon.Reports do
   alias Beroon.Checklists.ChecklistItem
   alias Beroon.Fleet.DeviceType
   alias Beroon.Fleet.Scooter
+  alias Beroon.Logistics
   alias Beroon.Operations.Branch
   alias Beroon.Reports.BranchNotification
   alias Beroon.Reports.BranchNotificationRecipient
@@ -274,7 +275,8 @@ defmodule Beroon.Reports do
       date: iran_today(),
       branches: branches,
       rows: rows,
-      totals: totals
+      totals: totals,
+      loan_details: Logistics.list_open_loans()
     }
   end
 
@@ -444,6 +446,7 @@ defmodule Beroon.Reports do
       # این همان عدد کنترل روزانه است و دقیقاً برابر جمع شعب + تعمیرگاه +
       # در انتظار قطعه + امانی + سرقتی است.
       grand_total: totals.operational_total_count,
+      loan_details: Logistics.list_open_loans(),
       summary: %{
         branch_evening_total_count: totals.branches_total_count,
         pending_acceptance_total_count: totals.pending_acceptance_count,
