@@ -115,6 +115,7 @@ defmodule BeroonWeb.Router do
     get "/admin/evening-reports", PageController, :admin_evening_report_branches
     get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail
     get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports
+    post "/admin/evening-reports/branches/:id/reopen", PageController, :reopen_branch_evening_report
 
     get "/admin/checklists/branches/:id/unchecked",
         PageController,

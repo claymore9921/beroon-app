@@ -1226,6 +1226,77 @@ defmodule Beroon.Reports do
   end
 
   @doc """
+  Deletes the finalized evening count for one branch and one operational night so
+  an admin can reopen that night for a clean re-entry. Related count items and
+  location alerts are removed by their database cascade constraints.
+
+  For scooters touched by the deleted report, current_branch_id is restored from
+  the latest remaining evening scan when possible; otherwise it falls back to
+  the scooter's permanent owner branch.
+  """
+  def reopen_branch_evening_count(branch_id, %Date{} = date) do
+    {window_start, window_end} = evening_window_utc_bounds(date)
+
+    Repo.transaction(fn ->
+      counts =
+        EveningCount
+        |> where(
+          [e],
+          e.branch_id == ^branch_id and e.counted_at >= ^window_start and
+            e.counted_at < ^window_end
+        )
+        |> Repo.all()
+
+      count_ids = Enum.map(counts, & &1.id)
+
+      scooter_ids =
+        if count_ids == [] do
+          []
+        else
+          EveningCountItem
+          |> where([i], i.evening_count_id in ^count_ids)
+          |> select([i], i.scooter_id)
+          |> Repo.all()
+          |> Enum.uniq()
+        end
+
+      Enum.each(counts, fn count ->
+        case Repo.delete(count) do
+          {:ok, _} -> :ok
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+
+      Enum.each(scooter_ids, &restore_location_after_evening_reopen/1)
+
+      %{deleted_reports: length(counts), affected_scooters: length(scooter_ids)}
+    end)
+  end
+
+  defp restore_location_after_evening_reopen(scooter_id) do
+    scooter = Repo.get(Scooter, scooter_id)
+
+    if scooter do
+      previous_branch_id =
+        EveningCountItem
+        |> join(:inner, [i], e in EveningCount, on: e.id == i.evening_count_id)
+        |> where([i, _e], i.scooter_id == ^scooter_id)
+        |> order_by([_i, e], desc: e.counted_at, desc: e.id)
+        |> select([i, _e], i.current_branch_id)
+        |> limit(1)
+        |> Repo.one()
+
+      target_branch_id = previous_branch_id || scooter.branch_id
+
+      scooter
+      |> Ecto.Changeset.change(current_branch_id: target_branch_id)
+      |> Repo.update!()
+    end
+
+    :ok
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking evening_count changes.
 
   ## Examples

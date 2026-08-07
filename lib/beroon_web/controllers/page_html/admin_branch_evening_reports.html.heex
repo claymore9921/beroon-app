@@ -40,6 +40,24 @@
       برای این شعبه در بازه ۲۱:۰۰ {Beroon.Calendar.persian_numeric_date(@selected_date)} تا ۰۶:۰۰ روز بعد، آمار نهایی ثبت نشده است.
     </div>
 
+    <form
+      :if={@audit.submitted}
+      method="post"
+      action={~p"/admin/evening-reports/branches/#{@branch}/reopen"}
+      class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4"
+      onsubmit="return window.confirm('آیا مطمئن هستید؟ آمار شب این شعبه برای تاریخ انتخاب‌شده حذف می‌شود و مدیر شعبه می‌تواند از ابتدا آمارگیری کند.')"
+    >
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+      <input type="hidden" name="date" value={Beroon.Calendar.persian_numeric_date(@selected_date)} />
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="font-black text-red-900">آمار این شب اشتباه ثبت شده است؟</p>
+          <p class="mt-1 text-xs font-semibold text-red-700">با بازکردن مجدد، آمار ثبت‌شده این شعبه برای همین شب حذف می‌شود تا مدیر شعبه از ابتدا ثبت کند.</p>
+        </div>
+        <button type="submit" class="btn btn-error min-h-11 shrink-0">بازکردن مجدد آمارگیری</button>
+      </div>
+    </form>
+
     <section class="mt-4 grid gap-3 lg:grid-cols-3" aria-label="خلاصه مغایرت آمار شب">
       <details class="group rounded-2xl border border-emerald-200 bg-white shadow-sm">
         <summary class="cursor-pointer list-none rounded-2xl bg-emerald-50 p-4 text-center text-emerald-900 marker:hidden">

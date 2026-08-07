@@ -762,6 +762,28 @@ defmodule BeroonWeb.PageController do
     )
   end
 
+  def reopen_branch_evening_report(conn, %{"id" => id} = params) do
+    branch = Operations.get_branch!(id)
+    selected_date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+
+    case Reports.reopen_branch_evening_count(branch.id, selected_date) do
+      {:ok, %{deleted_reports: 0}} ->
+        conn
+        |> put_flash(:error, "برای این شعبه در تاریخ انتخاب‌شده آمار نهایی ثبت نشده است.")
+        |> redirect(to: ~p"/admin/evening-reports/branches/#{branch}?date=#{Beroon.Calendar.persian_numeric_date(selected_date)}")
+
+      {:ok, %{deleted_reports: deleted_reports}} ->
+        conn
+        |> put_flash(:info, "آمار شب شعبه #{branch.name} حذف و مجدداً باز شد. مدیر شعبه اکنون می‌تواند آمار را از نو ثبت کند. (#{deleted_reports} رکورد حذف شد)")
+        |> redirect(to: ~p"/admin/evening-reports/branches/#{branch}?date=#{Beroon.Calendar.persian_numeric_date(selected_date)}")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, "بازکردن مجدد آمار انجام نشد: #{inspect(reason)}")
+        |> redirect(to: ~p"/admin/evening-reports/branches/#{branch}?date=#{Beroon.Calendar.persian_numeric_date(selected_date)}")
+    end
+  end
+
   def admin_manager_registrations(conn, _params) do
     render(conn, :admin_manager_registrations,
       registrations: Operations.list_pending_manager_registrations(),

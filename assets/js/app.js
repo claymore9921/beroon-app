@@ -342,9 +342,14 @@ const setupEveningScanner = () => {
   })
 
   form?.addEventListener("submit", (event) => {
-    if (!window.confirm("آیا از پایان آمارگیری و ثبت نهایی آن مطمئن هستید؟")) {
+    if (!window.confirm("آیا از پایان آمارگیری و ثبت نهایی آن مطمئن هستید؟ پس از ثبت نهایی، برای اصلاح باید با ادمین هماهنگ کنید.")) {
       event.preventDefault()
+      return
     }
+
+    // پس از تأیید نهایی، پیش‌نویس محلی پاک می‌شود تا اگر ادمین همان شب
+    // آمار را مجدداً باز کرد، فرم با اسکن‌های قبلی پر نشود.
+    localStorage.removeItem(storageKey)
   })
   closeButton.addEventListener("click", stopScanner)
   retryButton?.addEventListener("click", async () => {
