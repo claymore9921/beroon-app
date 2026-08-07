@@ -33,21 +33,6 @@
       <button class="btn btn-neutral min-h-11">نمایش</button>
     </form>
 
-    <section class="mt-4 grid grid-cols-3 gap-3 text-center">
-      <article class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
-        <p class="text-xs font-bold">اسکن‌شده</p>
-        <strong class="mt-1 block text-2xl">{length(@audit.scanned)}</strong>
-      </article>
-      <article class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
-        <p class="text-xs font-bold">جابه‌جا‌شده</p>
-        <strong class="mt-1 block text-2xl">{length(@audit.moved)}</strong>
-      </article>
-      <article class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-900">
-        <p class="text-xs font-bold">اسکن‌نشده</p>
-        <strong class="mt-1 block text-2xl">{length(@audit.missing)}</strong>
-      </article>
-    </section>
-
     <div
       :if={!@audit.submitted}
       class="mt-4 rounded-xl border border-zinc-200 bg-white p-4 text-sm font-semibold text-zinc-600"
@@ -55,14 +40,15 @@
       برای این شعبه در بازه ۲۱:۰۰ {Beroon.Calendar.persian_numeric_date(@selected_date)} تا ۰۶:۰۰ روز بعد، آمار نهایی ثبت نشده است.
     </div>
 
-    <section class="mt-5 grid gap-4 lg:grid-cols-3" aria-label="ریز آمار شب">
-      <div class="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="font-black text-emerald-800">پلاک‌های اسکن‌شده</h2>
-          <span class="rounded bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-800">{length(@audit.scanned)}</span>
-        </div>
-        <p :if={@audit.scanned == []} class="text-sm text-zinc-500">موردی ثبت نشده است.</p>
-        <div class="grid gap-2">
+    <section class="mt-4 grid gap-3 lg:grid-cols-3" aria-label="خلاصه مغایرت آمار شب">
+      <details class="group rounded-2xl border border-emerald-200 bg-white shadow-sm">
+        <summary class="cursor-pointer list-none rounded-2xl bg-emerald-50 p-4 text-center text-emerald-900 marker:hidden">
+          <p class="text-sm font-black">تعداد کل دستگاه‌های اسکن‌شده</p>
+          <strong class="mt-1 block text-3xl">{length(@audit.scanned)}</strong>
+          <p class="mt-1 text-[11px] font-bold opacity-70">برای مشاهده پلاک‌ها کلیک کنید</p>
+        </summary>
+        <div class="grid gap-2 border-t border-emerald-100 p-4">
+          <p :if={@audit.scanned == []} class="text-sm text-zinc-500">موردی ثبت نشده است.</p>
           <article :for={item <- @audit.scanned} class="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
             <p class="font-black">پلاک {item.plate}</p>
             <p class="mt-1 text-xs text-zinc-500">QR: {item.barcode || "-"}</p>
@@ -71,38 +57,36 @@
             </p>
           </article>
         </div>
-      </div>
+      </details>
 
-      <div class="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="font-black text-amber-800">پلاک‌های جابه‌جا‌شده</h2>
-          <span class="rounded bg-amber-100 px-2 py-1 text-xs font-black text-amber-800">{length(@audit.moved)}</span>
-        </div>
-        <p :if={@audit.moved == []} class="text-sm text-zinc-500">جابجایی در این بازه ثبت نشده است.</p>
-        <div class="grid gap-2">
-          <article :for={item <- @audit.moved} class="rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <div class="flex items-center justify-between gap-2">
-              <p class="font-black">پلاک {item.plate}</p>
-              <span class="rounded bg-amber-700 px-2 py-1 text-[11px] font-black text-white">
-                {if item.direction == :out, do: "خروج از شعبه", else: "ورود به شعبه"}
-              </span>
-            </div>
-            <p class="mt-2 text-xs text-zinc-700">
-              {item.home_branch_name || "-"} ← {item.detected_branch_name || "-"}
+      <details class="group rounded-2xl border border-sky-200 bg-white shadow-sm">
+        <summary class="cursor-pointer list-none rounded-2xl bg-sky-50 p-4 text-center text-sky-900 marker:hidden">
+          <p class="text-sm font-black">تعداد دستگاه‌های تعیین تکلیف شده</p>
+          <strong class="mt-1 block text-3xl">{length(@audit.accounted)}</strong>
+          <p class="mt-1 text-[11px] font-bold opacity-70">برای مشاهده پلاک‌ها کلیک کنید</p>
+        </summary>
+        <div class="grid gap-2 border-t border-sky-100 p-4">
+          <p :if={@audit.accounted == []} class="text-sm text-zinc-500">موردی وجود ندارد.</p>
+          <article :for={item <- @audit.accounted} class="rounded-lg border border-sky-200 bg-sky-50 p-3">
+            <p class="font-black">پلاک {item.plate}</p>
+            <p class="mt-1 text-xs text-zinc-500">QR: {item.barcode || "-"}</p>
+            <p class="mt-1 text-xs font-black text-sky-800">{item.accounted_reason}</p>
+            <p class="mt-1 text-xs font-semibold text-zinc-600">
+              {Enum.reject([item.device_type_identifier, item.device_type_category, item.device_type_name], &(&1 in [nil, ""])) |> Enum.join(" - ")}
             </p>
-            <p class="mt-1 text-xs text-zinc-500">{Beroon.Calendar.persian_datetime(item.detected_at)}</p>
           </article>
         </div>
-      </div>
+      </details>
 
-      <div class="rounded-2xl border border-red-200 bg-white p-4 shadow-sm">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="font-black text-red-800">پلاک‌های اسکن‌نشده</h2>
-          <span class="rounded bg-red-100 px-2 py-1 text-xs font-black text-red-800">{length(@audit.missing)}</span>
-        </div>
-        <p :if={@audit.missing == []} class="text-sm text-zinc-500">همه دستگاه‌های مورد انتظار تعیین تکلیف شده‌اند.</p>
-        <div class="grid gap-2">
-          <article :for={item <- @audit.missing} class="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <details class="group rounded-2xl border border-red-200 bg-white shadow-sm">
+        <summary class="cursor-pointer list-none rounded-2xl bg-red-50 p-4 text-center text-red-900 marker:hidden">
+          <p class="text-sm font-black">تعداد دستگاه‌های نیاز به بررسی</p>
+          <strong class="mt-1 block text-3xl">{length(@audit.needs_review)}</strong>
+          <p class="mt-1 text-[11px] font-bold opacity-70">برای مشاهده پلاک‌ها کلیک کنید</p>
+        </summary>
+        <div class="grid gap-2 border-t border-red-100 p-4">
+          <p :if={@audit.needs_review == []} class="text-sm text-zinc-500">دستگاه بدون توضیح باقی نمانده است.</p>
+          <article :for={item <- @audit.needs_review} class="rounded-lg border border-red-200 bg-red-50 p-3">
             <p class="font-black">پلاک {item.plate}</p>
             <p class="mt-1 text-xs text-zinc-500">QR: {item.barcode || "-"}</p>
             <p class="mt-1 text-xs font-semibold text-zinc-600">
@@ -110,7 +94,7 @@
             </p>
           </article>
         </div>
-      </div>
+      </details>
     </section>
   </section>
 </main>

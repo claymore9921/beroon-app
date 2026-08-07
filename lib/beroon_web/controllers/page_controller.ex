@@ -237,7 +237,7 @@ defmodule BeroonWeb.PageController do
       render(conn, :manager_repairs,
         branch: branch,
         query: query,
-        scooters: Fleet.list_scooters_for_branch_search(branch.id, query, "active"),
+        scooters: Fleet.list_scooters_for_current_branch_search(branch.id, query, "active"),
         ready_for_pickup_scooters:
           Fleet.list_scooters_for_branch_with_details(branch.id, "ready_for_pickup"),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
@@ -250,7 +250,7 @@ defmodule BeroonWeb.PageController do
     delivery_method = Map.get(repair_params, "delivery_method", "attendant")
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
     notes = String.trim(to_string(notes || ""))
-    scooter = branch && Fleet.get_scooter_for_branch_with_details(branch.id, id)
+    scooter = branch && Fleet.get_scooter_for_current_branch_with_details(branch.id, id)
 
     cond do
       is_nil(branch) ->
@@ -258,7 +258,7 @@ defmodule BeroonWeb.PageController do
 
       is_nil(scooter) ->
         conn
-        |> put_flash(:error, "این دستگاه در شعبه شما پیدا نشد.")
+        |> put_flash(:error, "این دستگاه در محل فعلی شعبه شما پیدا نشد.")
         |> redirect(to: ~p"/manager/repairs")
 
       notes == "" ->
@@ -1145,9 +1145,14 @@ defmodule BeroonWeb.PageController do
         {"تعداد دستگاه‌های در انتظار قطعه", export.totals.waiting_for_part_count},
         {"تعداد دستگاه‌های امانی", export.totals.loaned_count},
         {"تعداد دستگاه‌های سرقتی", export.totals.stolen_count},
-        {"تعداد دستگاه‌های انبار نو", export.totals.new_stock_count},
-        {"تعداد دستگاه‌های فروخته‌شده", export.totals.sold_count},
-        {"جمع کل گزارش روز", export.totals.operational_total_count}
+        {"تعداد دستگاه‌های حمل‌ونقل", export.totals.transport_count},
+        {"تعداد دستگاه‌های از مدار خارج", export.totals.out_of_service_count},
+        {"موقعیت معلوم / جابه‌جایی ثبت‌شده", export.totals.location_known_count},
+        {"جمع کل تعیین تکلیف شده‌ها", export.totals.accounted_total_count},
+        {"نیاز به بررسی (خارج از جمع کل)", export.totals.needs_review_count},
+        {"جمع کل ناوگان (بدون نیاز به بررسی، انبار نو و فروش)", export.totals.operational_total_count},
+        {"موجودی انبار نو (جدا از ناوگان)", export.totals.new_stock_count},
+        {"فروش ثبت‌شده (جدا از ناوگان)", export.totals.sold_count}
       ])
 
     xlsx_workbook([
@@ -1161,7 +1166,21 @@ defmodule BeroonWeb.PageController do
     fixed_headers =
       case mode do
         :reference -> ["جمع شعب", "در انتظار قطعه", "انبار نو", "امانی", "سرقتی", "جمع کل"]
-        :daily -> ["جمع شعب", "تعمیرگاه", "در انتظار قطعه", "انبار نو", "امانی", "سرقتی", "جمع کل"]
+        :daily -> [
+          "تعمیرگاه",
+          "در انتظار قطعه",
+          "امانی",
+          "سرقتی",
+          "حمل‌ونقل",
+          "از مدار خارج",
+          "موقعیت معلوم / جابه‌جایی",
+          "جمع کل ناوگان",
+          "انبار نو",
+          "فروش",
+          "جمع کل اسکن‌شده‌ها",
+          "جمع کل تعیین تکلیف شده‌ها",
+          "جمع کل نیاز به بررسی"
+        ]
       end
 
     headers = ["نوع دستگاه"] ++ Enum.map(branches, & &1.name) ++ fixed_headers
@@ -1184,14 +1203,19 @@ defmodule BeroonWeb.PageController do
 
             :daily ->
               [
-                row.branches_total_count,
                 row.workshop_total_count,
                 row.waiting_for_part_count,
-                row.new_stock_count,
                 row.loaned_count,
                 row.stolen_count,
-                row.branches_total_count + row.workshop_total_count + row.waiting_for_part_count +
-                  row.new_stock_count + row.loaned_count + row.stolen_count
+                row.transport_count,
+                row.out_of_service_count,
+                row.location_known_count,
+                row.operational_total_count,
+                row.new_stock_count,
+                row.sold_count,
+                row.branches_total_count,
+                row.accounted_total_count,
+                row.needs_review_count
               ]
           end
 
@@ -1214,15 +1238,19 @@ defmodule BeroonWeb.PageController do
 
         :daily ->
           [
-            totals.branches_total_count,
             totals.workshop_total_count,
             totals.waiting_for_part_count,
-            totals.new_stock_count,
             totals.loaned_count,
             totals.stolen_count,
-            totals.branches_total_count + totals.workshop_total_count +
-              totals.waiting_for_part_count + totals.new_stock_count + totals.loaned_count +
-              totals.stolen_count
+            totals.transport_count,
+            totals.out_of_service_count,
+            totals.location_known_count,
+            totals.operational_total_count,
+            totals.new_stock_count,
+            totals.sold_count,
+            totals.branches_total_count,
+            totals.accounted_total_count,
+            totals.needs_review_count
           ]
       end
 

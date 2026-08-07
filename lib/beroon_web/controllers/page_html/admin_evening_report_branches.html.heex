@@ -52,6 +52,12 @@
                 <span>آمار شب</span>
               </div>
               <p class="mt-1 text-xs font-semibold">{if status.evening_submitted, do: "انجام شده", else: "انجام نشده"}</p>
+              <p :if={status.evening_submitted && status.needs_review_count > 0} class="mt-1 text-[11px] font-black text-red-700">
+                {status.needs_review_count} دستگاه نیاز به بررسی
+              </p>
+              <p :if={status.evening_submitted && status.needs_review_count == 0} class="mt-1 text-[11px] font-black text-emerald-700">
+                همه دستگاه‌ها تعیین تکلیف شده‌اند
+              </p>
               <p class="mt-1 text-[11px] opacity-75">مشاهده ریز گزارش</p>
             </.link>
           </div>

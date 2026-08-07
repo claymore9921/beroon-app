@@ -122,8 +122,18 @@ defmodule Beroon.Fleet do
     Scooter
     |> where(
       [s],
-      s.branch_id == ^branch_id and s.current_branch_id == ^branch_id and
-        s.status not in ["awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service", "loaned", "stolen"]
+      s.current_branch_id == ^branch_id and
+        s.status not in [
+          "needs_service",
+          "awaiting_repair",
+          "repairing",
+          "waiting_for_part",
+          "ready_for_pickup",
+          "out_of_service",
+          "loaned",
+          "stolen",
+          "transport"
+        ]
     )
     |> order_by([s], asc: s.plate)
     |> Repo.all()
@@ -199,6 +209,31 @@ defmodule Beroon.Fleet do
     end)
     |> order_by([s], asc: s.plate)
     |> preload([:branch, :device_type])
+    |> Repo.all()
+  end
+
+  # دستگاه‌های حاضر در شعبه بر اساس محل فعلی، نه مالک دائمی.
+  # برای عملیات روزمره مثل اعلام خرابی، شعبه میزبان باید بتواند دستگاه مهمان را مدیریت کند.
+  def list_scooters_for_current_branch_search(branch_id, search_term \\ nil, status \\ nil)
+
+  def list_scooters_for_current_branch_search(nil, _search_term, _status), do: []
+
+  def list_scooters_for_current_branch_search(branch_id, search_term, status) do
+    search_term = search_term |> to_string() |> String.trim()
+    pattern = "%#{search_term}%"
+
+    Scooter
+    |> where([s], s.current_branch_id == ^branch_id)
+    |> maybe_filter_status(status)
+    |> then(fn query ->
+      if search_term == "" do
+        query
+      else
+        where(query, [s], ilike(s.plate, ^pattern) or ilike(s.barcode, ^pattern))
+      end
+    end)
+    |> order_by([s], asc: s.plate)
+    |> preload([:branch, :current_branch, :device_type])
     |> Repo.all()
   end
 
@@ -334,6 +369,13 @@ defmodule Beroon.Fleet do
     Scooter
     |> where([s], s.branch_id == ^branch_id and s.id == ^scooter_id)
     |> preload([:branch, :device_type])
+    |> Repo.one()
+  end
+
+  def get_scooter_for_current_branch_with_details(branch_id, scooter_id) do
+    Scooter
+    |> where([s], s.current_branch_id == ^branch_id and s.id == ^scooter_id)
+    |> preload([:branch, :current_branch, :device_type])
     |> Repo.one()
   end
 
