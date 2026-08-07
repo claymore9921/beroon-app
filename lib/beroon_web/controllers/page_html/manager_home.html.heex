@@ -23,23 +23,6 @@
       <span></span>
     </section>
 
-    <section
-      :if={@location_alerts != []}
-      class="manager-alert-card"
-      aria-label="هشدار دستگاه خارج از شعبه"
-    >
-      <h2>هشدار دستگاه خارج از شعبه</h2>
-      <article :for={alert <- @location_alerts}>
-        <p class="font-bold">پلاک {alert.plate}</p>
-        <p>
-          این دستگاه متعلق به شعبه شماست، اما در آمار شعبه {alert.detected_branch_name} اسکن شده.
-        </p>
-        <span>
-          بارکد {alert.barcode} · {Beroon.Calendar.persian_date(alert.detected_on)}
-        </span>
-      </article>
-    </section>
-
     <section class="manager-status-grid">
       <article class="manager-status-card">
         <div class="manager-card-icon">

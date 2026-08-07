@@ -34,19 +34,54 @@ defmodule Beroon.Reports do
   @doc """
   Returns the operational date for an evening count.
 
-  In Tehran time, scans from midnight through 05:59 belong to the previous day.
-  Scans from 06:00 onward belong to the current day.
+  The operational window is 21:00 through 05:59 Tehran time. Counts after
+  midnight and before 06:00 belong to the previous calendar date.
   """
   def evening_report_date(now \\ DateTime.utc_now()) do
-    tehran_now = DateTime.add(now, @iran_utc_offset_seconds, :second)
+    tehran_now = tehran_now(now)
     date = DateTime.to_date(tehran_now)
 
-    if tehran_now.hour < 6 do
-      Date.add(date, -1)
-    else
-      date
+    if tehran_now.hour < 6, do: Date.add(date, -1), else: date
+  end
+
+  @doc "Returns true only during the 21:00-06:00 Tehran evening-count window."
+  def evening_window_open?(now \\ DateTime.utc_now()) do
+    hour = tehran_now(now).hour
+    hour >= 21 or hour < 6
+  end
+
+  @doc """
+  Returns the evening cycle an admin/manager should currently inspect.
+  Between 06:00 and 20:59 the latest completed cycle is the previous date.
+  """
+  def current_evening_cycle_date(now \\ DateTime.utc_now()) do
+    tehran = tehran_now(now)
+    date = DateTime.to_date(tehran)
+
+    cond do
+      tehran.hour < 6 -> Date.add(date, -1)
+      tehran.hour >= 21 -> date
+      true -> Date.add(date, -1)
     end
   end
+
+  @doc "UTC boundaries for a report date: 21:00 Tehran to 06:00 next day."
+  def evening_window_utc_bounds(%Date{} = date) do
+    start_utc =
+      DateTime.new!(date, ~T[21:00:00], "Etc/UTC")
+      |> DateTime.add(-@iran_utc_offset_seconds, :second)
+      |> DateTime.truncate(:second)
+
+    end_utc =
+      Date.add(date, 1)
+      |> DateTime.new!(~T[06:00:00], "Etc/UTC")
+      |> DateTime.add(-@iran_utc_offset_seconds, :second)
+      |> DateTime.truncate(:second)
+
+    {start_utc, end_utc}
+  end
+
+  defp tehran_now(%DateTime{} = now), do: DateTime.add(now, @iran_utc_offset_seconds, :second)
 
   def create_branch_notification(attrs, branch_ids) do
     branch_ids =
@@ -305,8 +340,8 @@ defmodule Beroon.Reports do
       })
       |> Repo.all()
 
-    # فقط اسکن‌های صحیح همان شعبه در آمار شعب محاسبه می‌شوند. اسکن دستگاه شعبه دیگر
-    # و اسکن حمل‌ونقل در گزارش جزئیات باقی می‌مانند، اما نباید جمع شعبه را افزایش دهند.
+    # هر دستگاهی که در این شعبه به‌صورت معتبر اسکن شده (مالک یا دستگاه جابه‌جا شده)
+    # در آمار همان شعبه محاسبه می‌شود. حمل‌ونقل غیرمالک پیش از ثبت رد می‌شود.
     # دستگاهی که اکنون در تعمیرگاه، در انتظار قطعه یا امانی است از ستون شعب حذف می‌شود
     # تا در جمع نهایی دوبار شمرده نشود.
     branch_scan_counts =
@@ -316,7 +351,7 @@ defmodule Beroon.Reports do
       |> where(
         [i, e, s],
         e.counted_on == ^date and
-          (i.scan_result == "expected" or is_nil(i.scan_result)) and
+          (i.scan_result in ["expected", "foreign"] or is_nil(i.scan_result)) and
           s.status not in [
             "needs_service",
             "awaiting_repair",
@@ -505,6 +540,119 @@ defmodule Beroon.Reports do
     |> Repo.all()
   end
 
+  @doc """
+  Returns the three-way audit for one branch and one evening operational date:
+  scanned at the branch, moved in/out, and expected but not scanned.
+  The query is bounded by the actual 21:00-06:00 Tehran window.
+  """
+  def branch_evening_audit_for_date(branch_id, %Date{} = date) do
+    {window_start, window_end} = evening_window_utc_bounds(date)
+
+    counts =
+      EveningCount
+      |> where(
+        [e],
+        e.branch_id == ^branch_id and e.counted_at >= ^window_start and e.counted_at < ^window_end
+      )
+      |> select([e], %{id: e.id, expected_scooter_ids: e.expected_scooter_ids, counted_at: e.counted_at})
+      |> Repo.all()
+
+    count_ids = Enum.map(counts, & &1.id)
+
+    items =
+      if count_ids == [] do
+        []
+      else
+        EveningCountItem
+        |> join(:inner, [i], s in Scooter, on: s.id == i.scooter_id)
+        |> join(:left, [i, s], d in DeviceType, on: d.id == s.device_type_id)
+        |> where([i], i.evening_count_id in ^count_ids)
+        |> order_by([i, s], asc: s.plate)
+        |> select([i, s, d], %{
+          scooter_id: s.id,
+          plate: s.plate,
+          barcode: s.barcode,
+          scan_result: i.scan_result,
+          home_branch_id: i.home_branch_id,
+          current_branch_id: i.current_branch_id,
+          device_type_identifier: d.device_identifier,
+          device_type_category: d.category,
+          device_type_name: d.device_model
+        })
+        |> Repo.all()
+      end
+
+    moves =
+      ScooterLocationAlert
+      |> join(:inner, [a], s in Scooter, on: s.id == a.scooter_id)
+      |> join(:left, [a, s], h in Branch, on: h.id == a.home_branch_id)
+      |> join(:left, [a, s, h], d in Branch, on: d.id == a.detected_branch_id)
+      |> join(:left, [a, s, h, d], t in DeviceType, on: t.id == s.device_type_id)
+      |> where(
+        [a],
+        a.detected_at >= ^window_start and a.detected_at < ^window_end and
+          (a.home_branch_id == ^branch_id or a.detected_branch_id == ^branch_id)
+      )
+      |> order_by([a], asc: a.detected_at)
+      |> select([a, s, h, d, t], %{
+        scooter_id: s.id,
+        plate: s.plate,
+        barcode: s.barcode,
+        home_branch_id: a.home_branch_id,
+        home_branch_name: h.name,
+        detected_branch_id: a.detected_branch_id,
+        detected_branch_name: d.name,
+        detected_at: a.detected_at,
+        device_type_identifier: t.device_identifier,
+        device_type_category: t.category,
+        device_type_name: t.device_model
+      })
+      |> Repo.all()
+      |> Enum.map(fn move ->
+        Map.put(move, :direction, if(move.home_branch_id == branch_id, do: :out, else: :in))
+      end)
+      |> Enum.uniq_by(&{&1.scooter_id, &1.direction, &1.detected_branch_id})
+
+    moved_ids = MapSet.new(moves, & &1.scooter_id)
+
+    scanned =
+      items
+      |> Enum.filter(fn item ->
+        item.home_branch_id == branch_id and item.scan_result in [nil, "expected"] and
+          not MapSet.member?(moved_ids, item.scooter_id)
+      end)
+      |> Enum.uniq_by(& &1.scooter_id)
+
+    expected_ids = counts |> Enum.flat_map(&List.wrap(&1.expected_scooter_ids)) |> Enum.uniq()
+    scanned_ids = MapSet.new(scanned, & &1.scooter_id)
+
+    missing_ids =
+      Enum.reject(expected_ids, fn scooter_id ->
+        MapSet.member?(scanned_ids, scooter_id) or MapSet.member?(moved_ids, scooter_id)
+      end)
+
+    missing =
+      if missing_ids == [] do
+        []
+      else
+        Scooter
+        |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
+        |> where([s], s.id in ^missing_ids)
+        |> order_by([s], asc: s.plate)
+        |> select([s, d], %{
+          scooter_id: s.id,
+          plate: s.plate,
+          barcode: s.barcode,
+          device_type_identifier: d.device_identifier,
+          device_type_category: d.category,
+          device_type_name: d.device_model
+        })
+        |> Repo.all()
+      end
+
+    %{date: date, submitted: counts != [], scanned: scanned, moved: moves, missing: missing}
+  end
+
   def get_evening_count_report!(id) do
     count =
       EveningCount
@@ -645,6 +793,13 @@ defmodule Beroon.Reports do
           {:error, changeset} -> Repo.rollback(changeset)
         end
 
+      affected_previous_count_ids =
+        remove_scooters_from_other_evening_counts(
+          evening_count.counted_on,
+          evening_count.branch_id,
+          Enum.map(scanned_scooters, & &1.id)
+        )
+
       scanned_scooters
       |> Enum.uniq_by(& &1.id)
       |> Enum.each(fn scooter ->
@@ -660,6 +815,7 @@ defmodule Beroon.Reports do
         |> Repo.insert!()
       end)
 
+      Enum.each(affected_previous_count_ids, &recalculate_evening_count_totals/1)
       resolve_returned_location_alerts(evening_count, scanned_scooters)
       create_location_alerts(evening_count, attrs, scanned_scooters)
 
@@ -669,11 +825,69 @@ defmodule Beroon.Reports do
 
 
   defp evening_scan_result(scooter, branch_id) do
-    cond do
-      scooter.branch_id == branch_id -> "expected"
-      scooter.current_branch_id == branch_id -> "transport"
-      true -> "foreign"
+    if scooter.branch_id == branch_id, do: "expected", else: "foreign"
+  end
+
+  # اگر یک دستگاه در همان تاریخ عملیاتی قبلاً در آمار شعبه دیگری ثبت شده باشد،
+  # با ثبت شعبه جدید از رکورد قبلی حذف می‌شود تا هر دستگاه فقط یک بار شمرده شود.
+  defp remove_scooters_from_other_evening_counts(_date, _branch_id, []), do: []
+
+  defp remove_scooters_from_other_evening_counts(date, branch_id, scooter_ids) do
+    unique_scooter_ids = Enum.uniq(scooter_ids)
+
+    rows =
+      EveningCountItem
+      |> join(:inner, [i], c in EveningCount, on: c.id == i.evening_count_id)
+      |> where(
+        [i, c],
+        i.scooter_id in ^unique_scooter_ids and c.counted_on == ^date and
+          c.branch_id != ^branch_id
+      )
+      |> select([i, c], {i.id, c.id})
+      |> Repo.all()
+
+    item_ids = Enum.map(rows, &elem(&1, 0))
+    count_ids = rows |> Enum.map(&elem(&1, 1)) |> Enum.uniq()
+
+    if item_ids != [] do
+      EveningCountItem
+      |> where([i], i.id in ^item_ids)
+      |> Repo.delete_all()
     end
+
+    count_ids
+  end
+
+  defp recalculate_evening_count_totals(count_id) do
+    count = Repo.get!(EveningCount, count_id)
+
+    counted_scooter_ids =
+      EveningCountItem
+      |> where([i], i.evening_count_id == ^count_id)
+      |> where([i], is_nil(i.scan_result) or i.scan_result in ["expected", "foreign"])
+      |> select([i], i.scooter_id)
+      |> Repo.all()
+      |> Enum.uniq()
+
+    expected_scanned_ids =
+      EveningCountItem
+      |> where([i], i.evening_count_id == ^count_id)
+      |> where([i], is_nil(i.scan_result) or i.scan_result == "expected")
+      |> select([i], i.scooter_id)
+      |> Repo.all()
+      |> Enum.uniq()
+
+    expected_ids = count.expected_scooter_ids || []
+    missing_count = Enum.count(expected_ids -- expected_scanned_ids)
+    total_count = length(counted_scooter_ids)
+
+    count
+    |> EveningCount.changeset(%{
+      total_count: total_count,
+      available_count: total_count,
+      missing_count: missing_count
+    })
+    |> Repo.update!()
   end
 
 
@@ -1084,10 +1298,14 @@ defmodule Beroon.Reports do
       |> MapSet.new()
 
     evening_date = Date.add(date, -1)
+    {evening_start, evening_end} = evening_window_utc_bounds(evening_date)
 
     evening_branch_ids =
       EveningCount
-      |> where([e], e.branch_id in ^branch_ids and e.counted_on == ^evening_date)
+      |> where(
+        [e],
+        e.branch_id in ^branch_ids and e.counted_at >= ^evening_start and e.counted_at < ^evening_end
+      )
       |> distinct([e], e.branch_id)
       |> select([e], e.branch_id)
       |> Repo.all()
@@ -1102,16 +1320,26 @@ defmodule Beroon.Reports do
     end)
   end
 
-  def evening_submission_locked?(branch_id, now \\ DateTime.utc_now())
+  def evening_submitted_for_cycle?(branch_id, now \\ DateTime.utc_now())
+  def evening_submitted_for_cycle?(nil, _now), do: false
 
-  def evening_submission_locked?(nil, _now), do: false
-
-  def evening_submission_locked?(branch_id, %DateTime{} = now) do
-    report_date = evening_report_date(now)
+  def evening_submitted_for_cycle?(branch_id, %DateTime{} = now) do
+    date = current_evening_cycle_date(now)
+    {window_start, window_end} = evening_window_utc_bounds(date)
 
     EveningCount
-    |> where([e], e.branch_id == ^branch_id and e.counted_on == ^report_date)
+    |> where(
+      [e],
+      e.branch_id == ^branch_id and e.counted_at >= ^window_start and e.counted_at < ^window_end
+    )
     |> Repo.exists?()
+  end
+
+  def evening_submission_locked?(branch_id, now \\ DateTime.utc_now())
+  def evening_submission_locked?(nil, _now), do: true
+
+  def evening_submission_locked?(branch_id, %DateTime{} = now) do
+    not evening_window_open?(now) or evening_submitted_for_cycle?(branch_id, now)
   end
 
   # Kept for compatibility with older callers.

@@ -38,6 +38,13 @@ defmodule Beroon.Operations do
     |> Repo.all()
   end
 
+  def list_active_workshops do
+    Branch
+    |> where([b], b.active == true and b.kind == "workshop")
+    |> order_by([b], asc: b.name)
+    |> Repo.all()
+  end
+
   def get_branch_for_manager_phone(phone) when is_binary(phone) do
     normalized_phone = String.trim(phone)
 

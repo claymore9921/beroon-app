@@ -33,13 +33,12 @@ defmodule BeroonWeb.PageController do
       render(conn, :manager_home,
         branch: branch,
         manager_name: manager_name(branch),
-        location_alerts: branch_location_alerts(branch),
         scooter_counts: manager_scooter_counts(branch.id),
         persian_today: Beroon.Calendar.persian_date(today),
         morning_submitted:
           Reports.morning_submitted_today?(branch.id, today),
         evening_submitted:
-          Reports.evening_submission_locked?(branch.id)
+          Reports.evening_submitted_for_cycle?(branch.id)
       )
     end
   end
@@ -89,7 +88,7 @@ defmodule BeroonWeb.PageController do
         persian_today: Beroon.Calendar.persian_date(today),
         daily_revenue: Reports.get_daily_revenue(branch.id, today),
         morning_submitted: Reports.morning_submitted_today?(branch.id, today),
-        evening_submitted: Reports.evening_submission_locked?(branch.id)
+        evening_submitted: Reports.evening_submitted_for_cycle?(branch.id)
       )
     end
   end
@@ -165,7 +164,6 @@ defmodule BeroonWeb.PageController do
         after_evening: after_evening,
         branches: Operations.list_active_transport_branches(),
         default_destination_id: bahonar && bahonar.id,
-        transports: Logistics.list_transports_for_branch(branch.id),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
@@ -320,7 +318,13 @@ defmodule BeroonWeb.PageController do
         )
 
       scooter.status == "ready_for_pickup" ->
-        {:ok, _scooter} = Fleet.update_scooter(scooter, %{status: "active", notes: nil})
+        {:ok, _scooter} =
+          Fleet.update_scooter(scooter, %{
+            status: "active",
+            notes: nil,
+            current_branch_id: branch.id,
+            transport_until: nil
+          })
 
         conn
         |> put_flash(:info, "تحویل دستگاه از تعمیرگاه ثبت شد.")
@@ -426,7 +430,11 @@ defmodule BeroonWeb.PageController do
            Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone),
          scooter <- Fleet.get_scooter_with_details!(id),
          true <- scooter.status == "needs_service",
-         {:ok, _scooter} <- Fleet.update_scooter(scooter, %{status: "awaiting_repair"}) do
+         {:ok, _scooter} <-
+           Fleet.update_scooter(scooter, %{
+             status: "awaiting_repair",
+             current_branch_id: workshop.id
+           }) do
       record_workshop_event(scooter.id, "accepted", conn.assigns.current_user_phone)
       conn
       |> put_flash(:info, "پذیرش دستگاه در #{workshop.name} ثبت شد.")
@@ -440,8 +448,10 @@ defmodule BeroonWeb.PageController do
   end
 
   def workshop_start_repair(conn, %{"id" => id}) do
+    workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
     scooter = Fleet.get_scooter!(id)
-    case Fleet.update_scooter(scooter, %{status: "repairing"}) do
+    attrs = %{status: "repairing"} |> then(fn a -> if workshop, do: Map.put(a, :current_branch_id, workshop.id), else: a end)
+    case Fleet.update_scooter(scooter, attrs) do
       {:ok, _} ->
         record_workshop_event(scooter.id, "repair_started", conn.assigns.current_user_phone)
         conn |> put_flash(:info, "دستگاه وارد مرحله تعمیر شد.") |> redirect(to: ~p"/workshop/repairing")
@@ -471,7 +481,12 @@ defmodule BeroonWeb.PageController do
       parts_used == "" ->
         conn |> put_flash(:error, "ثبت قطعات مصرف‌شده برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
       true ->
-        case Fleet.update_scooter(scooter, %{status: "ready_for_pickup", repair_parts_used: parts_used}) do
+        workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
+        attrs =
+          %{status: "ready_for_pickup", repair_parts_used: parts_used}
+          |> then(fn a -> if workshop, do: Map.put(a, :current_branch_id, workshop.id), else: a end)
+
+        case Fleet.update_scooter(scooter, attrs) do
           {:ok, _} ->
             record_workshop_event(scooter.id, "discharged", conn.assigns.current_user_phone)
             conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop/discharge")
@@ -519,6 +534,7 @@ defmodule BeroonWeb.PageController do
 
   defp do_submit_morning(conn, params, branch, scooter) do
     scooter = Logistics.activate_owner_return(scooter, branch.id)
+    scooter = Logistics.mark_seen_at_branch(scooter, branch.id)
     checklist_item_ids = List.wrap(params["checklist_item_ids"])
     checked_item_ids = List.wrap(params["checked_item_ids"])
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -560,7 +576,8 @@ defmodule BeroonWeb.PageController do
     else
       render(conn, :manager_evening,
         branches: [branch],
-        submitted: Reports.evening_submission_locked?(branch.id),
+        submitted: Reports.evening_submitted_for_cycle?(branch.id),
+        window_open: Reports.evening_window_open?(),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
@@ -573,9 +590,14 @@ defmodule BeroonWeb.PageController do
       is_nil(branch) ->
         redirect(conn, to: ~p"/manager/pending")
 
-      Reports.evening_submission_locked?(branch.id) ->
+      not Reports.evening_window_open?() ->
         conn
-        |> put_flash(:error, "آمار شب این شعبه قبلا ثبت شده و فعلا غیرفعال است.")
+        |> put_flash(:error, "آمارگیری شب فقط از ساعت ۲۱:۰۰ تا ۰۶:۰۰ صبح فعال است.")
+        |> redirect(to: ~p"/manager/evening")
+
+      Reports.evening_submitted_for_cycle?(branch.id) ->
+        conn
+        |> put_flash(:error, "آمار شب این شعبه برای این بازه قبلا ثبت شده است.")
         |> redirect(to: ~p"/manager/evening")
 
       true ->
@@ -597,13 +619,15 @@ defmodule BeroonWeb.PageController do
       |> Enum.reject(fn scooter -> scooter.status in ["loaned", "stolen"] end)
       |> Enum.reject(fn scooter -> scooter.status == "transport" and scooter.branch_id != branch.id end)
       |> Enum.map(&Logistics.activate_owner_return(&1, branch.id))
+      |> Enum.map(&Logistics.mark_evening_seen(&1, branch.id))
+      |> Enum.uniq_by(& &1.id)
 
     expected_scooters = Fleet.expected_evening_scooters_for_branch(branch.id)
+    expected_ids = Enum.map(expected_scooters, & &1.id)
+    scanned_ids = Enum.map(scanned_scooters, & &1.id)
 
-    total_count =
-      scanned_scooters
-      |> Enum.uniq_by(& &1.id)
-      |> Enum.count(&(&1.branch_id == branch.id))
+    total_count = length(scanned_scooters)
+    missing_count = Enum.count(expected_ids -- scanned_ids)
 
     attrs =
       params
@@ -616,7 +640,7 @@ defmodule BeroonWeb.PageController do
         "available_count" => total_count,
         "rented_count" => 0,
         "damaged_count" => 0,
-        "missing_count" => max(length(expected_scooters) - total_count, 0),
+        "missing_count" => missing_count,
         "expected_scooter_ids" => Enum.map(expected_scooters, & &1.id),
         "counted_on" => Reports.evening_report_date(now),
         "counted_at" => now
@@ -681,8 +705,7 @@ defmodule BeroonWeb.PageController do
 
     render(conn, :admin_device_locations,
       query: query,
-      result: Logistics.find_scooter_location(query),
-      recent_transports: Logistics.list_recent_transports()
+      result: Logistics.find_scooter_location(query)
     )
   end
 
@@ -709,7 +732,7 @@ defmodule BeroonWeb.PageController do
 
   def admin_evening_report_branches(conn, _params) do
     date = Reports.iran_today()
-    branches = Operations.list_branches()
+    branches = Operations.list_active_transport_branches()
 
     render(conn, :admin_evening_report_branches,
       branches: branches,
@@ -719,17 +742,13 @@ defmodule BeroonWeb.PageController do
   end
 
   def admin_branch_evening_reports(conn, %{"id" => id} = params) do
-    Logistics.expire_transports!()
     branch = Operations.get_branch!(id)
-    filter_dates = Reports.list_evening_report_dates_for_branch(branch.id)
-    selected_date = parse_optional_date(params["date"])
+    selected_date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
 
     render(conn, :admin_branch_evening_reports,
       branch: branch,
-      filter_dates: filter_dates,
       selected_date: selected_date,
-      reports: Reports.list_evening_counts_for_branch(branch.id, selected_date),
-      transport_scooters: Logistics.list_active_transports_for_branch(branch.id)
+      audit: Reports.branch_evening_audit_for_date(branch.id, selected_date)
     )
   end
 
@@ -1616,8 +1635,16 @@ defmodule BeroonWeb.PageController do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Repo.transaction(fn ->
+      workshop = Operations.list_active_workshops() |> List.first()
+
+      scooter_attrs =
+        %{status: "needs_service", notes: notes}
+        |> then(fn attrs ->
+          if workshop, do: Map.put(attrs, :current_branch_id, workshop.id), else: attrs
+        end)
+
       updated_scooter =
-        case Fleet.update_scooter(scooter, %{status: "needs_service", notes: notes}) do
+        case Fleet.update_scooter(scooter, scooter_attrs) do
           {:ok, scooter} -> scooter
           {:error, changeset} -> Repo.rollback(changeset)
         end
@@ -1656,9 +1683,11 @@ defmodule BeroonWeb.PageController do
   end
 
   defp workshop_update_status(conn, id, status, message, extra_attrs, redirect_path) do
-    if Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone) do
+    workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
+
+    if workshop do
       scooter = Fleet.get_scooter!(id)
-      attrs = Map.merge(%{status: status}, extra_attrs)
+      attrs = Map.merge(%{status: status, current_branch_id: workshop.id}, extra_attrs)
 
       case Fleet.update_scooter(scooter, attrs) do
         {:ok, _scooter} ->

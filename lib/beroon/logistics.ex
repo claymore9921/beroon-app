@@ -137,6 +137,49 @@ defmodule Beroon.Logistics do
 
   def activate_owner_return(%{} = scooter, _owner_branch_id), do: scooter
 
+  # ثبت مشاهده فیزیکی دستگاه در یک شعبه. در آمار شب هر دستگاه مجاز که دیده
+  # می‌شود فعال شده و current_branch_id آن به شعبه اسکن‌کننده تغییر می‌کند.
+  def mark_evening_seen(%Scooter{} = scooter, branch_id) do
+    scooter
+    |> Ecto.Changeset.change(
+      status: "active",
+      current_branch_id: branch_id,
+      transport_until: nil
+    )
+    |> Repo.update!()
+  end
+
+  def mark_evening_seen(%{id: id} = scooter, branch_id) do
+    Repo.get!(Scooter, id)
+    |> Ecto.Changeset.change(
+      status: "active",
+      current_branch_id: branch_id,
+      transport_until: nil
+    )
+    |> Repo.update!()
+
+    scooter
+    |> Map.put(:status, "active")
+    |> Map.put(:current_branch_id, branch_id)
+    |> Map.put(:transport_until, nil)
+  end
+
+  # برای چک‌لیست صبح فقط محل مشاهده به‌روزرسانی می‌شود؛ وضعیت عملیاتی دستگاه
+  # بدون دلیل تغییر نمی‌کند (به‌جز حمل‌ونقل مالک که activate_owner_return انجام می‌دهد).
+  def mark_seen_at_branch(%Scooter{} = scooter, branch_id) do
+    scooter
+    |> Ecto.Changeset.change(current_branch_id: branch_id)
+    |> Repo.update!()
+  end
+
+  def mark_seen_at_branch(%{id: id} = scooter, branch_id) do
+    Repo.get!(Scooter, id)
+    |> Ecto.Changeset.change(current_branch_id: branch_id)
+    |> Repo.update!()
+
+    Map.put(scooter, :current_branch_id, branch_id)
+  end
+
   def list_active_transports_for_branch(branch_id) do
     expire_transports!()
     now = DateTime.utc_now() |> DateTime.truncate(:second)

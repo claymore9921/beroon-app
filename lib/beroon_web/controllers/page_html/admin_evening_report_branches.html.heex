@@ -37,19 +37,23 @@
               <p class="mt-1 text-xs font-semibold">{if status.morning_submitted, do: "انجام شده", else: "انجام نشده"}</p>
             </div>
 
-            <div class={[
-              "rounded-lg border p-3",
-              if(status.evening_submitted,
-                do: "border-emerald-200 bg-emerald-50 text-emerald-800",
-                else: "border-red-200 bg-red-50 text-red-800"
-              )
-            ]}>
+            <.link
+              navigate={~p"/admin/evening-reports/branches/#{status.branch}"}
+              class={[
+                "block rounded-lg border p-3 transition hover:shadow-sm",
+                if(status.evening_submitted,
+                  do: "border-emerald-200 bg-emerald-50 text-emerald-800",
+                  else: "border-red-200 bg-red-50 text-red-800"
+                )
+              ]}
+            >
               <div class="flex items-center gap-2 font-bold">
                 <.icon name={if status.evening_submitted, do: "hero-check-circle", else: "hero-x-circle"} class="size-5" />
                 <span>آمار شب</span>
               </div>
               <p class="mt-1 text-xs font-semibold">{if status.evening_submitted, do: "انجام شده", else: "انجام نشده"}</p>
-            </div>
+              <p class="mt-1 text-[11px] opacity-75">مشاهده ریز گزارش</p>
+            </.link>
           </div>
         </article>
       </div>

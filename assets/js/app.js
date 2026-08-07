@@ -124,6 +124,40 @@ const lookupScooter = async (code) => {
   return payload.scooter
 }
 
+const registerEveningScan = async (code) => {
+  const clean = String(code || "").trim()
+  if (!clean) return null
+
+  const body = new URLSearchParams({code: clean})
+  const response = await fetch("/api/scooters/evening-scan", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+      "x-csrf-token": csrfToken,
+    },
+    body: body.toString(),
+  })
+
+  let payload = {}
+  try { payload = await response.json() } catch (_error) { payload = {} }
+
+  if (response.ok) return payload.scooter
+
+  if (payload.error === "transport_foreign") {
+    alert("این دستگاه برای حمل‌ونقل انتخاب شده و نباید جزو آمار این شعبه ثبت شود.")
+  } else if (payload.error === "loaned") {
+    alert("این دستگاه امانی است و در آمار شب ثبت نمی‌شود.")
+  } else if (payload.error === "stolen") {
+    alert("این دستگاه سرقتی است و در آمار شب ثبت نمی‌شود.")
+  } else if (payload.error === "not_found") {
+    alert("این پلاک قبلا توسط ادمین ثبت نشده است.")
+  } else {
+    alert("ثبت محل دستگاه انجام نشد. دوباره تلاش کنید.")
+  }
+
+  return null
+}
+
 const addScannedScooter = (scooter) => {
   const list = document.getElementById("scanned-list")
   const count = document.getElementById("scan-count")
@@ -188,6 +222,7 @@ const setupEveningScanner = () => {
     startPanel.classList.add("hidden")
     const form = document.getElementById("count-form")
     form?.classList.remove("hidden")
+    requestAnimationFrame(() => input.focus({preventScroll: true}))
   })
 
   const stopScanner = () => {
@@ -223,22 +258,21 @@ const setupEveningScanner = () => {
     const code = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts: "attemptBoth"})
 
     if (code?.data) {
-      const scooter = await lookupScooter(code.data)
-      if (scooter) {
-        if (scooter.status === "transport" && scooter.branch_id !== managerBranchId) {
-          alert("این دستگاه برای حمل‌ونقل انتخاب شده و نباید جزو آمار این شعبه ثبت شود.")
+      const original = await lookupScooter(code.data)
+      if (original) {
+        const scooter = await registerEveningScan(original.plate || code.data)
+        if (scooter) {
+          if (scooter.branch_id !== managerBranchId) {
+            alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است؛ محل فعلی آن به این شعبه تغییر کرد و در آمار این شعبه ثبت می‌شود.`)
+          }
+          if (!seenPlates.has(scooter.plate)) {
+            seenPlates.add(scooter.plate)
+            addScannedScooter(scooter)
+          }
+          input.value = scooter.plate || code.data
+        } else {
           input.value = ""
-          stopScanner()
-          return
         }
-        if (scooter.branch_id !== managerBranchId) {
-          alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و جزو آمار اصلی شعبه شما محاسبه نمی‌شود.`)
-        }
-        if (!seenPlates.has(scooter.plate)) {
-          seenPlates.add(scooter.plate)
-          addScannedScooter(scooter)
-        }
-        input.value = scooter.plate || code.data
       }
       stopScanner()
       return
@@ -272,18 +306,45 @@ const setupEveningScanner = () => {
 
   scanButton.addEventListener("click", openScanner)
   manualAdd.addEventListener("click", async () => {
-    const scooter = await lookupScooter(input.value)
-    if (!scooter) return
-    if (scooter.status === "transport" && scooter.branch_id !== managerBranchId) {
-      alert("این دستگاه برای حمل‌ونقل انتخاب شده و نباید جزو آمار این شعبه ثبت شود.")
-      input.value = ""
+    const clean = String(input.value || "").trim()
+    if (!/^\d{4}$/.test(clean)) {
+      alert("پلاک را به‌صورت عدد ۴ رقمی وارد کنید.")
+      input.focus({preventScroll: true})
       return
     }
-    if (scooter.branch_id !== managerBranchId) {
-      alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و جزو آمار اصلی شعبه شما محاسبه نمی‌شود.`)
+
+    const original = await lookupScooter(clean)
+    if (!original) {
+      input.focus({preventScroll: true})
+      return
     }
-    addScannedScooter(scooter)
+
+    const scooter = await registerEveningScan(original.plate || clean)
+    if (scooter) {
+      if (scooter.branch_id !== managerBranchId) {
+        alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است؛ محل فعلی آن به این شعبه تغییر کرد و در آمار این شعبه ثبت می‌شود.`)
+      }
+      if (!seenPlates.has(scooter.plate)) {
+        seenPlates.add(scooter.plate)
+        addScannedScooter(scooter)
+      }
+    }
+
     input.value = ""
+    requestAnimationFrame(() => input.focus({preventScroll: true}))
+  })
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      manualAdd.click()
+    }
+  })
+
+  form?.addEventListener("submit", (event) => {
+    if (!window.confirm("آیا از پایان آمارگیری و ثبت نهایی آن مطمئن هستید؟")) {
+      event.preventDefault()
+    }
   })
   closeButton.addEventListener("click", stopScanner)
   retryButton?.addEventListener("click", async () => {

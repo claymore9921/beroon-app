@@ -44,6 +44,7 @@ defmodule BeroonWeb.Router do
     pipe_through [:browser, :require_authenticated]
 
     get "/scooters/lookup", ScooterLookupController, :show
+    post "/scooters/evening-scan", ScooterLookupController, :evening_scan
   end
 
   scope "/", BeroonWeb do
