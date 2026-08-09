@@ -806,20 +806,57 @@ defmodule Beroon.Reports do
         |> Repo.all()
       end
 
-    {accounted, needs_review} =
+    {accounted_from_missing, needs_review} =
       Enum.split_with(unresolved_candidates, fn item ->
         Map.has_key?(other_branch_scans, item.scooter_id) or
           item.status in @explained_missing_statuses or
           (not is_nil(item.current_branch_id) and item.current_branch_id != branch_id)
       end)
 
-    accounted =
-      Enum.map(accounted, fn item ->
+    accounted_from_missing =
+      Enum.map(accounted_from_missing, fn item ->
         case Map.get(other_branch_scans, item.scooter_id) do
           nil -> Map.put(item, :accounted_reason, missing_accounted_reason(item, branch_id))
           scan -> Map.put(item, :accounted_reason, "اسکن‌شده در شعبه #{scan.detected_branch_name || "دیگر"}")
         end
       end)
+
+    # دستگاه‌های متعلق به شعبه که به دلیل وضعیت عملیاتی از ابتدا جزو «مورد انتظار
+    # آمار شب» نبوده‌اند نیز باید در گزارش همان شعبه تعیین تکلیف شده دیده شوند؛
+    # برای مثال خراب، در انتظار تعمیر، در حال تعمیر، آماده تحویل یا در انتظار قطعه.
+    # branch_id مالک دائمی دستگاه است، بنابراین حتی وقتی current_branch_id تعمیرگاه
+    # باشد دستگاه همچنان در گزارش شعبه مالک قابل ردیابی خواهد بود.
+    branch_scanned_id_list = MapSet.to_list(branch_scanned_ids)
+
+    explained_owned =
+      Scooter
+      |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
+      |> join(:left, [s, d], c in Branch, on: c.id == s.current_branch_id)
+      |> where(
+        [s],
+        s.branch_id == ^branch_id and s.status in ^@explained_missing_statuses and
+          s.id not in ^branch_scanned_id_list
+      )
+      |> order_by([s], asc: s.plate)
+      |> select([s, d, c], %{
+        scooter_id: s.id,
+        plate: s.plate,
+        barcode: s.barcode,
+        status: s.status,
+        home_branch_id: s.branch_id,
+        current_branch_id: s.current_branch_id,
+        current_branch_name: c.name,
+        device_type_identifier: d.device_identifier,
+        device_type_category: d.category,
+        device_type_name: d.device_model
+      })
+      |> Repo.all()
+      |> Enum.map(&Map.put(&1, :accounted_reason, missing_accounted_reason(&1, branch_id)))
+
+    accounted =
+      (accounted_from_missing ++ explained_owned)
+      |> Enum.uniq_by(& &1.scooter_id)
+      |> Enum.sort_by(&(&1.plate || ""))
 
     %{
       date: date,

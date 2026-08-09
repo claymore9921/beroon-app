@@ -61,6 +61,7 @@ const buildScannedCard = (scooter) => {
 
   const card = document.createElement("div")
   card.className = "rounded-md bg-white p-3 text-sm"
+  card.dataset.plate = scooter.plate || ""
   card.innerHTML = `
     <div class="flex items-start justify-between gap-2">
       <div>
@@ -68,6 +69,13 @@ const buildScannedCard = (scooter) => {
         <p class="text-zinc-500">${deviceTypeLabel}</p>
         <p class="text-zinc-500">${scooter.branch_name || "شعبه نامشخص"}</p>
       </div>
+      <button
+        type="button"
+        class="evening-remove-scan btn btn-sm border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+        aria-label="حذف پلاک ${scooter.plate || ""}"
+      >
+        حذف
+      </button>
     </div>
   `
   card.appendChild(hidden)
@@ -216,6 +224,31 @@ const setupEveningScanner = () => {
   }
 
   document.addEventListener("evening:scan-added", saveDraft)
+
+  const scannedList = document.getElementById("scanned-list")
+  scannedList?.addEventListener("click", (event) => {
+    const button = event.target.closest(".evening-remove-scan")
+    if (!button) return
+
+    const card = button.closest("[data-plate]")
+    const plate = card?.dataset.plate || ""
+    if (!card || !plate) return
+
+    if (!window.confirm(`پلاک ${plate} از آمار در حال ثبت حذف شود؟`)) return
+
+    seenPlates.delete(plate)
+    card.remove()
+
+    const count = document.getElementById("scan-count")
+    if (count) {
+      count.textContent = String(document.querySelectorAll('input[name="evening[scanned_codes][]"]').length)
+    }
+
+    saveDraft()
+    input.value = ""
+    requestAnimationFrame(() => input.focus({preventScroll: true}))
+  })
+
   restoreDraft()
 
   startButton.addEventListener("click", () => {
