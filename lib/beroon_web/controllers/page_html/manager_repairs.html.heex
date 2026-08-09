@@ -9,42 +9,18 @@
       <p class="mt-1 text-sm text-zinc-500">{@branch.name} · {@persian_today}</p>
     </header>
 
-    <section id="ready-for-pickup-box" class="ready-pickup-card mt-4">
-      <div class="flex items-start justify-between gap-3 border-b border-zinc-100 pb-3">
-        <div>
-          <h2 class="text-lg font-black text-zinc-950">ترخیص‌شده از تعمیرگاه</h2>
-          <p class="mt-1 text-sm text-zinc-500">
-            این پلاک‌ها آماده تحویل گرفتن هستند.
-          </p>
-        </div>
-        <span class="rounded-full bg-teal-100 px-3 py-1 text-sm font-black text-teal-700">
-          {length(@ready_for_pickup_scooters)}
-        </span>
-      </div>
-
-      <div class="mt-3 grid max-h-80 gap-2 overflow-y-auto">
-        <p
-          :if={@ready_for_pickup_scooters == []}
-          class="rounded-lg bg-zinc-50 p-3 text-sm text-zinc-500"
-        >
-          فعلاً دستگاهی آماده تحویل نیست.
-        </p>
-
-        <article
-          :for={scooter <- @ready_for_pickup_scooters}
-          class="rounded-lg border border-teal-100 bg-teal-50/60 p-3"
-        >
-          <p class="font-black text-zinc-950">پلاک {scooter.plate}</p>
-          <p class="mt-1 text-xs font-bold text-zinc-500">
-            بارکد {scooter.barcode} · {device_type_label(scooter.device_type)}
-          </p>
-        </article>
-      </div>
-
-      <.link navigate={~p"/manager/repairs/receive"} class="btn btn-primary mt-4 min-h-12 w-full">
-        رفتن به تحویل از تعمیرگاه
+    <div class="mt-4 grid grid-cols-2 gap-2">
+      <.link navigate={~p"/manager/repairs"} class="btn btn-primary min-h-12 w-full">
+        دستگاه خراب
       </.link>
-    </section>
+      <.link navigate={~p"/manager/repairs/receive"} class="btn btn-outline min-h-12 w-full">
+        تحویل
+      </.link>
+    </div>
+
+    <div class="mt-4 rounded-xl border border-orange-100 bg-orange-50 p-3 text-sm text-orange-900">
+      دستگاه‌های حاضر در شعبه زیر نمایش داده می‌شوند. اگر دستگاهی از شعبه دیگری نزد شماست، پلاک یا QR آن را جستجو/اسکن کنید تا بتوانید خرابی آن را ثبت کنید.
+    </div>
 
     <form
       id="manager-repair-search"
@@ -79,6 +55,8 @@
           <div>
             <p class="font-bold text-zinc-950">پلاک {scooter.plate}</p>
             <p class="mt-1 text-xs text-zinc-500">{device_type_label(scooter.device_type)}</p>
+            <p :if={scooter.branch} class="mt-1 text-xs text-zinc-500">مالک: {scooter.branch.name}</p>
+            <p :if={scooter.current_branch} class="mt-1 text-xs text-zinc-500">محل ثبت‌شده فعلی: {scooter.current_branch.name}</p>
           </div>
           <span class={["rounded px-2 py-1 text-xs font-bold", status_badge_class(scooter.status)]}>
             {status_label(scooter.status)}

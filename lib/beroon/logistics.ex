@@ -35,14 +35,16 @@ defmodule Beroon.Logistics do
 
           case %ScooterTransport{} |> ScooterTransport.changeset(attrs) |> Repo.insert() do
             {:ok, transport} ->
-              scooter
-              |> Ecto.Changeset.change(
-                current_branch_id: destination_branch.id,
-                status: "transport",
-                transport_until: DateTime.add(now, 16 * 60 * 60, :second)
-              )
-              |> Repo.update!()
+              updated =
+                scooter
+                |> Ecto.Changeset.change(
+                  current_branch_id: destination_branch.id,
+                  status: "transport",
+                  transport_until: DateTime.add(now, 16 * 60 * 60, :second)
+                )
+                |> Repo.update!()
 
+              Beroon.LocationHistory.record(updated.id, destination_branch.id, now)
               transport
 
             {:error, changeset} ->
@@ -116,18 +118,25 @@ defmodule Beroon.Logistics do
 
   def activate_owner_return(%Scooter{} = scooter, owner_branch_id) do
     if scooter.status == "transport" and scooter.branch_id == owner_branch_id do
-      scooter
-      |> Ecto.Changeset.change(status: "active", transport_until: nil, current_branch_id: owner_branch_id)
-      |> Repo.update!()
+      updated =
+        scooter
+        |> Ecto.Changeset.change(status: "active", transport_until: nil, current_branch_id: owner_branch_id)
+        |> Repo.update!()
+
+      Beroon.LocationHistory.record(updated.id, owner_branch_id)
+      updated
     else
       scooter
     end
   end
 
   def activate_owner_return(%{id: id, status: "transport", branch_id: owner_branch_id} = scooter, owner_branch_id) do
-    Repo.get!(Scooter, id)
-    |> Ecto.Changeset.change(status: "active", transport_until: nil, current_branch_id: owner_branch_id)
-    |> Repo.update!()
+    updated =
+      Repo.get!(Scooter, id)
+      |> Ecto.Changeset.change(status: "active", transport_until: nil, current_branch_id: owner_branch_id)
+      |> Repo.update!()
+
+    Beroon.LocationHistory.record(updated.id, owner_branch_id)
 
     scooter
     |> Map.put(:status, "active")
@@ -140,23 +149,30 @@ defmodule Beroon.Logistics do
   # ثبت مشاهده فیزیکی دستگاه در یک شعبه. در آمار شب هر دستگاه مجاز که دیده
   # می‌شود فعال شده و current_branch_id آن به شعبه اسکن‌کننده تغییر می‌کند.
   def mark_evening_seen(%Scooter{} = scooter, branch_id) do
-    scooter
-    |> Ecto.Changeset.change(
-      status: "active",
-      current_branch_id: branch_id,
-      transport_until: nil
-    )
-    |> Repo.update!()
+    updated =
+      scooter
+      |> Ecto.Changeset.change(
+        status: "active",
+        current_branch_id: branch_id,
+        transport_until: nil
+      )
+      |> Repo.update!()
+
+    Beroon.LocationHistory.record(updated.id, branch_id)
+    updated
   end
 
   def mark_evening_seen(%{id: id} = scooter, branch_id) do
-    Repo.get!(Scooter, id)
-    |> Ecto.Changeset.change(
-      status: "active",
-      current_branch_id: branch_id,
-      transport_until: nil
-    )
-    |> Repo.update!()
+    updated =
+      Repo.get!(Scooter, id)
+      |> Ecto.Changeset.change(
+        status: "active",
+        current_branch_id: branch_id,
+        transport_until: nil
+      )
+      |> Repo.update!()
+
+    Beroon.LocationHistory.record(updated.id, branch_id)
 
     scooter
     |> Map.put(:status, "active")
@@ -167,16 +183,22 @@ defmodule Beroon.Logistics do
   # برای چک‌لیست صبح فقط محل مشاهده به‌روزرسانی می‌شود؛ وضعیت عملیاتی دستگاه
   # بدون دلیل تغییر نمی‌کند (به‌جز حمل‌ونقل مالک که activate_owner_return انجام می‌دهد).
   def mark_seen_at_branch(%Scooter{} = scooter, branch_id) do
-    scooter
-    |> Ecto.Changeset.change(current_branch_id: branch_id)
-    |> Repo.update!()
+    updated =
+      scooter
+      |> Ecto.Changeset.change(current_branch_id: branch_id)
+      |> Repo.update!()
+
+    Beroon.LocationHistory.record(updated.id, branch_id)
+    updated
   end
 
   def mark_seen_at_branch(%{id: id} = scooter, branch_id) do
-    Repo.get!(Scooter, id)
-    |> Ecto.Changeset.change(current_branch_id: branch_id)
-    |> Repo.update!()
+    updated =
+      Repo.get!(Scooter, id)
+      |> Ecto.Changeset.change(current_branch_id: branch_id)
+      |> Repo.update!()
 
+    Beroon.LocationHistory.record(updated.id, branch_id)
     Map.put(scooter, :current_branch_id, branch_id)
   end
 

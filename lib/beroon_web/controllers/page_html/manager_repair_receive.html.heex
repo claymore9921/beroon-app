@@ -9,6 +9,15 @@
       <p class="mt-1 text-sm text-zinc-500">{@branch.name} · {@persian_today}</p>
     </header>
 
+    <div class="mt-4 grid grid-cols-2 gap-2">
+      <.link navigate={~p"/manager/repairs"} class="btn btn-outline min-h-12 w-full">
+        دستگاه خراب
+      </.link>
+      <.link navigate={~p"/manager/repairs/receive"} class="btn btn-primary min-h-12 w-full">
+        تحویل
+      </.link>
+    </div>
+
     <form
       id="receive-repaired-scooter-form"
       method="post"

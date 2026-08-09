@@ -237,7 +237,7 @@ defmodule BeroonWeb.PageController do
       render(conn, :manager_repairs,
         branch: branch,
         query: query,
-        scooters: Fleet.list_scooters_for_current_branch_search(branch.id, query, "active"),
+        scooters: Fleet.list_repair_candidates(branch.id, query),
         ready_for_pickup_scooters:
           Fleet.list_scooters_for_branch_with_details(branch.id, "ready_for_pickup"),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
@@ -250,7 +250,7 @@ defmodule BeroonWeb.PageController do
     delivery_method = Map.get(repair_params, "delivery_method", "attendant")
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
     notes = String.trim(to_string(notes || ""))
-    scooter = branch && Fleet.get_scooter_for_current_branch_with_details(branch.id, id)
+    scooter = branch && Fleet.get_scooter_with_details!(id)
 
     cond do
       is_nil(branch) ->
@@ -258,7 +258,7 @@ defmodule BeroonWeb.PageController do
 
       is_nil(scooter) ->
         conn
-        |> put_flash(:error, "این دستگاه در محل فعلی شعبه شما پیدا نشد.")
+        |> put_flash(:error, "دستگاه پیدا نشد.")
         |> redirect(to: ~p"/manager/repairs")
 
       notes == "" ->
@@ -703,9 +703,13 @@ defmodule BeroonWeb.PageController do
   def admin_device_locations(conn, params) do
     query = params |> Map.get("q", "") |> String.trim()
 
+    result = Logistics.find_scooter_location(query)
+
     render(conn, :admin_device_locations,
       query: query,
-      result: Logistics.find_scooter_location(query)
+      result: result,
+      location_history:
+        if(result, do: Beroon.LocationHistory.list_recent(result.scooter.id, 10), else: [])
     )
   end
 

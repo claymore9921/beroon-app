@@ -237,6 +237,30 @@ defmodule Beroon.Fleet do
     |> Repo.all()
   end
 
+  # فهرست خرابی مدیر شعبه: در حالت عادی دستگاه‌های حاضر در همان شعبه
+  # نمایش داده می‌شوند؛ اما با جستجو/اسکن، پلاک از کل ناوگان قابل پیدا شدن است
+  # تا دستگاه مهمان یا جابه‌جا شده نیز بتواند خرابی ثبت کند.
+  def list_repair_candidates(branch_id, search_term \\ "")
+
+  def list_repair_candidates(nil, _search_term), do: []
+
+  def list_repair_candidates(branch_id, search_term) do
+    search_term = search_term |> to_string() |> String.trim()
+    pattern = "%#{search_term}%"
+
+    Scooter
+    |> then(fn query ->
+      if search_term == "" do
+        where(query, [s], s.current_branch_id == ^branch_id and s.status == "active")
+      else
+        where(query, [s], ilike(s.plate, ^pattern) or ilike(s.barcode, ^pattern))
+      end
+    end)
+    |> order_by([s], asc: s.plate)
+    |> preload([:branch, :current_branch, :device_type])
+    |> Repo.all()
+  end
+
   def list_scooters_by_statuses(statuses) do
     list_scooters_by_statuses(statuses, nil)
   end
@@ -489,9 +513,21 @@ defmodule Beroon.Fleet do
 
   """
   def update_scooter(%Scooter{} = scooter, attrs) do
-    scooter
-    |> Scooter.changeset(attrs)
-    |> Repo.update()
+    previous_branch_id = scooter.current_branch_id
+
+    result =
+      scooter
+      |> Scooter.changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated} when not is_nil(updated.current_branch_id) and updated.current_branch_id != previous_branch_id ->
+        Beroon.LocationHistory.record(updated.id, updated.current_branch_id)
+        {:ok, updated}
+
+      _ ->
+        result
+    end
   end
 
   @doc """
