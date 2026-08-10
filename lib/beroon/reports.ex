@@ -263,6 +263,13 @@ defmodule Beroon.Reports do
       |> Repo.all()
       |> Map.new()
 
+    sales_rack_counts =
+      Beroon.Inventory.SalesRackStock
+      |> group_by([stock], stock.device_type_id)
+      |> select([stock], {stock.device_type_id, sum(stock.quantity)})
+      |> Repo.all()
+      |> Map.new()
+
     rows =
       Enum.map(device_types, fn device_type ->
         per_branch =
@@ -273,6 +280,7 @@ defmodule Beroon.Reports do
         branches_total = Enum.sum(Map.values(per_branch))
         waiting_for_part = Map.get(waiting_for_part_counts, device_type.id, 0) || 0
         new_stock = Map.get(new_stock_counts, device_type.id, 0) || 0
+        sales_rack = Map.get(sales_rack_counts, device_type.id, 0) || 0
         loaned = Map.get(loaned_counts, device_type.id, 0) || 0
         stolen = Map.get(stolen_counts, device_type.id, 0) || 0
 
@@ -282,9 +290,10 @@ defmodule Beroon.Reports do
           branches_total_count: branches_total,
           waiting_for_part_count: waiting_for_part,
           new_stock_count: new_stock,
+          sales_rack_count: sales_rack,
           loaned_count: loaned,
           stolen_count: stolen,
-          grand_total_count: branches_total + waiting_for_part + new_stock + loaned + stolen
+          grand_total_count: branches_total + waiting_for_part + new_stock + sales_rack + loaned + stolen
         }
       end)
 
@@ -301,6 +310,7 @@ defmodule Beroon.Reports do
       branches_total_count: Enum.sum(Map.values(branch_totals)),
       waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
       new_stock_count: Enum.reduce(rows, 0, &(&1.new_stock_count + &2)),
+      sales_rack_count: Enum.reduce(rows, 0, &(&1.sales_rack_count + &2)),
       loaned_count: Enum.reduce(rows, 0, &(&1.loaned_count + &2)),
       stolen_count: Enum.reduce(rows, 0, &(&1.stolen_count + &2)),
       grand_total_count: Enum.reduce(rows, 0, &(&1.grand_total_count + &2))
@@ -536,6 +546,13 @@ defmodule Beroon.Reports do
       |> Repo.all()
       |> Map.new()
 
+    sales_rack_counts =
+      Beroon.Inventory.SalesRackStock
+      |> group_by([stock], stock.device_type_id)
+      |> select([stock], {stock.device_type_id, sum(stock.quantity)})
+      |> Repo.all()
+      |> Map.new()
+
     sold_counts =
       Beroon.Inventory.Sale
       |> group_by([sale], sale.device_type_id)
@@ -597,6 +614,7 @@ defmodule Beroon.Reports do
           accounted_total_count: accounted_total_count,
           needs_review_count: needs_review_count,
           new_stock_count: Map.get(new_stock_counts, device_type.id, 0) || 0,
+          sales_rack_count: Map.get(sales_rack_counts, device_type.id, 0) || 0,
           sold_count: Map.get(sold_counts, device_type.id, 0) || 0,
           operational_total_count: operational_total_count
         }
@@ -630,6 +648,7 @@ defmodule Beroon.Reports do
       accounted_total_count: Enum.reduce(rows, 0, &(&1.accounted_total_count + &2)),
       needs_review_count: Enum.reduce(rows, 0, &(&1.needs_review_count + &2)),
       new_stock_count: Enum.reduce(rows, 0, &(&1.new_stock_count + &2)),
+      sales_rack_count: Enum.reduce(rows, 0, &(&1.sales_rack_count + &2)),
       sold_count: Enum.reduce(rows, 0, &(&1.sold_count + &2)),
       operational_total_count: Enum.reduce(rows, 0, &(&1.operational_total_count + &2))
     }
@@ -660,6 +679,7 @@ defmodule Beroon.Reports do
         accounted_total_count: totals.accounted_total_count,
         needs_review_total_count: totals.needs_review_count,
         new_stock_total_count: totals.new_stock_count,
+        sales_rack_total_count: totals.sales_rack_count,
         sold_total_count: totals.sold_count,
         operational_total: totals.operational_total_count
       }
@@ -1786,6 +1806,27 @@ defmodule Beroon.Reports do
 
   def create_workshop_event(attrs) do
     %WorkshopEvent{} |> WorkshopEvent.changeset(attrs) |> Repo.insert()
+  end
+
+  def workshop_discharges_for_date(%Date{} = date) do
+    WorkshopEvent
+    |> where([e], e.event_on == ^date and e.event_type == "discharged")
+    |> join(:inner, [e], s in Scooter, on: s.id == e.scooter_id)
+    |> join(:left, [e, s], d in DeviceType, on: d.id == s.device_type_id)
+    |> order_by([e, s, d], asc: e.event_at, asc: s.plate)
+    |> select([e, s, d], %{
+      plate: s.plate,
+      barcode: s.barcode,
+      device_type: %{
+        category: d.category,
+        device_model: d.device_model,
+        device_identifier: d.device_identifier
+      },
+      technician_name: e.technician_name,
+      repair_parts_used: e.repair_parts_used,
+      discharged_at: e.event_at
+    })
+    |> Repo.all()
   end
 
   def workshop_stats(from_date, to_date) do

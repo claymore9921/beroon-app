@@ -71,7 +71,7 @@ const buildScannedCard = (scooter) => {
       </div>
       <button
         type="button"
-        class="evening-remove-scan btn btn-sm border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+        class="evening-remove-scan inline-flex h-7 min-h-0 items-center justify-center rounded-md border border-red-200 bg-red-50 px-2 text-xs font-bold text-red-700 hover:bg-red-100"
         aria-label="حذف پلاک ${scooter.plate || ""}"
       >
         حذف

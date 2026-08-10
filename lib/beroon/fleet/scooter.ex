@@ -27,6 +27,7 @@ defmodule Beroon.Fleet.Scooter do
     field :notes, :string
     field :transport_until, :utc_datetime
     field :repair_parts_used, :string
+    field :repair_technician, :string
     belongs_to :branch, Branch
     belongs_to :current_branch, Branch
     belongs_to :device_type, DeviceType
@@ -45,6 +46,7 @@ defmodule Beroon.Fleet.Scooter do
       :notes,
       :transport_until,
       :repair_parts_used,
+      :repair_technician,
       :branch_id,
       :current_branch_id,
       :device_type_id

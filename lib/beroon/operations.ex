@@ -51,7 +51,7 @@ defmodule Beroon.Operations do
     Branch
     |> where(
       [b],
-      b.manager_phone == ^normalized_phone and b.active == true and b.kind == "branch"
+      (b.manager_phone == ^normalized_phone or b.manager_phone_secondary == ^normalized_phone) and b.active == true and b.kind == "branch"
     )
     |> order_by([b], asc: b.name)
     |> Repo.one()

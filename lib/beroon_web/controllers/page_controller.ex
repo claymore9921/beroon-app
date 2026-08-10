@@ -12,6 +12,13 @@ defmodule BeroonWeb.PageController do
 
   @manager_workshop_statuses ["awaiting_repair", "repairing"]
 
+  def catalog(conn, _params) do
+    conn
+    |> put_root_layout(false)
+    |> put_layout(false)
+    |> render(:catalog)
+  end
+
   def home(conn, _params) do
     case conn.assigns[:current_user_role] do
       "admin" -> redirect(conn, to: ~p"/admin/reports")
@@ -473,24 +480,39 @@ defmodule BeroonWeb.PageController do
     )
   end
 
+  @repair_technicians ["محب صافی", "احسان طیاری", "میثاق پرتو"]
+
   def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
     parts_used = params |> Map.get("repair_parts_used", "") |> String.trim()
+    technician = params |> Map.get("technician_name", "") |> String.trim()
     scooter = Fleet.get_scooter!(id)
 
     cond do
       parts_used == "" ->
         conn |> put_flash(:error, "ثبت قطعات مصرف‌شده برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
+
+      technician not in @repair_technicians ->
+        conn |> put_flash(:error, "انتخاب تعمیرکار برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
+
       true ->
         workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
         attrs =
-          %{status: "ready_for_pickup", repair_parts_used: parts_used}
+          %{status: "ready_for_pickup", repair_parts_used: parts_used, repair_technician: technician}
           |> then(fn a -> if workshop, do: Map.put(a, :current_branch_id, workshop.id), else: a end)
 
         case Fleet.update_scooter(scooter, attrs) do
           {:ok, _} ->
-            record_workshop_event(scooter.id, "discharged", conn.assigns.current_user_phone)
+            record_workshop_event(
+              scooter.id,
+              "discharged",
+              conn.assigns.current_user_phone,
+              %{technician_name: technician, repair_parts_used: parts_used}
+            )
+
             conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop/discharge")
-          {:error, _} -> conn |> put_flash(:error, "ترخیص دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/discharge")
+
+          {:error, _} ->
+            conn |> put_flash(:error, "ترخیص دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/discharge")
         end
     end
   end
@@ -829,6 +851,30 @@ defmodule BeroonWeb.PageController do
     )
   end
 
+  def admin_sales_rack(conn, _params) do
+    render(conn, :admin_sales_rack, stocks: Inventory.list_sales_rack_stocks())
+  end
+
+  def update_sales_rack_stock(conn, %{"stock" => params}) do
+    quantity =
+      case Integer.parse(params["quantity"] || "0") do
+        {n, _} -> n
+        _ -> -1
+      end
+
+    case Inventory.set_sales_rack_stock(params["device_type_id"], quantity) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "موجودی رگال فروش به‌روزرسانی شد.")
+        |> redirect(to: ~p"/admin/sales-rack")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "موجودی نامعتبر است.")
+        |> redirect(to: ~p"/admin/sales-rack")
+    end
+  end
+
   def update_new_device_stock(conn, %{"stock" => params}) do
     quantity = case Integer.parse(params["quantity"] || "0") do {n, _} -> n; _ -> -1 end
     case Inventory.set_stock(params["device_type_id"], quantity) do
@@ -1141,6 +1187,7 @@ defmodule BeroonWeb.PageController do
         {"تعداد کل دستگاه‌های امانی", export.totals.loaned_count},
         {"تعداد کل دستگاه‌های سرقتی", export.totals.stolen_count},
         {"تعداد کل دستگاه‌های انبار نو", export.totals.new_stock_count},
+        {"تعداد کل دستگاه‌های رگال فروش", export.totals.sales_rack_count},
         {"جمع کل ناوگان", export.totals.grand_total_count}
       ])
 
@@ -1178,20 +1225,25 @@ defmodule BeroonWeb.PageController do
         {"نیاز به بررسی (خارج از جمع کل)", export.totals.needs_review_count},
         {"جمع کل ناوگان (بدون نیاز به بررسی، انبار نو و فروش)", export.totals.operational_total_count},
         {"موجودی انبار نو (جدا از ناوگان)", export.totals.new_stock_count},
+        {"موجودی رگال فروش (جدا از ناوگان)", export.totals.sales_rack_count},
+        {"جمع موجودی انبار نو و رگال فروش", export.totals.new_stock_count + export.totals.sales_rack_count},
         {"فروش ثبت‌شده (جدا از ناوگان)", export.totals.sold_count}
       ])
+
+    workshop_rows = workshop_discharge_sheet_rows(export.date)
 
     xlsx_workbook([
       {"گزارش روزانه", main_rows},
       {"دستگاه‌های امانی", loan_rows},
-      {"خلاصه مدیریتی", summary_rows}
+      {"خلاصه مدیریتی", summary_rows},
+      {"تعمیرگاه", workshop_rows}
     ])
   end
 
   defp inventory_sheet_rows(title, date, branches, rows, totals, mode) do
     fixed_headers =
       case mode do
-        :reference -> ["جمع شعب", "در انتظار قطعه", "انبار نو", "امانی", "سرقتی", "جمع کل"]
+        :reference -> ["جمع شعب", "در انتظار قطعه", "انبار نو", "رگال فروش", "امانی", "سرقتی", "جمع کل"]
         :daily -> [
           "تعمیرگاه",
           "در انتظار قطعه",
@@ -1202,6 +1254,7 @@ defmodule BeroonWeb.PageController do
           "موقعیت معلوم / جابه‌جایی",
           "جمع کل ناوگان",
           "انبار نو",
+          "رگال فروش",
           "فروش",
           "جمع کل اسکن‌شده‌ها",
           "جمع کل تعیین تکلیف شده‌ها",
@@ -1222,6 +1275,7 @@ defmodule BeroonWeb.PageController do
                 row.branches_total_count,
                 row.waiting_for_part_count,
                 row.new_stock_count,
+                row.sales_rack_count,
                 row.loaned_count,
                 row.stolen_count,
                 row.grand_total_count
@@ -1238,6 +1292,7 @@ defmodule BeroonWeb.PageController do
                 row.location_known_count,
                 row.operational_total_count,
                 row.new_stock_count,
+                row.sales_rack_count,
                 row.sold_count,
                 row.branches_total_count,
                 row.accounted_total_count,
@@ -1257,6 +1312,7 @@ defmodule BeroonWeb.PageController do
             totals.branches_total_count,
             totals.waiting_for_part_count,
             totals.new_stock_count,
+            totals.sales_rack_count,
             totals.loaned_count,
             totals.stolen_count,
             totals.grand_total_count
@@ -1273,6 +1329,7 @@ defmodule BeroonWeb.PageController do
             totals.location_known_count,
             totals.operational_total_count,
             totals.new_stock_count,
+            totals.sales_rack_count,
             totals.sold_count,
             totals.branches_total_count,
             totals.accounted_total_count,
@@ -1333,6 +1390,46 @@ defmodule BeroonWeb.PageController do
       [],
       Enum.map(headers, &{&1, "Header"})
     ] ++ rows ++ empty_rows
+  end
+
+  defp workshop_discharge_sheet_rows(date) do
+    discharges = Reports.workshop_discharges_for_date(date)
+    technicians = ["محب صافی", "احسان طیاری", "میثاق پرتو"]
+
+    detail_rows =
+      discharges
+      |> Enum.with_index(1)
+      |> Enum.map(fn {item, index} ->
+        type_label =
+          [item.device_type.category, item.device_type.device_model, item.device_type.device_identifier]
+          |> Enum.reject(&(&1 in [nil, ""]))
+          |> Enum.join(" ")
+
+        [
+          index,
+          item.plate || "-",
+          type_label,
+          item.repair_parts_used || "-",
+          item.technician_name || "ثبت نشده",
+          Beroon.Calendar.persian_datetime(item.discharged_at)
+        ]
+      end)
+
+    technician_rows =
+      Enum.map(technicians, fn technician ->
+        count = Enum.count(discharges, &(&1.technician_name == technician))
+        [{"تعداد ترخیص #{technician}", "Label"}, {count, "Number"}]
+      end)
+
+    [
+      [{"گزارش ترخیص تعمیرگاه", "Title"}],
+      [{"تاریخ گزارش: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
+      [],
+      Enum.map(["ردیف", "پلاک", "نوع دستگاه", "قطعات مصرف‌شده", "تعمیرکار", "زمان ترخیص"], &{&1, "Header"})
+    ] ++
+      detail_rows ++
+      [[], [{"جمع کل ترخیص", "Total"}, {length(discharges), "Total"}]] ++
+      technician_rows
   end
 
   defp summary_sheet_rows(title, date, items) do
@@ -1618,8 +1715,16 @@ defmodule BeroonWeb.PageController do
     end
   end
 
-  defp record_workshop_event(scooter_id, event_type, phone) do
-    Reports.create_workshop_event(%{scooter_id: scooter_id, event_type: event_type, event_on: Reports.iran_today(), event_at: DateTime.utc_now() |> DateTime.truncate(:second), registered_by_phone: phone})
+  defp record_workshop_event(scooter_id, event_type, phone, extra \\ %{}) do
+    attrs = %{
+      scooter_id: scooter_id,
+      event_type: event_type,
+      event_on: Reports.iran_today(),
+      event_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      registered_by_phone: phone
+    }
+
+    Reports.create_workshop_event(Map.merge(attrs, extra))
   end
 
   defp repair_stats_xls(rows) do

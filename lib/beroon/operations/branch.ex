@@ -7,6 +7,7 @@ defmodule Beroon.Operations.Branch do
     field :code, :string
     field :manager_name, :string
     field :manager_phone, :string
+    field :manager_phone_secondary, :string
     field :kind, :string, default: "branch"
     field :active, :boolean, default: false
 
@@ -16,7 +17,7 @@ defmodule Beroon.Operations.Branch do
   @doc false
   def changeset(branch, attrs) do
     branch
-    |> cast(attrs, [:name, :code, :manager_name, :manager_phone, :kind, :active])
+    |> cast(attrs, [:name, :code, :manager_name, :manager_phone, :manager_phone_secondary, :kind, :active])
     |> validate_required([:name, :code, :manager_name, :kind, :active])
     |> validate_inclusion(:kind, ["branch", "workshop"])
   end

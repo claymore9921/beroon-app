@@ -27,6 +27,7 @@ defmodule BeroonWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/catalog", PageController, :catalog
     get "/login", AdminSessionController, :new
     post "/login", AdminSessionController, :create
     get "/verify", AdminSessionController, :verify
@@ -109,6 +110,8 @@ defmodule BeroonWeb.Router do
     post "/admin/new-device-inventory/stocks", PageController, :update_new_device_stock
     get "/admin/new-device-sales", PageController, :admin_new_device_sales
     post "/admin/new-device-sales", PageController, :create_new_device_sale
+    get "/admin/sales-rack", PageController, :admin_sales_rack
+    post "/admin/sales-rack/stocks", PageController, :update_sales_rack_stock
     get "/admin/report-export/download", PageController, :download_admin_report_export
     get "/admin/report-export/reference", PageController, :download_admin_reference_export
     get "/report-export/download", PageController, :download_admin_report_export

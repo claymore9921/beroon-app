@@ -7,13 +7,15 @@ defmodule Beroon.Reports.WorkshopEvent do
     field :event_on, :date
     field :event_at, :utc_datetime
     field :registered_by_phone, :string
+    field :technician_name, :string
+    field :repair_parts_used, :string
     belongs_to :scooter, Beroon.Fleet.Scooter
     timestamps(type: :utc_datetime)
   end
 
   def changeset(event, attrs) do
     event
-    |> cast(attrs, [:scooter_id, :event_type, :event_on, :event_at, :registered_by_phone])
+    |> cast(attrs, [:scooter_id, :event_type, :event_on, :event_at, :registered_by_phone, :technician_name, :repair_parts_used])
     |> validate_required([:scooter_id, :event_type, :event_on, :event_at])
     |> validate_inclusion(:event_type, ["accepted", "repair_started", "discharged"])
   end

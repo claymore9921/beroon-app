@@ -3,11 +3,19 @@ defmodule Beroon.Inventory do
   alias Ecto.Multi
   alias Beroon.Repo
   alias Beroon.Fleet.DeviceType
-  alias Beroon.Inventory.{NewDeviceStock,Sale}
+  alias Beroon.Inventory.{NewDeviceStock, SalesRackStock, Sale}
 
   def list_stocks do
     DeviceType |> where([d], d.active==true) |> order_by([d], asc: d.category, asc: d.device_model) |> preload([d], [:new_device_stock]) |> Repo.all()
   end
+  def list_sales_rack_stocks do
+    DeviceType
+    |> where([d], d.active == true)
+    |> order_by([d], asc: d.category, asc: d.device_model)
+    |> preload([d], [:sales_rack_stock])
+    |> Repo.all()
+  end
+
   def list_sales do
     Sale |> order_by([s], desc: s.sold_at) |> preload(:device_type) |> limit(100) |> Repo.all()
   end
@@ -16,6 +24,15 @@ defmodule Beroon.Inventory do
     case Repo.get_by(NewDeviceStock, device_type_id: device_type_id) do
       nil -> %NewDeviceStock{} |> NewDeviceStock.changeset(attrs) |> Repo.insert()
       stock -> stock |> NewDeviceStock.changeset(attrs) |> Repo.update()
+    end
+  end
+
+  def set_sales_rack_stock(device_type_id, quantity) do
+    attrs = %{device_type_id: device_type_id, quantity: quantity}
+
+    case Repo.get_by(SalesRackStock, device_type_id: device_type_id) do
+      nil -> %SalesRackStock{} |> SalesRackStock.changeset(attrs) |> Repo.insert()
+      stock -> stock |> SalesRackStock.changeset(attrs) |> Repo.update()
     end
   end
   def create_sale(attrs) do

@@ -73,6 +73,15 @@
                 placeholder="مثلاً: تعویض دسته ترمز، لنت جلو و کابل گاز"
               ></textarea>
             </label>
+            <fieldset class="mb-3 rounded-xl border border-zinc-200 bg-white p-3">
+              <legend class="px-2 text-sm font-black">تعمیرکار</legend>
+              <div class="mt-2 grid gap-2">
+                <label :for={name <- ["محب صافی", "احسان طیاری", "میثاق پرتو"]} class="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 p-3">
+                  <input type="radio" name="discharge[technician_name]" value={name} required />
+                  <span class="font-bold">{name}</span>
+                </label>
+              </div>
+            </fieldset>
             <button class="btn btn-primary min-h-11 w-full">ترخیص</button>
           </form>
         </div>
