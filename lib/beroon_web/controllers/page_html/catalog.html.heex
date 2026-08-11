@@ -163,6 +163,12 @@
         z-index: 4;
       }
       .catalog-hotspots.is-visible { display: block; }
+      .catalog-about-hotspots { position: absolute; inset: 0; display: none; z-index: 5; }
+      .catalog-about-hotspots.is-visible { display: block; }
+      .catalog-about-hotspot { position: absolute; left: 0; width: 100%; height: 50%; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+      .catalog-about-hotspot.top { top: 0; }
+      .catalog-about-hotspot.bottom { bottom: 0; }
+      .catalog-about-hotspot:focus-visible { outline: 3px solid rgba(255,255,255,.95); outline-offset: -5px; }
       .catalog-hotspot {
         position: absolute;
         width: 50%;
@@ -259,6 +265,17 @@
         .catalog-image.is-entering,
         .catalog-image-wrap.is-transitioning::after { animation-duration: 1ms !important; }
       }
+
+      .lead-modal { border:0; padding:0; width:min(92vw,420px); border-radius:24px; background:#fff; color:#18181b; box-shadow:0 24px 80px rgba(0,0,0,.45); }
+      .lead-modal::backdrop { background:rgba(0,16,28,.78); backdrop-filter:blur(6px); }
+      .lead-form { padding:22px; direction:rtl; }
+      .lead-form h2 { margin:0 0 6px; font-size:22px; font-weight:900; }
+      .lead-form p { margin:0 0 18px; color:#71717a; font-size:14px; line-height:1.8; }
+      .lead-form label { display:block; margin:12px 0 6px; font-size:13px; font-weight:800; }
+      .lead-form input { width:100%; min-height:50px; border:1px solid #d4d4d8; border-radius:14px; padding:0 14px; font:inherit; outline:none; }
+      .lead-form input:focus { border-color:#0d9488; box-shadow:0 0 0 3px rgba(13,148,136,.12); }
+      .lead-submit { width:100%; min-height:52px; margin-top:16px; border:0; border-radius:14px; background:#0f766e; color:white; font:inherit; font-weight:900; cursor:pointer; }
+      .lead-error { margin-top:10px !important; color:#b91c1c !important; font-weight:800; }
     </style>
   </head>
   <body>
@@ -285,6 +302,11 @@
             <button class="catalog-hotspot hotspot-bottom-left" type="button" data-product="h1" aria-label="مینی هارلی"></button>
           </div>
 
+          <div id="catalog-about-hotspots" class="catalog-about-hotspots" aria-label="راه‌های ارتباطی">
+            <button class="catalog-about-hotspot top" type="button" data-about-action="call" aria-label="تماس با برون"></button>
+            <button class="catalog-about-hotspot bottom" type="button" data-about-action="instagram" aria-label="اینستاگرام برون"></button>
+          </div>
+
             <div id="catalog-hint" class="catalog-hint">روی دستگاه موردنظر بزنید</div>
           </div>
         </div>
@@ -293,13 +315,31 @@
       </section>
     </main>
 
+
+    <dialog id="catalog-lead-modal" class="lead-modal">
+      <form class="lead-form" action="/catalog/leads" method="post">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>قبل از مشاهده دستگاه‌ها</h2>
+        <p>نام و شماره تماس خود را ثبت کنید تا کاتالوگ محصولات برای شما باز شود.</p>
+        <label for="lead-name">نام و نام خانوادگی</label>
+        <input id="lead-name" name="lead[name]" required minlength="2" maxlength="80" autocomplete="name" />
+        <label for="lead-phone">شماره موبایل</label>
+        <input id="lead-phone" name="lead[phone]" required inputmode="numeric" pattern="09[0-9]{9}" maxlength="11" placeholder="09xxxxxxxxx" autocomplete="tel" dir="ltr" />
+        <p :if={@lead_error} class="lead-error">اطلاعات واردشده معتبر نیست. لطفاً نام و شماره موبایل صحیح وارد کنید.</p>
+        <button class="lead-submit" type="submit">ثبت و مشاهده دستگاه‌ها</button>
+      </form>
+    </dialog>
+
     <script>
       (() => {
         const image = document.getElementById("catalog-image")
         const imageWrap = document.getElementById("catalog-image-wrap")
         const actions = document.getElementById("catalog-actions")
         const hotspots = document.getElementById("catalog-hotspots")
+        const aboutHotspots = document.getElementById("catalog-about-hotspots")
         const hint = document.getElementById("catalog-hint")
+        const leadModal = document.getElementById("catalog-lead-modal")
+        const unlocked = new URLSearchParams(window.location.search).get("unlocked") === "1"
 
         const products = {
           s: ["s1.jpg", "s2.jpg", "s3.jpg"],
@@ -385,11 +425,15 @@
 
         const render = () => {
           hotspots.classList.remove("is-visible")
+          aboutHotspots.classList.remove("is-visible")
           hint.classList.remove("is-visible")
 
           if (state.screen === "cover") {
             setImage("1.jpg", "فروش انواع اسکوتر و دوچرخه برقی برون")
-            setActions([{label: "دستگاه‌ها", primary: true, onClick: () => navigate({screen: "products", product: null, step: 0})}])
+            setActions([{label: "دستگاه‌ها", primary: true, onClick: () => {
+              if (unlocked) navigate({screen: "products", product: null, step: 0})
+              else leadModal.showModal()
+            }}])
             return
           }
 
@@ -409,6 +453,7 @@
 
           if (state.screen === "about") {
             setImage("about-us.jpg", "راه‌های ارتباطی برون")
+            aboutHotspots.classList.add("is-visible")
             setActions([{label: "بازگشت", onClick: goBack}])
             return
           }
@@ -446,6 +491,16 @@
           navigate({screen: "product", product, step: 1})
         })
 
+        aboutHotspots.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-about-action]")
+          if (!button) return
+          if (button.dataset.aboutAction === "call") {
+            window.location.href = "tel:09002791000"
+          } else if (button.dataset.aboutAction === "instagram") {
+            window.location.href = "https://instagram.com/beroon_app"
+          }
+        })
+
         // Preload catalog images after first paint for near-instant transitions.
         window.addEventListener("load", () => {
           ["2.jpg", "about-us.jpg", "services.jpg", ...Object.values(products).flat()].forEach((filename) => {
@@ -454,6 +509,7 @@
           })
         }, {once: true})
 
+        if (new URLSearchParams(window.location.search).get("lead_error") === "1") leadModal.showModal()
         render()
       })()
     </script>

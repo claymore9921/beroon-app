@@ -2,6 +2,7 @@ defmodule BeroonWeb.PageController do
   use BeroonWeb, :controller
 
   alias Beroon.Checklists
+  alias Beroon.Catalog
   alias Beroon.Fleet
   alias Beroon.Logistics
   alias Beroon.Inventory
@@ -11,12 +12,24 @@ defmodule BeroonWeb.PageController do
   alias Beroon.Thefts
 
   @manager_workshop_statuses ["awaiting_repair", "repairing"]
+  @repair_technicians ["محب صافی", "احسان طیاری", "میثاق پرتو"]
 
-  def catalog(conn, _params) do
+  def catalog(conn, params) do
     conn
     |> put_root_layout(false)
     |> put_layout(false)
-    |> render(:catalog)
+    |> render(:catalog, lead_error: params["lead_error"] == "1")
+  end
+
+  def create_catalog_lead(conn, %{"lead" => params}) do
+    case Catalog.create_lead(params) do
+      {:ok, _lead} -> redirect(conn, to: ~p"/catalog?unlocked=1")
+      {:error, _changeset} -> redirect(conn, to: ~p"/catalog?lead_error=1")
+    end
+  end
+
+  def admin_catalog_leads(conn, _params) do
+    render(conn, :admin_catalog_leads, leads: Catalog.list_leads())
   end
 
   def home(conn, _params) do
@@ -380,23 +393,21 @@ defmodule BeroonWeb.PageController do
     end
   end
 
-  def workshop_home(conn, _params) do
+  def workshop_home(conn, params) do
     workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
+    query = params |> Map.get("q", "") |> String.trim()
 
     if is_nil(workshop) do
-      conn
-      |> put_flash(:error, "دسترسی تعمیرگاه برای این شماره فعال نیست.")
-      |> redirect(to: ~p"/manager/pending")
+      conn |> put_flash(:error, "دسترسی تعمیرگاه برای این شماره فعال نیست.") |> redirect(to: ~p"/manager/pending")
     else
+      selected = if query == "", do: nil, else: Fleet.get_scooter_by_plate_or_barcode_with_details(query)
       render(conn, :workshop_home,
-        workshop: workshop,
-        acceptance_count: length(Fleet.list_scooters_by_statuses(["needs_service"])),
-        repairing_count:
-          length(
-            Fleet.list_scooters_by_statuses(["awaiting_repair", "repairing", "waiting_for_part"])
-          ),
-        discharge_count:
-          length(Fleet.list_scooters_by_statuses(["repairing", "waiting_for_part"]))
+        workshop: workshop, query: query, selected_scooter: selected,
+        acceptance: Fleet.list_scooters_by_statuses(["needs_service"]),
+        repairing: Fleet.list_scooters_by_statuses(["awaiting_repair", "repairing"]),
+        waiting_part: Fleet.list_scooters_by_statuses(["waiting_for_part"]),
+        ready: Fleet.list_scooters_by_statuses(["ready_for_pickup"]),
+        repair_technicians: @repair_technicians
       )
     end
   end
@@ -445,7 +456,7 @@ defmodule BeroonWeb.PageController do
       record_workshop_event(scooter.id, "accepted", conn.assigns.current_user_phone)
       conn
       |> put_flash(:info, "پذیرش دستگاه در #{workshop.name} ثبت شد.")
-      |> redirect(to: ~p"/workshop/acceptance")
+      |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
     else
       _ ->
         conn
@@ -454,14 +465,16 @@ defmodule BeroonWeb.PageController do
     end
   end
 
-  def workshop_start_repair(conn, %{"id" => id}) do
+  def workshop_start_repair(conn, %{"id" => id} = params) do
     workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
     scooter = Fleet.get_scooter!(id)
     attrs = %{status: "repairing"} |> then(fn a -> if workshop, do: Map.put(a, :current_branch_id, workshop.id), else: a end)
     case Fleet.update_scooter(scooter, attrs) do
       {:ok, _} ->
-        record_workshop_event(scooter.id, "repair_started", conn.assigns.current_user_phone)
-        conn |> put_flash(:info, "دستگاه وارد مرحله تعمیر شد.") |> redirect(to: ~p"/workshop/repairing")
+        technician = params |> get_in(["repair", "technician_name"]) |> to_string() |> String.trim()
+        extra = if technician in @repair_technicians, do: %{technician_name: technician}, else: %{}
+        record_workshop_event(scooter.id, "repair_started", conn.assigns.current_user_phone, extra)
+        conn |> put_flash(:info, "دستگاه وارد مرحله تعمیر شد.") |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
       {:error, _} -> conn |> put_flash(:error, "تغییر وضعیت دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/repairing")
     end
   end
@@ -476,11 +489,10 @@ defmodule BeroonWeb.PageController do
       "waiting_for_part",
       "وضعیت دستگاه در انتظار قطعه شد.",
       %{notes: notes},
-      ~p"/workshop/repairing"
+      ~p"/workshop"
     )
   end
 
-  @repair_technicians ["محب صافی", "احسان طیاری", "میثاق پرتو"]
 
   def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
     parts_used = params |> Map.get("repair_parts_used", "") |> String.trim()
@@ -509,7 +521,7 @@ defmodule BeroonWeb.PageController do
               %{technician_name: technician, repair_parts_used: parts_used}
             )
 
-            conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop/discharge")
+            conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
 
           {:error, _} ->
             conn |> put_flash(:error, "ترخیص دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/discharge")

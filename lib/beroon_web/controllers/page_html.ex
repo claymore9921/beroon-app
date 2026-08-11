@@ -50,6 +50,28 @@ defmodule BeroonWeb.PageHTML do
     """
   end
 
+  attr :title, :string, required: true
+  attr :count, :integer, required: true
+  attr :items, :list, required: true
+  def workshop_status_box(assigns) do
+    ~H"""
+    <details class="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm open:col-span-2">
+      <summary class="cursor-pointer list-none text-center"><span class="block text-sm font-black text-zinc-700">{@title}</span><strong class="mt-1 block text-3xl font-black text-teal-700">{@count}</strong></summary>
+      <div class="mt-3 grid gap-2 border-t border-zinc-100 pt-3">
+        <a :for={s <- @items} href={~p"/workshop?q=#{s.plate}"} class="flex items-center justify-between rounded-xl bg-zinc-50 p-3 text-sm"><b>{s.plate}</b><span class="text-zinc-500">{device_type_label(s.device_type)}</span></a>
+        <p :if={@items == []} class="text-center text-sm text-zinc-400">موردی وجود ندارد.</p>
+      </div>
+    </details>
+    """
+  end
+
+  def workshop_status_label("needs_service"), do: "منتظر پذیرش"
+  def workshop_status_label("awaiting_repair"), do: "پذیرش‌شده"
+  def workshop_status_label("repairing"), do: "در حال تعمیر"
+  def workshop_status_label("waiting_for_part"), do: "در انتظار قطعه"
+  def workshop_status_label("ready_for_pickup"), do: "آماده تحویل"
+  def workshop_status_label(status), do: status || "-"
+
   def device_type_label(nil), do: "-"
 
   def device_type_label(device_type) do

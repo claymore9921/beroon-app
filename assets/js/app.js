@@ -764,6 +764,17 @@ const bootScannerPages = () => {
   })
 
   setupSearchScanner({
+    buttonId: "workshop-home-scan",
+    inputId: "workshop-home-q",
+    formId: "workshop-home-search",
+    dialogId: "workshop-home-scan-dialog",
+    videoId: "workshop-home-scan-video",
+    statusId: "workshop-home-scan-status",
+    closeId: "workshop-home-scan-close",
+    retryId: "workshop-home-scan-retry",
+  })
+
+  setupSearchScanner({
     buttonId: "workshop-acceptance-scan",
     inputId: "workshop-acceptance-q",
     formId: "workshop-acceptance-search",
