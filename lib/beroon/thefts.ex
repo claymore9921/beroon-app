@@ -41,7 +41,7 @@ defmodule Beroon.Thefts do
             device_type_id: scooter.device_type_id,
             quantity: 1,
             plate_snapshot: scooter.plate,
-            previous_status: if(scooter.status == "transport", do: "active", else: scooter.status),
+            previous_status: scooter.status,
             reported_at: now,
             registered_by_phone: attrs[:registered_by_phone] || attrs["registered_by_phone"],
             notes: attrs[:notes] || attrs["notes"]
@@ -53,7 +53,7 @@ defmodule Beroon.Thefts do
               {:error, changeset} -> Repo.rollback(changeset)
             end
 
-          case Fleet.update_scooter(scooter, %{status: "stolen", transport_until: nil}) do
+          case Fleet.update_scooter(scooter, %{status: "stolen"}) do
             {:ok, _scooter} -> record
             {:error, changeset} -> Repo.rollback(changeset)
           end

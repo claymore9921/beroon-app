@@ -107,7 +107,6 @@ defmodule Beroon.Fleet do
       {"repairing", "در حال تعمیر"},
       {"waiting_for_part", "در انتظار قطعه"},
       {"ready_for_pickup", "آماده تحویل"},
-      {"out_of_service", "از مدار خارج شده"},
       {"loaned", "امانی"},
       {"stolen", "سرقتی"}
     ]
@@ -129,10 +128,8 @@ defmodule Beroon.Fleet do
           "repairing",
           "waiting_for_part",
           "ready_for_pickup",
-          "out_of_service",
           "loaned",
-          "stolen",
-          "transport"
+          "stolen"
         ]
     )
     |> order_by([s], asc: s.plate)
@@ -291,7 +288,6 @@ defmodule Beroon.Fleet do
               "repairing",
               "waiting_for_part",
               "ready_for_pickup",
-              "out_of_service",
               "loaned",
               "stolen"
             ] do
@@ -345,7 +341,6 @@ defmodule Beroon.Fleet do
       barcode: s.barcode,
       model: s.model,
       status: s.status,
-      transport_until: s.transport_until,
       branch_id: s.branch_id,
       branch_name: b.name,
       current_branch_id: s.current_branch_id,
@@ -574,7 +569,6 @@ defmodule Beroon.Fleet do
       |> Ecto.Multi.delete_all(:repair_reports, from(r in "scooter_repair_reports", where: field(r, :scooter_id) in ^ids))
       |> Ecto.Multi.delete_all(:evening_items, from(i in "evening_count_items", where: field(i, :scooter_id) in ^ids))
       |> Ecto.Multi.delete_all(:morning_inspections, from(i in "morning_inspections", where: field(i, :scooter_id) in ^ids))
-      |> Ecto.Multi.delete_all(:transports, from(t in "scooter_transports", where: field(t, :scooter_id) in ^ids))
       |> Ecto.Multi.delete_all(:scooters, from(s in Scooter, where: s.id in ^ids))
       |> Repo.transaction()
     end

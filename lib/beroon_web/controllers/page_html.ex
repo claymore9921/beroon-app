@@ -15,9 +15,9 @@ defmodule BeroonWeb.PageHTML do
         <.icon class="size-9" name="hero-home" />
         <span>خانه</span>
       </.link>
-      <.link navigate={~p"/manager/transports"} class={[@active == "transports" && "is-active"]}>
-        <.icon class="size-9" name="hero-truck" />
-        <span>حمل‌ونقل</span>
+      <.link navigate={~p"/manager/dinner"} class={[@active == "dinner" && "is-active"]}>
+        <.icon class="size-9" name="hero-cake" />
+        <span>آمار شام</span>
       </.link>
       <.link navigate={~p"/manager/scan"} class={["is-scan", @active == "scan" && "is-active"]}>
         <span class="manager-scan-bubble">
@@ -91,7 +91,6 @@ defmodule BeroonWeb.PageHTML do
   def status_label("repairing"), do: "در حال تعمیر"
   def status_label("waiting_for_part"), do: "در انتظار قطعه"
   def status_label("ready_for_pickup"), do: "آماده تحویل"
-  def status_label("out_of_service"), do: "از مدار خارج شده"
   def status_label("loaned"), do: "امانی"
   def status_label("stolen"), do: "سرقتی"
   def status_label(status), do: status || "-"
@@ -106,14 +105,25 @@ defmodule BeroonWeb.PageHTML do
   def status_badge_class("repairing"), do: "bg-sky-100 text-sky-700"
   def status_badge_class("waiting_for_part"), do: "bg-purple-100 text-purple-700"
   def status_badge_class("ready_for_pickup"), do: "bg-teal-100 text-teal-700"
-  def status_badge_class("out_of_service"), do: "bg-zinc-200 text-zinc-700"
   def status_badge_class("loaned"), do: "bg-red-600 text-white"
   def status_badge_class("stolen"), do: "bg-rose-950 text-white"
   def status_badge_class(_status), do: "bg-zinc-100 text-zinc-700"
-  def transport_local_datetime(nil), do: nil
-  def transport_local_datetime(datetime), do: Beroon.Calendar.tehran_datetime(datetime)
   def persian_datetime(datetime), do: Beroon.Calendar.persian_datetime(datetime)
   def persian_time(datetime), do: Beroon.Calendar.persian_time(datetime)
   def persian_numeric_date(date), do: Beroon.Calendar.persian_numeric_date(date)
+
+  attr :plate, :string, required: true
+  attr :class, :any, default: nil
+
+  def admin_plate_link(assigns) do
+    ~H"""
+    <.link
+      navigate={~p"/admin/devices/#{@plate}"}
+      class={["font-black text-orange-700 underline decoration-orange-300 underline-offset-2", @class]}
+    >
+      {@plate}
+    </.link>
+    """
+  end
 
 end

@@ -51,19 +51,6 @@
         </div>
         <.icon class="size-9 manager-scan-arrow" name="hero-chevron-left" />
       </.link>
-
-      <section class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <div class="flex items-center gap-3">
-          <div class="manager-scan-action-icon"><.icon name="hero-banknotes" class="size-9" /></div>
-          <div><h2 class="font-black text-zinc-950">گزارش درآمد نقدی و کارت به کارت</h2><p class="text-sm text-zinc-500">مبالغ درآمد امروز را به تومان ثبت کنید.</p></div>
-        </div>
-        <form method="post" action={~p"/manager/daily-revenue"} class="mt-4 grid gap-3">
-          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-          <label class="grid gap-1"><span class="text-sm font-bold">درآمد کارت به کارت</span><input type="number" min="0" name="revenue[card_to_card_amount]" value={@daily_revenue && @daily_revenue.card_to_card_amount || 0} class="input input-bordered w-full" required /></label>
-          <label class="grid gap-1"><span class="text-sm font-bold">درآمد نقدی</span><input type="number" min="0" name="revenue[cash_amount]" value={@daily_revenue && @daily_revenue.cash_amount || 0} class="input input-bordered w-full" required /></label>
-          <button class="btn btn-primary w-full">ثبت گزارش درآمد</button>
-        </form>
-      </section>
     </section>
   </section>
 

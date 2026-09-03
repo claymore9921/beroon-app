@@ -12,8 +12,6 @@ defmodule Beroon.Fleet.Scooter do
     "repairing",
     "waiting_for_part",
     "ready_for_pickup",
-    "out_of_service",
-    "transport",
     "loaned",
     "stolen"
   ]
@@ -25,7 +23,6 @@ defmodule Beroon.Fleet.Scooter do
     field :model, :string
     field :status, :string
     field :notes, :string
-    field :transport_until, :utc_datetime
     field :repair_parts_used, :string
     field :repair_technician, :string
     belongs_to :branch, Branch
@@ -44,7 +41,6 @@ defmodule Beroon.Fleet.Scooter do
       :model,
       :status,
       :notes,
-      :transport_until,
       :repair_parts_used,
       :repair_technician,
       :branch_id,

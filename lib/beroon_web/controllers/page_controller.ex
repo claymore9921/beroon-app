@@ -43,7 +43,6 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_home(conn, _params) do
-    Logistics.expire_transports!()
     today = Reports.iran_today()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
 
@@ -106,31 +105,9 @@ defmodule BeroonWeb.PageController do
         branch: branch,
         manager_name: manager_name(branch),
         persian_today: Beroon.Calendar.persian_date(today),
-        daily_revenue: Reports.get_daily_revenue(branch.id, today),
         morning_submitted: Reports.morning_submitted_today?(branch.id, today),
         evening_submitted: Reports.evening_submitted_for_cycle?(branch.id)
       )
-    end
-  end
-
-  def submit_daily_revenue(conn, %{"revenue" => params}) do
-    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
-    cash = parse_money(params["cash_amount"])
-    card = parse_money(params["card_to_card_amount"])
-
-    if is_nil(branch) do
-      redirect(conn, to: ~p"/manager/pending")
-    else
-      case Reports.upsert_daily_revenue(%{
-             branch_id: branch.id,
-             reported_on: Reports.iran_today(),
-             cash_amount: cash,
-             card_to_card_amount: card,
-             registered_by_phone: conn.assigns.current_user_phone
-           }) do
-        {:ok, _} -> conn |> put_flash(:info, "گزارش درآمد امروز ثبت شد.") |> redirect(to: ~p"/manager/scan")
-        {:error, _} -> conn |> put_flash(:error, "ثبت درآمد انجام نشد.") |> redirect(to: ~p"/manager/scan")
-      end
     end
   end
 
@@ -167,83 +144,6 @@ defmodule BeroonWeb.PageController do
         date: date,
         scooters: Reports.list_unhealthy_scooters_for_branch(date, branch.id)
       )
-    end
-  end
-
-  def manager_transports(conn, params) do
-    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
-
-    if is_nil(branch) do
-      redirect(conn, to: ~p"/manager/pending")
-    else
-      after_evening = params["after_evening"] == "1"
-      bahonar = Operations.get_bahonar_branch()
-
-      render(conn, :manager_transports,
-        branch: branch,
-        after_evening: after_evening,
-        branches: Operations.list_active_transport_branches(),
-        default_destination_id: bahonar && bahonar.id,
-        persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
-      )
-    end
-  end
-
-  def create_manager_transport(conn, %{"transport" => params}) do
-    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
-    code = params |> Map.get("code", "") |> String.trim()
-    destination_id = params["destination_branch_id"]
-    notes = params["notes"] || ""
-
-    cond do
-      is_nil(branch) ->
-        redirect(conn, to: ~p"/manager/pending")
-
-      code == "" ->
-        conn
-        |> put_flash(:error, "پلاک یا بارکد دستگاه را وارد کنید.")
-        |> redirect(to: ~p"/manager/transports")
-
-      true ->
-        scooter = Fleet.get_scooter_by_plate_or_barcode_with_details(branch.id, code)
-        destination = destination_id && Operations.get_branch(destination_id)
-
-        cond do
-          is_nil(scooter) ->
-            conn
-            |> put_flash(:error, "این دستگاه متعلق به شعبه شما نیست یا پیدا نشد.")
-            |> redirect(to: ~p"/manager/transports")
-
-          is_nil(destination) ->
-            conn
-            |> put_flash(:error, "شعبه مقصد معتبر نیست.")
-            |> redirect(to: ~p"/manager/transports")
-
-          true ->
-            actor = %{phone: conn.assigns.current_user_phone, name: manager_name(branch)}
-
-            case Logistics.register_transport(scooter, destination, branch, actor, notes) do
-              {:ok, _transport} ->
-                conn
-                |> put_flash(:info, "حمل‌ونقل دستگاه #{scooter.plate} به شعبه #{destination.name} ثبت شد.")
-                |> redirect(to: ~p"/manager/transports")
-
-              {:error, :same_branch} ->
-                conn
-                |> put_flash(:error, "دستگاه همین حالا در شعبه مقصد قرار دارد.")
-                |> redirect(to: ~p"/manager/transports")
-
-              {:error, :not_owned_by_manager_branch} ->
-                conn
-                |> put_flash(:error, "این دستگاه متعلق به شعبه شما نیست.")
-                |> redirect(to: ~p"/manager/transports")
-
-              {:error, _reason} ->
-                conn
-                |> put_flash(:error, "ثبت حمل‌ونقل انجام نشد.")
-                |> redirect(to: ~p"/manager/transports")
-            end
-        end
     end
   end
 
@@ -342,8 +242,7 @@ defmodule BeroonWeb.PageController do
           Fleet.update_scooter(scooter, %{
             status: "active",
             notes: nil,
-            current_branch_id: branch.id,
-            transport_until: nil
+            current_branch_id: branch.id
           })
 
         conn
@@ -362,7 +261,6 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_morning(conn, params) do
-    Logistics.expire_transports!()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
     code = params |> Map.get("code", "") |> String.trim()
     selected_scooter = selected_morning_scooter(branch, code)
@@ -493,6 +391,29 @@ defmodule BeroonWeb.PageController do
     )
   end
 
+  def workshop_update_notes(conn, %{"id" => id} = params) do
+    scooter = Fleet.get_scooter!(id)
+    notes = params |> get_in(["repair", "notes"]) |> to_string() |> String.trim()
+
+    if scooter.status in ["repairing", "waiting_for_part", "awaiting_repair"] do
+      case Fleet.update_scooter(scooter, %{notes: notes}) do
+        {:ok, _} ->
+          conn
+          |> put_flash(:info, "توضیحات دستگاه ذخیره شد.")
+          |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
+
+        {:error, _} ->
+          conn
+          |> put_flash(:error, "ذخیره توضیحات انجام نشد.")
+          |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
+      end
+    else
+      conn
+      |> put_flash(:error, "در وضعیت فعلی امکان ویرایش توضیحات تعمیر وجود ندارد.")
+      |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
+    end
+  end
+
 
   def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
     parts_used = params |> Map.get("repair_parts_used", "") |> String.trim()
@@ -602,7 +523,6 @@ defmodule BeroonWeb.PageController do
   end
 
   def manager_evening(conn, _params) do
-    Logistics.expire_transports!()
     branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
 
     if is_nil(branch) do
@@ -612,6 +532,7 @@ defmodule BeroonWeb.PageController do
         branches: [branch],
         submitted: Reports.evening_submitted_for_cycle?(branch.id),
         window_open: Reports.evening_window_open?(),
+        daily_revenue: Reports.get_daily_revenue(branch.id, Reports.evening_report_date(DateTime.utc_now())),
         persian_today: Beroon.Calendar.persian_date(Reports.iran_today())
       )
     end
@@ -649,10 +570,7 @@ defmodule BeroonWeb.PageController do
       scanned_codes
       |> Enum.map(&Fleet.get_scooter_by_plate_or_barcode/1)
       |> Enum.reject(&is_nil/1)
-      |> Enum.map(&Logistics.refresh_expired_transport/1)
       |> Enum.reject(fn scooter -> scooter.status in ["loaned", "stolen"] end)
-      |> Enum.reject(fn scooter -> scooter.status == "transport" and scooter.branch_id != branch.id end)
-      |> Enum.map(&Logistics.activate_owner_return(&1, branch.id))
       |> Enum.map(&Logistics.mark_evening_seen(&1, branch.id))
       |> Enum.uniq_by(& &1.id)
 
@@ -682,15 +600,85 @@ defmodule BeroonWeb.PageController do
 
     case Reports.create_evening_count_with_items(attrs, scanned_scooters) do
       {:ok, _count} ->
+        record_evening_revenue(branch, conn.assigns.current_user_phone, attrs["counted_on"], params)
+
         conn
-        |> put_flash(:info, "آمار شب با مجموع #{total_count} دستگاه ثبت شد. آیا دستگاهی را برای حمل‌ونقل می‌برید؟")
-        |> redirect(to: ~p"/manager/transports?after_evening=1")
+        |> put_flash(:info, "آمار شب با مجموع #{total_count} دستگاه ثبت شد.")
+        |> redirect(to: ~p"/manager/evening")
 
       {:error, changeset} ->
         conn
         |> put_flash(:error, "آمار ثبت نشد: #{first_error(changeset)}")
         |> redirect(to: ~p"/manager/evening")
     end
+  end
+
+  defp record_evening_revenue(branch, manager_phone, reported_on, params) do
+    Reports.upsert_daily_revenue(%{
+      branch_id: branch.id,
+      reported_on: reported_on,
+      cash_amount: parse_money(params["cash_amount"]),
+      card_to_card_amount: parse_money(params["card_to_card_amount"]),
+      registered_by_phone: manager_phone
+    })
+  end
+
+  def manager_dinner(conn, _params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    today = Reports.iran_today()
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_dinner,
+        branch: branch,
+        persian_today: Beroon.Calendar.persian_date(today),
+        dinner_report: Reports.get_dinner_report(branch.id, today)
+      )
+    end
+  end
+
+  def submit_dinner(conn, %{"dinner" => params}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    today = Reports.iran_today()
+
+    names =
+      params
+      |> Map.get("attendant_names", [])
+      |> List.wrap()
+      |> Enum.map(&String.trim(to_string(&1 || "")))
+      |> Enum.reject(&(&1 == ""))
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      case Reports.upsert_dinner_report(%{
+             branch_id: branch.id,
+             reported_on: today,
+             attendant_count: length(names),
+             attendant_names: names,
+             registered_by_phone: conn.assigns.current_user_phone
+           }) do
+        {:ok, _report} ->
+          conn
+          |> put_flash(:info, "آمار شام با #{length(names)} نفر ثبت شد.")
+          |> redirect(to: ~p"/manager/dinner")
+
+        {:error, changeset} ->
+          conn
+          |> put_flash(:error, "ثبت آمار شام انجام نشد: #{first_error(changeset)}")
+          |> redirect(to: ~p"/manager/dinner")
+      end
+    end
+  end
+
+  def admin_dinner(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+
+    render(conn, :admin_dinner,
+      selected_date: date,
+      dinner_reports: Reports.list_dinner_reports_for_date(date)
+    )
   end
 
   def admin_stale_unscanned_scooters(conn, _params) do
@@ -747,6 +735,21 @@ defmodule BeroonWeb.PageController do
     )
   end
 
+  def admin_device_detail(conn, %{"plate" => plate}) do
+    case Fleet.get_scooter_by_plate_or_barcode_with_details(plate) do
+      nil ->
+        conn
+        |> put_flash(:error, "دستگاهی با این پلاک پیدا نشد.")
+        |> redirect(to: ~p"/admin/device-locations")
+
+      scooter ->
+        render(conn, :admin_device_detail,
+          scooter: scooter,
+          location_history: Beroon.LocationHistory.list_recent(scooter.id, 10)
+        )
+    end
+  end
+
   def admin_reports(conn, _params) do
     date = Reports.iran_today()
     branches = Operations.list_branches()
@@ -782,12 +785,60 @@ defmodule BeroonWeb.PageController do
   def admin_branch_evening_reports(conn, %{"id" => id} = params) do
     branch = Operations.get_branch!(id)
     selected_date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    audit = Reports.branch_evening_audit_for_date(branch.id, selected_date)
 
     render(conn, :admin_branch_evening_reports,
       branch: branch,
       selected_date: selected_date,
-      audit: Reports.branch_evening_audit_for_date(branch.id, selected_date)
+      audit: audit,
+      audit_export_json: evening_audit_export_json(branch, selected_date, audit)
     )
+  end
+
+  defp evening_audit_export_json(branch, date, audit) do
+    category = fn item ->
+      %{
+        plate: item.plate,
+        barcode: item.barcode,
+        device_type:
+          [item[:device_type_identifier], item[:device_type_category], item[:device_type_name]]
+          |> Enum.reject(&(&1 in [nil, ""]))
+          |> Enum.join(" - "),
+        reason: Map.get(item, :accounted_reason)
+      }
+    end
+
+    build_category = fn key, title, color, list ->
+      items = Enum.map(list, category)
+
+      device_type_summary =
+        items
+        |> Enum.frequencies_by(fn item ->
+          if item.device_type == "", do: "بدون نوع دستگاه", else: item.device_type
+        end)
+        |> Enum.map(fn {label, count} -> %{label: label, count: count} end)
+        |> Enum.sort_by(& &1.label)
+
+      %{key: key, title: title, color: color, items: items, device_type_summary: device_type_summary}
+    end
+
+    revenue = Reports.get_daily_revenue(branch.id, date)
+
+    Jason.encode!(%{
+      branch_name: branch.name,
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      submitted: audit.submitted,
+      revenue: %{
+        cash_amount: (revenue && revenue.cash_amount) || 0,
+        card_to_card_amount: (revenue && revenue.card_to_card_amount) || 0
+      },
+      categories: [
+        build_category.("scanned", "اسکن‌شده", "#059669", audit.scanned),
+        build_category.("moved", "جابجا شده", "#0284c7", audit.moved),
+        build_category.("workshop", "تعمیرگاه، امانی، سرقتی", "#7c3aed", audit.workshop),
+        build_category.("needs_review", "نیاز به بررسی", "#dc2626", audit.needs_review)
+      ]
+    })
   end
 
   def admin_evening_report_detail(conn, %{"id" => id}) do
@@ -1230,8 +1281,6 @@ defmodule BeroonWeb.PageController do
         {"تعداد دستگاه‌های در انتظار قطعه", export.totals.waiting_for_part_count},
         {"تعداد دستگاه‌های امانی", export.totals.loaned_count},
         {"تعداد دستگاه‌های سرقتی", export.totals.stolen_count},
-        {"تعداد دستگاه‌های حمل‌ونقل", export.totals.transport_count},
-        {"تعداد دستگاه‌های از مدار خارج", export.totals.out_of_service_count},
         {"موقعیت معلوم / جابه‌جایی ثبت‌شده", export.totals.location_known_count},
         {"جمع کل تعیین تکلیف شده‌ها", export.totals.accounted_total_count},
         {"نیاز به بررسی (خارج از جمع کل)", export.totals.needs_review_count},
@@ -1243,13 +1292,47 @@ defmodule BeroonWeb.PageController do
       ])
 
     workshop_rows = workshop_discharge_sheet_rows(export.date)
+    revenue_rows = revenue_sheet_rows(export.date, export.revenue_details)
 
     xlsx_workbook([
       {"گزارش روزانه", main_rows},
       {"دستگاه‌های امانی", loan_rows},
       {"خلاصه مدیریتی", summary_rows},
-      {"تعمیرگاه", workshop_rows}
+      {"تعمیرگاه", workshop_rows},
+      {"درآمد شعب", revenue_rows}
     ])
+  end
+
+  defp revenue_sheet_rows(date, revenue_details) do
+    headers = ["ردیف", "شعبه", "کارت به کارت (تومان)", "نقدی (تومان)", "جمع (تومان)"]
+
+    rows =
+      revenue_details
+      |> Enum.with_index(1)
+      |> Enum.map(fn {revenue, index} ->
+        [
+          index,
+          revenue.branch_name,
+          revenue.card_to_card_amount,
+          revenue.cash_amount,
+          revenue.total_amount
+        ]
+      end)
+
+    total_cash = Enum.reduce(revenue_details, 0, &(&1.cash_amount + &2))
+    total_card = Enum.reduce(revenue_details, 0, &(&1.card_to_card_amount + &2))
+    total_all = total_cash + total_card
+
+    [
+      [{"درآمد نقدی و کارت‌به‌کارت شعب", "Title"}],
+      [{"تاریخ گزارش: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
+      [],
+      Enum.map(headers, &{&1, "Header"})
+    ] ++
+      rows ++
+      [
+        [{"جمع کل", "Total"}, {"", "Total"}, {total_card, "Total"}, {total_cash, "Total"}, {total_all, "Total"}]
+      ]
   end
 
   defp inventory_sheet_rows(title, date, branches, rows, totals, mode) do
@@ -1261,8 +1344,6 @@ defmodule BeroonWeb.PageController do
           "در انتظار قطعه",
           "امانی",
           "سرقتی",
-          "حمل‌ونقل",
-          "از مدار خارج",
           "موقعیت معلوم / جابه‌جایی",
           "جمع کل ناوگان",
           "انبار نو",
@@ -1299,8 +1380,6 @@ defmodule BeroonWeb.PageController do
                 row.waiting_for_part_count,
                 row.loaned_count,
                 row.stolen_count,
-                row.transport_count,
-                row.out_of_service_count,
                 row.location_known_count,
                 row.operational_total_count,
                 row.new_stock_count,
@@ -1336,8 +1415,6 @@ defmodule BeroonWeb.PageController do
             totals.waiting_for_part_count,
             totals.loaned_count,
             totals.stolen_count,
-            totals.transport_count,
-            totals.out_of_service_count,
             totals.location_known_count,
             totals.operational_total_count,
             totals.new_stock_count,
@@ -1776,8 +1853,7 @@ defmodule BeroonWeb.PageController do
       needs_service: Map.get(by_status, "needs_service", 0),
       awaiting_repair: Map.get(by_status, "awaiting_repair", 0),
       workshop: Enum.sum(Enum.map(@manager_workshop_statuses, &Map.get(by_status, &1, 0))),
-      waiting_for_part: Map.get(by_status, "waiting_for_part", 0),
-      out_of_service: Map.get(by_status, "out_of_service", 0)
+      waiting_for_part: Map.get(by_status, "waiting_for_part", 0)
     }
   end
 
@@ -1891,9 +1967,6 @@ defmodule BeroonWeb.PageController do
 
   defp manager_scooters_title("waiting_for_part"),
     do: "دستگاه‌های در انتظار قطعه"
-
-  defp manager_scooters_title("out_of_service"),
-    do: "دستگاه‌های از مدار خارج شده"
 
   defp manager_scooters_title(_status), do: "لیست دستگاه‌های شعبه من"
 end

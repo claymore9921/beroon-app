@@ -93,7 +93,7 @@ defmodule Beroon.FleetTest do
       scooter = scooter_fixture()
 
       update_attrs = %{
-        status: "out_of_service",
+        status: "ready_for_pickup",
         plate: "some updated plate",
         barcode: "some updated barcode",
         model: "some updated model",
@@ -101,7 +101,7 @@ defmodule Beroon.FleetTest do
       }
 
       assert {:ok, %Scooter{} = scooter} = Fleet.update_scooter(scooter, update_attrs)
-      assert scooter.status == "out_of_service"
+      assert scooter.status == "ready_for_pickup"
       assert scooter.plate == "some updated plate"
       assert scooter.barcode == "some updated barcode"
       assert scooter.model == "some updated model"

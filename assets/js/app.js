@@ -151,9 +151,7 @@ const registerEveningScan = async (code) => {
 
   if (response.ok) return payload.scooter
 
-  if (payload.error === "transport_foreign") {
-    alert("این دستگاه برای حمل‌ونقل انتخاب شده و نباید جزو آمار این شعبه ثبت شود.")
-  } else if (payload.error === "loaned") {
+  if (payload.error === "loaned") {
     alert("این دستگاه امانی است و در آمار شب ثبت نمی‌شود.")
   } else if (payload.error === "stolen") {
     alert("این دستگاه سرقتی است و در آمار شب ثبت نمی‌شود.")
@@ -455,12 +453,6 @@ const setupMorningChecklist = () => {
       const scooter = await lookupScooter(code.data)
       if (scooter) {
         const managerBranchId = Number(form.dataset.branchId || 0)
-        if (scooter.status === "transport" && scooter.branch_id !== managerBranchId) {
-          alert("این دستگاه برای حمل‌ونقل انتخاب شده و در چک‌لیست این شعبه ثبت نمی‌شود.")
-          input.value = ""
-          stopScanner()
-          return
-        }
         if (scooter.branch_id !== managerBranchId) {
           alert(`این دستگاه متعلق به ${scooter.branch_name || "شعبه دیگری"} است و در چک‌لیست این شعبه ثبت نمی‌شود.`)
           input.value = ""
@@ -747,10 +739,315 @@ const setupSearchScanner = ({
   dialog.addEventListener("close", stopCamera)
 }
 
+const roundRect = (ctx, x, y, w, h, r) => {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+const hexWithAlpha = (hex, alpha) => {
+  const clean = (hex || "#334155").replace("#", "")
+  const bigint = parseInt(clean, 16)
+  const r = (bigint >> 16) & 255
+  const g = (bigint >> 8) & 255
+  const b = bigint & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+const renderEveningAuditCanvas = async (payload) => {
+  if (document.fonts?.load) {
+    await Promise.all([
+      document.fonts.load("800 26px Peyda"),
+      document.fonts.load("700 18px Peyda"),
+      document.fonts.load("700 15px Peyda"),
+      document.fonts.load("700 13px Peyda"),
+    ]).catch(() => {})
+    await document.fonts.ready.catch(() => {})
+  }
+
+  const width = 900
+  const padding = 32
+  const chipHeight = 30
+  const chipGapX = 8
+  const chipGapY = 10
+  const sectionGapTop = 26
+  const headerHeight = 118
+
+  const measureCanvas = document.createElement("canvas")
+  const mctx = measureCanvas.getContext("2d")
+  mctx.font = "700 13px Peyda, sans-serif"
+
+  const buildChipLabel = (item) => item.plate + (item.reason ? ` · ${item.reason}` : "")
+  const summaryChipHeight = 28
+  const summaryGapY = 8
+
+  const contentWidth = width - padding * 2
+
+  const layoutWrap = (chipList, gapX, availableWidth) => {
+    const rows = []
+    let currentRow = []
+    let currentWidth = 0
+    for (const chip of chipList) {
+      if (currentWidth + chip.width + gapX > availableWidth && currentRow.length > 0) {
+        rows.push(currentRow)
+        currentRow = []
+        currentWidth = 0
+      }
+      currentRow.push(chip)
+      currentWidth += chip.width + gapX
+    }
+    if (currentRow.length > 0) rows.push(currentRow)
+    return rows
+  }
+
+  const sections = payload.categories.map((category) => {
+    mctx.font = "700 13px Peyda, sans-serif"
+    const chips = category.items.map((item) => {
+      const label = buildChipLabel(item)
+      const textWidth = mctx.measureText(label).width
+      return {label, width: Math.min(textWidth + 24, contentWidth)}
+    })
+
+    mctx.font = "800 13px Peyda, sans-serif"
+    const summaryChips = (category.device_type_summary || []).map((entry) => {
+      const label = `${entry.label} × ${entry.count}`
+      const textWidth = mctx.measureText(label).width
+      return {label, width: Math.min(textWidth + 28, contentWidth)}
+    })
+
+    return {...category, chips, summaryChips}
+  })
+
+  const layoutRows = sections.map((section) => layoutWrap(section.chips, chipGapX, contentWidth))
+  const summaryLayoutRows = sections.map((section) => layoutWrap(section.summaryChips, chipGapX, contentWidth))
+
+  let totalHeight = headerHeight
+  sections.forEach((section, idx) => {
+    const rows = layoutRows[idx]
+    const summaryRows = summaryLayoutRows[idx]
+    totalHeight += sectionGapTop + 40
+    if (summaryRows.length > 0) {
+      totalHeight += summaryRows.length * (summaryChipHeight + summaryGapY) + 6
+    }
+    totalHeight += section.items.length === 0 ? 28 : rows.length * (chipHeight + chipGapY)
+  })
+  const revenueBoxHeight = 108
+  totalHeight += sectionGapTop + revenueBoxHeight
+  totalHeight += padding
+
+  const scale = 2
+  const canvas = document.createElement("canvas")
+  canvas.width = width * scale
+  canvas.height = totalHeight * scale
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${totalHeight}px`
+
+  const ctx = canvas.getContext("2d")
+  ctx.scale(scale, scale)
+  ctx.direction = "rtl"
+  ctx.textAlign = "right"
+
+  ctx.fillStyle = "#f8fafc"
+  ctx.fillRect(0, 0, width, totalHeight)
+
+  ctx.fillStyle = "#0f172a"
+  ctx.font = "800 24px Peyda, sans-serif"
+  ctx.fillText(`آمار شب شعبه ${payload.branch_name}`, width - padding, padding + 26)
+
+  ctx.fillStyle = "#475569"
+  ctx.font = "700 15px Peyda, sans-serif"
+  ctx.fillText(`تاریخ: ${payload.date_label}`, width - padding, padding + 52)
+  ctx.fillText(payload.submitted ? "وضعیت ثبت: ثبت شده" : "وضعیت ثبت: ثبت نشده", width - padding, padding + 74)
+
+  let y = headerHeight
+
+  sections.forEach((section, idx) => {
+    y += sectionGapTop
+
+    ctx.fillStyle = section.color || "#334155"
+    ctx.font = "700 17px Peyda, sans-serif"
+    ctx.textAlign = "right"
+    ctx.fillText(`${section.title} (${section.items.length})`, width - padding, y + 16)
+    y += 40
+
+    const summaryRows = summaryLayoutRows[idx]
+    if (summaryRows.length > 0) {
+      summaryRows.forEach((row) => {
+        let x = width - padding
+        row.forEach((chip) => {
+          const chipX = x - chip.width
+
+          ctx.fillStyle = section.color || "#334155"
+          roundRect(ctx, chipX, y, chip.width, summaryChipHeight, 8)
+          ctx.fill()
+
+          ctx.fillStyle = "#ffffff"
+          ctx.font = "800 12px Peyda, sans-serif"
+          ctx.textAlign = "center"
+          ctx.fillText(chip.label, chipX + chip.width / 2, y + summaryChipHeight / 2 + 4, chip.width - 10)
+          ctx.textAlign = "right"
+
+          x = chipX - chipGapX
+        })
+        y += summaryChipHeight + summaryGapY
+      })
+      y += 6
+    }
+
+    const rows = layoutRows[idx]
+
+    if (section.items.length === 0) {
+      ctx.fillStyle = "#94a3b8"
+      ctx.font = "600 13px Peyda, sans-serif"
+      ctx.fillText("موردی وجود ندارد.", width - padding, y + 14)
+      y += 28
+      return
+    }
+
+    rows.forEach((row) => {
+      let x = width - padding
+      row.forEach((chip) => {
+        const chipX = x - chip.width
+
+        ctx.fillStyle = hexWithAlpha(section.color, 0.12)
+        roundRect(ctx, chipX, y, chip.width, chipHeight, 8)
+        ctx.fill()
+
+        ctx.strokeStyle = hexWithAlpha(section.color, 0.4)
+        ctx.lineWidth = 1
+        roundRect(ctx, chipX, y, chip.width, chipHeight, 8)
+        ctx.stroke()
+
+        ctx.fillStyle = "#1e293b"
+        ctx.font = "700 12px Peyda, sans-serif"
+        ctx.textAlign = "center"
+        ctx.fillText(chip.label, chipX + chip.width / 2, y + chipHeight / 2 + 4, chip.width - 10)
+        ctx.textAlign = "right"
+
+        x = chipX - chipGapX
+      })
+      y += chipHeight + chipGapY
+    })
+  })
+
+  // بخش پایانی گزارش: درآمد نقدی و کارت‌به‌کارت همان شب
+  y += sectionGapTop
+  const revenue = payload.revenue || {cash_amount: 0, card_to_card_amount: 0}
+  const total = (revenue.cash_amount || 0) + (revenue.card_to_card_amount || 0)
+  const formatToman = (n) => `${Number(n || 0).toLocaleString("fa-IR")} تومان`
+
+  ctx.fillStyle = "#0f172a"
+  roundRect(ctx, padding, y, contentWidth, revenueBoxHeight, 12)
+  ctx.fill()
+
+  ctx.fillStyle = "#a7f3d0"
+  ctx.font = "700 15px Peyda, sans-serif"
+  ctx.textAlign = "right"
+  ctx.fillText("درآمد امشب", width - padding - 18, y + 30)
+
+  ctx.fillStyle = "#f8fafc"
+  ctx.font = "700 14px Peyda, sans-serif"
+  ctx.fillText(`کارت به کارت: ${formatToman(revenue.card_to_card_amount)}`, width - padding - 18, y + 58)
+  ctx.fillText(`نقدی: ${formatToman(revenue.cash_amount)}`, width - padding - 18, y + 82)
+
+  ctx.fillStyle = "#5eead4"
+  ctx.font = "800 15px Peyda, sans-serif"
+  ctx.textAlign = "left"
+  ctx.fillText(`جمع: ${formatToman(total)}`, padding + 18, y + 58)
+  ctx.textAlign = "right"
+
+  return canvas
+}
+
+const setupEveningAuditExport = () => {
+  const button = document.getElementById("export-evening-audit-image")
+  if (!button) return
+  if (button.dataset.exportBound === "true") return
+  button.dataset.exportBound = "true"
+
+  button.addEventListener("click", async () => {
+    let payload
+    try {
+      payload = JSON.parse(button.dataset.audit || "")
+    } catch (error) {
+      console.error("Evening audit export data parse error:", error)
+      alert("داده‌ای برای ساخت عکس پیدا نشد.")
+      return
+    }
+
+    const originalHTML = button.innerHTML
+    button.disabled = true
+    button.textContent = "در حال آماده‌سازی..."
+
+    try {
+      const canvas = await renderEveningAuditCanvas(payload)
+      const filename = `آمار-شب-${payload.branch_name}-${payload.date_label}`.replace(/[\s/]+/g, "-")
+      const link = document.createElement("a")
+      link.download = `${filename}.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+    } catch (error) {
+      console.error("Evening audit export error:", error)
+      alert("ساخت عکس انجام نشد. دوباره تلاش کنید.")
+    } finally {
+      button.disabled = false
+      button.innerHTML = originalHTML
+    }
+  })
+}
+
+const buildDinnerNameField = (index, value) => {
+  const wrapper = document.createElement("label")
+  wrapper.className = "block"
+  wrapper.innerHTML = `
+    <span class="mb-1 block text-xs font-semibold text-zinc-500">نام و نام خانوادگی نفر ${index + 1}</span>
+    <input type="text" name="dinner[attendant_names][]" class="input input-bordered min-h-11 w-full" autocomplete="off" />
+  `
+  const input = wrapper.querySelector("input")
+  input.value = value || ""
+  return wrapper
+}
+
+const setupDinnerForm = () => {
+  const form = document.getElementById("dinner-form")
+  const countInput = document.getElementById("dinner-count")
+  const container = document.getElementById("dinner-names-container")
+  if (!form || !countInput || !container) return
+  if (form.dataset.dinnerBound === "true") return
+  form.dataset.dinnerBound = "true"
+
+  const renderFields = (count, presetValues) => {
+    const clamped = Math.max(0, Math.min(40, Number(count) || 0))
+    const existing = Array.from(container.querySelectorAll("input")).map((el) => el.value)
+    const source = presetValues && presetValues.length ? presetValues : existing
+
+    container.innerHTML = ""
+    for (let i = 0; i < clamped; i++) {
+      container.appendChild(buildDinnerNameField(i, source[i]))
+    }
+  }
+
+  let initialNames = []
+  try {
+    initialNames = JSON.parse(form.dataset.initialNames || "[]")
+  } catch (error) {
+    initialNames = []
+  }
+
+  renderFields(countInput.value, initialNames)
+  countInput.addEventListener("input", () => renderFields(countInput.value))
+}
+
 const bootScannerPages = () => {
   setupMorningChecklist()
   setupEveningScanner()
   setupScooterFormScanner()
+  setupEveningAuditExport()
+  setupDinnerForm()
 
   setupSearchScanner({
     buttonId: "manager-repair-scan",
@@ -819,18 +1116,6 @@ const bootScannerPages = () => {
     autoSubmit: false,
   })
 
-
-  setupSearchScanner({
-    buttonId: "manager-transport-scan",
-    inputId: "manager-transport-code",
-    formId: "manager-transport-form",
-    dialogId: "manager-transport-scan-dialog",
-    videoId: "manager-transport-scan-video",
-    statusId: "manager-transport-scan-status",
-    closeId: "manager-transport-scan-close",
-    retryId: "manager-transport-scan-retry",
-    autoSubmit: false,
-  })
 
   setupSearchScanner({
     buttonId: "admin-scooter-search-scan",

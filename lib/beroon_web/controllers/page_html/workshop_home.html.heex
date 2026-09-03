@@ -32,6 +32,12 @@
           <label :for={name <- @repair_technicians} class="mb-2 flex items-center gap-2 text-sm font-bold"><input type="radio" name="repair[technician_name]" value={name} /> {name}</label>
           <button class="btn btn-primary mt-2 min-h-12 w-full">شروع تعمیر</button>
         </form>
+        <form :if={s.status in ["repairing", "waiting_for_part"]} action={~p"/workshop/scooters/#{s}/notes"} method="post" class="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <label for={"workshop-notes-#{s.id}"} class="mb-2 block text-sm font-black text-zinc-800">توضیحات تعمیر</label>
+          <textarea id={"workshop-notes-#{s.id}"} name="repair[notes]" rows="3" placeholder="شرح خرابی، کار انجام‌شده یا نکات تعمیر..." class="textarea textarea-bordered w-full resize-none bg-white">{s.notes || ""}</textarea>
+          <button class="btn btn-neutral mt-2 min-h-11 w-full">ذخیره توضیحات</button>
+        </form>
         <div :if={s.status in ["repairing", "waiting_for_part"]} class="grid grid-cols-2 gap-2">
           <form action={~p"/workshop/scooters/#{s}/waiting-part"} method="post"><input type="hidden" name="_csrf_token" value={get_csrf_token()} /><button class="btn min-h-12 w-full">در انتظار قطعه</button></form>
           <a href={~p"/workshop/discharge?q=#{s.plate}"} class="btn btn-primary min-h-12">ترخیص دستگاه</a>

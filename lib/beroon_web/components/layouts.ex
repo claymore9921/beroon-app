@@ -39,22 +39,6 @@ defmodule BeroonWeb.Layouts do
     ~H"""
     <div class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
       <div class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-24 pt-5">
-        <header class="mb-5 border-b border-zinc-200 pb-4">
-          <div class="flex items-center justify-between gap-3">
-            <a href="/" class="inline-flex items-center gap-2 text-sm font-semibold text-orange-700">
-              برون
-            </a>
-            <.link
-              :if={@current_admin_phone}
-              href={~p"/logout"}
-              method="delete"
-              class="btn btn-ghost btn-sm"
-            >
-              خروج
-            </.link>
-          </div>
-        </header>
-
         <main class="space-y-4">
           {render_slot(@inner_block)}
         </main>

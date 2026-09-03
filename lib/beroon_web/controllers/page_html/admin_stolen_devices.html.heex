@@ -1,21 +1,7 @@
 <Layouts.flash_group flash={@flash} />
 <main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
   <section class="mx-auto min-h-screen w-full max-w-4xl bg-stone-50 px-4 pb-24 pt-6">
-    <header class="flex items-start justify-between gap-4 border-b border-zinc-200 pb-5">
-      <div>
-        <.link navigate={~p"/admin/reports"} class="text-sm font-bold text-orange-700">بازگشت</.link>
-        <h1 class="mt-2 text-2xl font-black">دستگاه‌های سرقتی</h1>
-        <p class="mt-1 text-sm text-zinc-500">
-          ثبت دستگاه دارای پلاک یا تعداد دستگاه‌های بدون پلاک، به تفکیک شعبه و نوع دستگاه
-        </p>
-      </div>
-      <div class="rounded-xl bg-rose-950 px-4 py-3 text-center text-white">
-        <p class="text-xs font-bold text-rose-100">مجموع سرقتی</p>
-        <p class="mt-1 text-3xl font-black">{@total_count}</p>
-      </div>
-    </header>
-
-    <section class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+<section class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
       <article :for={item <- @branch_totals} class="rounded-xl border border-rose-200 bg-white p-3">
         <p class="text-xs font-bold text-zinc-500">{item.branch_name}</p>
         <p class="mt-1 text-2xl font-black text-rose-800">{item.quantity}</p>
@@ -83,7 +69,11 @@
             <div>
               <p class="text-xs font-bold text-zinc-500">{record.branch.name}</p>
               <h3 class="mt-1 text-lg font-black">
-                {if record.scooter, do: "پلاک #{record.plate_snapshot || record.scooter.plate}", else: "#{record.quantity} دستگاه بدون پلاک"}
+                <%= if record.scooter do %>
+                  پلاک <.admin_plate_link plate={record.plate_snapshot || record.scooter.plate} />
+                <% else %>
+                  {record.quantity} دستگاه بدون پلاک
+                <% end %>
               </h3>
               <p class="mt-1 text-sm font-bold text-zinc-700">نوع: {device_type_label(record.device_type)}</p>
               <p class="mt-1 text-xs text-zinc-500">ثبت: {Beroon.Calendar.persian_datetime(record.reported_at)}</p>

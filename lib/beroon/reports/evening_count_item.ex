@@ -24,7 +24,7 @@ defmodule Beroon.Reports.EveningCountItem do
       :current_branch_id
     ])
     |> validate_required([:evening_count_id, :scooter_id, :scanned_code, :scan_result])
-    |> validate_inclusion(:scan_result, ["expected", "foreign", "transport"])
+    |> validate_inclusion(:scan_result, ["expected", "foreign"])
     |> unique_constraint([:evening_count_id, :scooter_id])
   end
 end

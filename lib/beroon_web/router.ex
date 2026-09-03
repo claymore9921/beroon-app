@@ -60,8 +60,6 @@ defmodule BeroonWeb.Router do
     get "/manager/scooters", PageController, :manager_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
     get "/manager/unhealthy-scooters", PageController, :manager_unhealthy_scooters
-    get "/manager/transports", PageController, :manager_transports
-    post "/manager/transports", PageController, :create_manager_transport
     get "/manager/repairs", PageController, :manager_repairs
     post "/manager/repairs/:id/send", PageController, :send_scooter_to_workshop
     get "/manager/repairs/receive", PageController, :manager_repair_receive
@@ -70,7 +68,8 @@ defmodule BeroonWeb.Router do
     post "/manager/morning", PageController, :submit_morning
     get "/manager/evening", PageController, :manager_evening
     post "/manager/evening", PageController, :submit_evening
-    post "/manager/daily-revenue", PageController, :submit_daily_revenue
+    get "/manager/dinner", PageController, :manager_dinner
+    post "/manager/dinner", PageController, :submit_dinner
 
     get "/workshop", PageController, :workshop_home
     get "/workshop/info", PageController, :workshop_info
@@ -80,6 +79,7 @@ defmodule BeroonWeb.Router do
     post "/workshop/scooters/:id/accept", PageController, :workshop_accept_scooter
     post "/workshop/scooters/:id/start", PageController, :workshop_start_repair
     post "/workshop/scooters/:id/waiting-part", PageController, :workshop_waiting_part
+    post "/workshop/scooters/:id/notes", PageController, :workshop_update_notes
     post "/workshop/scooters/:id/discharge", PageController, :workshop_discharge_scooter
   end
 
@@ -102,6 +102,7 @@ defmodule BeroonWeb.Router do
     post "/admin/notifications", PageController, :send_admin_notification
     get "/admin/location-alerts", PageController, :admin_location_alerts
     get "/admin/device-locations", PageController, :admin_device_locations
+    get "/admin/devices/:plate", PageController, :admin_device_detail
     get "/admin/managers", PageController, :admin_manager_registrations
     post "/admin/managers/:id/approve", PageController, :approve_manager_registration
     get "/admin/checklists", PageController, :admin_checklist_branches
@@ -121,6 +122,7 @@ defmodule BeroonWeb.Router do
     get "/admin/evening-reports/counts/:id", PageController, :admin_evening_report_detail
     get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports
     post "/admin/evening-reports/branches/:id/reopen", PageController, :reopen_branch_evening_report
+    get "/admin/dinner", PageController, :admin_dinner
 
     get "/admin/checklists/branches/:id/unchecked",
         PageController,

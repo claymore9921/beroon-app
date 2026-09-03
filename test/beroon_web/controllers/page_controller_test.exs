@@ -29,8 +29,7 @@ defmodule BeroonWeb.PageControllerTest do
       "awaiting_repair",
       "repairing",
       "waiting_for_part",
-      "ready_for_pickup",
-      "out_of_service"
+      "ready_for_pickup"
     ]
     |> Enum.with_index()
     |> Enum.each(fn {status, index} ->
@@ -56,7 +55,6 @@ defmodule BeroonWeb.PageControllerTest do
     assert response =~ "در حال تعمیر"
     assert response =~ "در انتظار قطعه"
     assert response =~ "آماده تحویل"
-    assert response =~ "از مدار خارج شده"
     assert response =~ ~s(class="admin-bottom-nav")
     assert response =~ ~p"/admin/report-export"
     assert response =~ ~p"/admin/evening-reports"

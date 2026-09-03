@@ -14,7 +14,7 @@ defmodule BeroonWeb.ScooterControllerTest do
     notes: "some notes"
   }
   @update_attrs %{
-    status: "out_of_service",
+    status: "ready_for_pickup",
     plate: "some updated plate",
     barcode: "some updated barcode",
     model: "some updated model",

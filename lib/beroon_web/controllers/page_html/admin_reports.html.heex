@@ -1,19 +1,7 @@
 <Layouts.flash_group flash={@flash} />
 <main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
   <section class="mx-auto min-h-screen w-full max-w-3xl bg-stone-50 px-4 pb-24 pt-6">
-    <header class="flex items-start justify-between gap-4 border-b border-zinc-200 pb-5">
-      <div>
-        <p class="text-sm font-bold text-orange-700">برون</p>
-        <h1 class="mt-1 text-2xl font-black">داشبورد ادمین</h1>
-        <p class="mt-1 text-sm text-zinc-500">برای ورود به هر بخش، گزینه موردنظر را انتخاب کنید.</p>
-      </div>
-      <div class="text-left">
-        <p class="text-sm font-bold text-zinc-700">{Beroon.Calendar.persian_date(Beroon.Reports.iran_today())}</p>
-        <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm mt-2">خروج</.link>
-      </div>
-    </header>
-
-    <section class="mt-6 grid grid-cols-2 gap-3" aria-label="منوی مدیریت">
+<section class="mt-6 grid grid-cols-2 gap-3" aria-label="منوی مدیریت">
       <.link navigate={~p"/admin/evening-reports"} class="admin-menu-card">
         <.icon name="hero-clipboard-document-check" class="size-8" />
         <span>آمارگیری شبانه</span>

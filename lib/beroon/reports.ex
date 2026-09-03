@@ -332,10 +332,13 @@ defmodule Beroon.Reports do
     "ready_for_pickup",
     "waiting_for_part",
     "loaned",
-    "stolen",
-    "out_of_service",
-    "transport"
+    "stolen"
   ]
+
+  # وضعیت‌هایی که در آمار شب هر شعبه ذیل دسته «تعمیرگاه، امانی، سرقتی» نمایش
+  # داده می‌شوند. این دستگاه‌ها فیزیکاً در شعبه نیستند، پس نیازی به اسکن ندارند؛
+  # فقط برای اطمینان از اینکه گم یا سرقت نشده‌اند، اطلاع‌رسانی می‌شوند.
+  @workshop_loan_theft_statuses @explained_missing_statuses
 
   @doc """
   دستگاه‌هایی که برای چرخه آمار شب این تاریخ انتظار حضورشان وجود داشته، اما
@@ -511,8 +514,7 @@ defmodule Beroon.Reports do
             "ready_for_pickup",
             "waiting_for_part",
             "loaned",
-            "stolen",
-            "out_of_service"
+            "stolen"
           ] and
           not is_nil(s.device_type_id)
       )
@@ -532,8 +534,6 @@ defmodule Beroon.Reports do
     ready_for_pickup_counts = status_counts_by_device_type(["ready_for_pickup"])
     waiting_for_part_counts = status_counts_by_device_type(["waiting_for_part"])
     loaned_counts = status_counts_by_device_type(["loaned"])
-    transport_counts = status_counts_by_device_type(["transport"])
-    out_of_service_counts = status_counts_by_device_type(["out_of_service"])
     location_known_counts = location_known_counts_by_device_type(date)
     stolen_counts = Thefts.open_counts_by_device_type()
     stolen_breakdown = Thefts.open_breakdown()
@@ -582,15 +582,13 @@ defmodule Beroon.Reports do
 
         waiting_for_part_count = Map.get(waiting_for_part_counts, device_type.id, 0)
         loaned_count = Map.get(loaned_counts, device_type.id, 0)
-        transport_count = Map.get(transport_counts, device_type.id, 0)
-        out_of_service_count = Map.get(out_of_service_counts, device_type.id, 0)
         location_known_count = Map.get(location_known_counts, device_type.id, 0)
         stolen_count = Map.get(stolen_counts, device_type.id, 0) || 0
         needs_review_count = Map.get(needs_review_counts, device_type.id, 0) || 0
 
         accounted_total_count =
           workshop_total_count + waiting_for_part_count + loaned_count + stolen_count +
-            transport_count + out_of_service_count + location_known_count
+            location_known_count
 
         # «نیاز به بررسی» عمداً در جمع ناوگان وارد نمی‌شود تا مغایرت روزانه قابل مشاهده بماند.
         # انبار نو و فروش هم فقط اطلاعات جانبی‌اند و وارد عدد کنترل ناوگان نمی‌شوند.
@@ -608,8 +606,6 @@ defmodule Beroon.Reports do
           waiting_for_part_count: waiting_for_part_count,
           loaned_count: loaned_count,
           stolen_count: stolen_count,
-          transport_count: transport_count,
-          out_of_service_count: out_of_service_count,
           location_known_count: location_known_count,
           accounted_total_count: accounted_total_count,
           needs_review_count: needs_review_count,
@@ -642,8 +638,6 @@ defmodule Beroon.Reports do
       waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
       loaned_count: Enum.reduce(rows, 0, &(&1.loaned_count + &2)),
       stolen_count: Enum.reduce(rows, 0, &(&1.stolen_count + &2)),
-      transport_count: Enum.reduce(rows, 0, &(&1.transport_count + &2)),
-      out_of_service_count: Enum.reduce(rows, 0, &(&1.out_of_service_count + &2)),
       location_known_count: Enum.reduce(rows, 0, &(&1.location_known_count + &2)),
       accounted_total_count: Enum.reduce(rows, 0, &(&1.accounted_total_count + &2)),
       needs_review_count: Enum.reduce(rows, 0, &(&1.needs_review_count + &2)),
@@ -663,6 +657,7 @@ defmodule Beroon.Reports do
       # در انتظار قطعه + امانی + سرقتی است.
       grand_total: totals.operational_total_count,
       loan_details: Logistics.list_open_loans(),
+      revenue_details: list_daily_revenues_for_date(date),
       summary: %{
         branch_evening_total_count: totals.branches_total_count,
         pending_acceptance_total_count: totals.pending_acceptance_count,
@@ -673,8 +668,6 @@ defmodule Beroon.Reports do
         waiting_for_part_total_count: totals.waiting_for_part_count,
         loaned_total_count: totals.loaned_count,
         stolen_total_count: totals.stolen_count,
-        transport_total_count: totals.transport_count,
-        out_of_service_total_count: totals.out_of_service_count,
         location_known_total_count: totals.location_known_count,
         accounted_total_count: totals.accounted_total_count,
         needs_review_total_count: totals.needs_review_count,
@@ -728,36 +721,41 @@ defmodule Beroon.Reports do
   end
 
   @doc """
-  Returns the three-way audit for one branch and one evening operational date:
-  scanned at the branch, moved in/out, and expected but not scanned.
-  The query is bounded by the actual 21:00-06:00 Tehran window.
+  آمار شب یک شعبه برای یک تاریخ عملیاتی (بازه ۲۱:۰۰ تا ۰۶:۰۰ صبح تهران)، بر
+  اساس مالکیت دستگاه (scooter.branch_id) به ۴ دسته تقسیم می‌شود:
+
+    1. `scanned`      - پلاک‌های متعلق به شعبه که در خودِ شعبه مالک اسکن خورده‌اند
+    2. `moved`        - پلاک‌های متعلق به شعبه که در شعبه دیگری اسکن خورده‌اند
+    3. `workshop`      - پلاک‌های متعلق به شعبه که در تعمیرگاه، امانی یا سرقتی
+                          هستند (نیازی به اسکن ندارند، صرفاً اطلاع‌رسانی می‌شوند)
+    4. `needs_review`  - پلاک‌های متعلق به شعبه که وضعیت‌شان فعال بوده اما
+                          هیچ‌کجا اسکن نخورده‌اند
+
+  هر دستگاه متعلق به شعبه دقیقاً در یکی از این ۴ دسته قرار می‌گیرد.
   """
   def branch_evening_audit_for_date(branch_id, %Date{} = date) do
     {window_start, window_end} = evening_window_utc_bounds(date)
 
-    counts =
+    own_count_id =
       EveningCount
       |> where(
         [e],
         e.branch_id == ^branch_id and e.counted_at >= ^window_start and e.counted_at < ^window_end
       )
-      |> select([e], %{id: e.id, expected_scooter_ids: e.expected_scooter_ids, counted_at: e.counted_at})
-      |> Repo.all()
+      |> select([e], e.id)
+      |> Repo.one()
 
-    count_ids = Enum.map(counts, & &1.id)
-
-    # تمام دستگاه‌هایی که واقعاً در آمار همین شعبه اسکن شده‌اند؛ دستگاه مهمان هم اگر
-    # به شکل معتبر در این شعبه ثبت شده باشد در عدد «اسکن‌شده» همین شعبه دیده می‌شود.
+    # پلاک‌هایی متعلق به این شعبه که در آمار خودِ همین شعبه اسکن خورده‌اند.
     scanned =
-      if count_ids == [] do
+      if is_nil(own_count_id) do
         []
       else
         EveningCountItem
         |> join(:inner, [i], s in Scooter, on: s.id == i.scooter_id)
         |> join(:left, [i, s], d in DeviceType, on: d.id == s.device_type_id)
         |> where(
-          [i],
-          i.evening_count_id in ^count_ids and
+          [i, s],
+          i.evening_count_id == ^own_count_id and s.branch_id == ^branch_id and
             (i.scan_result in ["expected", "foreign"] or is_nil(i.scan_result))
         )
         |> order_by([i, s], asc: s.plate)
@@ -765,9 +763,7 @@ defmodule Beroon.Reports do
           scooter_id: s.id,
           plate: s.plate,
           barcode: s.barcode,
-          scan_result: i.scan_result,
-          home_branch_id: i.home_branch_id,
-          current_branch_id: i.current_branch_id,
+          status: s.status,
           device_type_identifier: d.device_identifier,
           device_type_category: d.category,
           device_type_name: d.device_model
@@ -776,134 +772,81 @@ defmodule Beroon.Reports do
         |> Enum.uniq_by(& &1.scooter_id)
       end
 
-    expected_ids = counts |> Enum.flat_map(&List.wrap(&1.expected_scooter_ids)) |> Enum.uniq()
-    branch_scanned_ids = MapSet.new(scanned, & &1.scooter_id)
+    scanned_ids = MapSet.new(scanned, & &1.scooter_id)
 
-    # اگر دستگاه مورد انتظار این شعبه در شعبه دیگری در همان چرخه شب اسکن شده باشد،
-    # برای این شعبه «تعیین تکلیف شده» است، نه «نیاز به بررسی».
-    other_branch_scans =
+    # پلاک‌هایی متعلق به این شعبه که همین امشب در آمار شعبه‌ی دیگری اسکن خورده‌اند.
+    moved =
       EveningCountItem
       |> join(:inner, [i], e in EveningCount, on: e.id == i.evening_count_id)
       |> join(:inner, [i, e], s in Scooter, on: s.id == i.scooter_id)
-      |> join(:left, [i, e, s], b in Branch, on: b.id == e.branch_id)
+      |> join(:left, [i, e, s], d in DeviceType, on: d.id == s.device_type_id)
+      |> join(:left, [i, e, s, d], b in Branch, on: b.id == e.branch_id)
       |> where(
-        [i, e],
-        e.branch_id != ^branch_id and e.counted_at >= ^window_start and e.counted_at < ^window_end and
+        [i, e, s],
+        s.branch_id == ^branch_id and e.branch_id != ^branch_id and
+          e.counted_at >= ^window_start and e.counted_at < ^window_end and
           (i.scan_result in ["expected", "foreign"] or is_nil(i.scan_result))
       )
-      |> select([i, e, s, b], %{
-        scooter_id: s.id,
-        detected_branch_id: e.branch_id,
-        detected_branch_name: b.name
-      })
-      |> Repo.all()
-      |> Enum.uniq_by(& &1.scooter_id)
-      |> Map.new(&{&1.scooter_id, &1})
-
-    missing_ids = Enum.reject(expected_ids, &MapSet.member?(branch_scanned_ids, &1))
-
-    unresolved_candidates =
-      if missing_ids == [] do
-        []
-      else
-        Scooter
-        |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
-        |> join(:left, [s, d], c in Branch, on: c.id == s.current_branch_id)
-        |> where([s], s.id in ^missing_ids)
-        |> order_by([s], asc: s.plate)
-        |> select([s, d, c], %{
-          scooter_id: s.id,
-          plate: s.plate,
-          barcode: s.barcode,
-          status: s.status,
-          home_branch_id: s.branch_id,
-          current_branch_id: s.current_branch_id,
-          current_branch_name: c.name,
-          device_type_identifier: d.device_identifier,
-          device_type_category: d.category,
-          device_type_name: d.device_model
-        })
-        |> Repo.all()
-      end
-
-    {accounted_from_missing, needs_review} =
-      Enum.split_with(unresolved_candidates, fn item ->
-        Map.has_key?(other_branch_scans, item.scooter_id) or
-          item.status in @explained_missing_statuses or
-          (not is_nil(item.current_branch_id) and item.current_branch_id != branch_id)
-      end)
-
-    accounted_from_missing =
-      Enum.map(accounted_from_missing, fn item ->
-        case Map.get(other_branch_scans, item.scooter_id) do
-          nil -> Map.put(item, :accounted_reason, missing_accounted_reason(item, branch_id))
-          scan -> Map.put(item, :accounted_reason, "اسکن‌شده در شعبه #{scan.detected_branch_name || "دیگر"}")
-        end
-      end)
-
-    # دستگاه‌های متعلق به شعبه که به دلیل وضعیت عملیاتی از ابتدا جزو «مورد انتظار
-    # آمار شب» نبوده‌اند نیز باید در گزارش همان شعبه تعیین تکلیف شده دیده شوند؛
-    # برای مثال خراب، در انتظار تعمیر، در حال تعمیر، آماده تحویل یا در انتظار قطعه.
-    # branch_id مالک دائمی دستگاه است، بنابراین حتی وقتی current_branch_id تعمیرگاه
-    # باشد دستگاه همچنان در گزارش شعبه مالک قابل ردیابی خواهد بود.
-    branch_scanned_id_list = MapSet.to_list(branch_scanned_ids)
-
-    explained_owned =
-      Scooter
-      |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
-      |> join(:left, [s, d], c in Branch, on: c.id == s.current_branch_id)
-      |> where(
-        [s],
-        s.branch_id == ^branch_id and s.status in ^@explained_missing_statuses and
-          s.id not in ^branch_scanned_id_list
-      )
-      |> order_by([s], asc: s.plate)
-      |> select([s, d, c], %{
+      |> order_by([i, e, s], asc: s.plate)
+      |> select([i, e, s, d, b], %{
         scooter_id: s.id,
         plate: s.plate,
         barcode: s.barcode,
         status: s.status,
-        home_branch_id: s.branch_id,
-        current_branch_id: s.current_branch_id,
-        current_branch_name: c.name,
+        device_type_identifier: d.device_identifier,
+        device_type_category: d.category,
+        device_type_name: d.device_model,
+        detected_branch_name: b.name
+      })
+      |> Repo.all()
+      |> Enum.uniq_by(& &1.scooter_id)
+      |> Enum.map(&Map.put(&1, :accounted_reason, "اسکن‌شده در شعبه #{&1.detected_branch_name || "دیگر"}"))
+
+    moved_ids = MapSet.new(moved, & &1.scooter_id)
+    accounted_for_ids = MapSet.to_list(MapSet.union(scanned_ids, moved_ids))
+
+    # باقی دستگاه‌های متعلق به این شعبه: نه در خودش و نه جای دیگری اسکن خورده‌اند.
+    remaining_owned =
+      Scooter
+      |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
+      |> where([s], s.branch_id == ^branch_id and s.id not in ^accounted_for_ids)
+      |> order_by([s], asc: s.plate)
+      |> select([s, d], %{
+        scooter_id: s.id,
+        plate: s.plate,
+        barcode: s.barcode,
+        status: s.status,
         device_type_identifier: d.device_identifier,
         device_type_category: d.category,
         device_type_name: d.device_model
       })
       |> Repo.all()
-      |> Enum.map(&Map.put(&1, :accounted_reason, missing_accounted_reason(&1, branch_id)))
 
-    accounted =
-      (accounted_from_missing ++ explained_owned)
-      |> Enum.uniq_by(& &1.scooter_id)
-      |> Enum.sort_by(&(&1.plate || ""))
+    {workshop, needs_review} =
+      Enum.split_with(remaining_owned, &(&1.status in @workshop_loan_theft_statuses))
+
+    workshop = Enum.map(workshop, &Map.put(&1, :accounted_reason, workshop_loan_theft_reason(&1.status)))
 
     %{
       date: date,
-      submitted: counts != [],
+      submitted: not is_nil(own_count_id),
       scanned: scanned,
-      accounted: accounted,
-      needs_review: needs_review,
-      # برای سازگاری با بخش‌های قدیمی قالب/کد
-      moved: Enum.filter(accounted, &String.starts_with?(&1.accounted_reason || "", "اسکن‌شده در شعبه")),
-      missing: needs_review
+      moved: moved,
+      workshop: workshop,
+      needs_review: needs_review
     }
   end
 
-  defp missing_accounted_reason(item, branch_id) do
-    cond do
-      item.status == "needs_service" -> "ارسال‌شده به تعمیرگاه"
-      item.status == "awaiting_repair" -> "پذیرش‌شده در تعمیرگاه"
-      item.status == "repairing" -> "در حال تعمیر"
-      item.status == "ready_for_pickup" -> "ترخیص‌شده و آماده تحویل"
-      item.status == "waiting_for_part" -> "در انتظار قطعه"
-      item.status == "loaned" -> "امانی"
-      item.status == "stolen" -> "سرقتی"
-      item.status == "out_of_service" -> "از مدار خارج"
-      item.status == "transport" -> "در حال حمل‌ونقل"
-      not is_nil(item.current_branch_id) and item.current_branch_id != branch_id ->
-        "موقعیت فعلی: #{item.current_branch_name || "شعبه دیگر"}"
-      true -> "تعیین تکلیف شده"
+  defp workshop_loan_theft_reason(status) do
+    case status do
+      "needs_service" -> "ارسال‌شده به تعمیرگاه"
+      "awaiting_repair" -> "پذیرش‌شده در تعمیرگاه"
+      "repairing" -> "در حال تعمیر"
+      "ready_for_pickup" -> "ترخیص‌شده و آماده تحویل"
+      "waiting_for_part" -> "در انتظار قطعه"
+      "loaned" -> "امانی"
+      "stolen" -> "سرقتی"
+      _ -> "تعمیرگاه"
     end
   end
 
@@ -994,7 +937,7 @@ defmodule Beroon.Reports do
       |> MapSet.new(& &1.scooter_id)
 
     missing = Enum.reject(expected, &MapSet.member?(expected_scanned_ids, &1.scooter_id))
-    foreign = Enum.filter(report.items, &(&1.scan_result in ["foreign", "transport"]))
+    foreign = Enum.filter(report.items, &(&1.scan_result == "foreign"))
     scanned = Enum.filter(report.items, &(&1.scan_result in [nil, "expected"]))
 
     report
@@ -1468,7 +1411,7 @@ defmodule Beroon.Reports do
   def list_unhealthy_scooters_for_branch(date, branch_id) do
     list_morning_inspections_for_branch(date, branch_id)
     |> Enum.filter(fn inspection ->
-      inspection.scooter_status not in ["needs_service", "awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "out_of_service", "loaned", "stolen"] and
+      inspection.scooter_status not in ["needs_service", "awaiting_repair", "repairing", "waiting_for_part", "ready_for_pickup", "loaned", "stolen"] and
         Enum.any?(inspection.items, fn item -> not item.checked end)
     end)
     |> Enum.map(fn inspection ->
@@ -1802,6 +1745,60 @@ defmodule Beroon.Reports do
       nil -> %DailyRevenue{} |> DailyRevenue.changeset(attrs) |> Repo.insert()
       revenue -> revenue |> DailyRevenue.changeset(attrs) |> Repo.update()
     end
+  end
+
+  @doc """
+  ریز درآمد نقدی و کارت‌به‌کارت همه‌ی شعب فعال برای یک تاریخ؛ برای انتهای
+  گزارش شب (هم خروجی اکسل و هم عکس) استفاده می‌شود.
+  """
+  def list_daily_revenues_for_date(%Date{} = date) do
+    Branch
+    |> where([b], b.active == true and b.kind == "branch")
+    |> join(:left, [b], r in DailyRevenue, on: r.branch_id == b.id and r.reported_on == ^date)
+    |> order_by([b], asc: b.name)
+    |> select([b, r], %{
+      branch_id: b.id,
+      branch_name: b.name,
+      cash_amount: coalesce(r.cash_amount, 0),
+      card_to_card_amount: coalesce(r.card_to_card_amount, 0)
+    })
+    |> Repo.all()
+    |> Enum.map(&Map.put(&1, :total_amount, &1.cash_amount + &1.card_to_card_amount))
+  end
+
+  alias Beroon.Reports.DinnerReport
+
+  def get_dinner_report(branch_id, date) do
+    Repo.get_by(DinnerReport, branch_id: branch_id, reported_on: date)
+  end
+
+  def upsert_dinner_report(attrs) do
+    branch_id = attrs[:branch_id] || attrs["branch_id"]
+    date = attrs[:reported_on] || attrs["reported_on"]
+
+    case get_dinner_report(branch_id, date) do
+      nil -> %DinnerReport{} |> DinnerReport.changeset(attrs) |> Repo.insert()
+      report -> report |> DinnerReport.changeset(attrs) |> Repo.update()
+    end
+  end
+
+  @doc """
+  آمار شام همه‌ی شعب فعال برای یک تاریخ؛ برای صفحه‌ی «شام شب» ادمین.
+  """
+  def list_dinner_reports_for_date(%Date{} = date) do
+    Branch
+    |> where([b], b.active == true and b.kind == "branch")
+    |> join(:left, [b], r in DinnerReport, on: r.branch_id == b.id and r.reported_on == ^date)
+    |> order_by([b], asc: b.name)
+    |> select([b, r], %{
+      branch_id: b.id,
+      branch_name: b.name,
+      submitted: not is_nil(r.id),
+      attendant_count: coalesce(r.attendant_count, 0),
+      attendant_names: r.attendant_names
+    })
+    |> Repo.all()
+    |> Enum.map(&Map.update!(&1, :attendant_names, fn names -> names || [] end))
   end
 
   def create_workshop_event(attrs) do
