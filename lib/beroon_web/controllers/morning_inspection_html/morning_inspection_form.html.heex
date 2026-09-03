@@ -1,0 +1,14 @@
+<.form :let={f} for={@changeset} action={@action}>
+  <.input field={f[:checked_on]} type="date" label="Checked on" />
+  <.input field={f[:checked_at]} type="datetime-local" label="Checked at" />
+  <.input field={f[:branch_id]} type="number" label="Branch ID" />
+  <.input field={f[:scooter_id]} type="number" label="Scooter ID" />
+  <.input field={f[:manager_name]} type="text" label="Manager name" />
+  <.input field={f[:status]} type="text" label="Status" />
+  <.input field={f[:notes]} type="textarea" label="Notes" />
+  <.input field={f[:submitted_before_deadline]} type="checkbox" label="Submitted before deadline" />
+  <footer>
+    <.button variant="primary">Save Morning inspection</.button>
+    <.button :if={@return_to} href={@return_to}>Cancel</.button>
+  </footer>
+</.form>

@@ -1,0 +1,123 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <.link navigate={~p"/workshop"} class="text-sm font-semibold text-orange-700">
+        بازگشت
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold">ترخیص دستگاه</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@workshop.name}</p>
+    </header>
+
+    <form
+      id="workshop-discharge-search"
+      method="get"
+      action={~p"/workshop/discharge"}
+      class="mt-4 grid grid-cols-[1fr_auto_auto] gap-2"
+    >
+      <input
+        id="workshop-discharge-q"
+        type="search"
+        name="q"
+        value={@query}
+        placeholder="جستجوی پلاک یا بارکد"
+        class="input input-bordered min-h-12 w-full"
+      />
+      <button class="btn btn-neutral min-h-12 px-4">جستجو</button>
+      <button id="workshop-discharge-scan" type="button" class="btn btn-primary min-h-12 px-4">
+        اسکن
+      </button>
+    </form>
+
+    <section class="mt-4 grid gap-3">
+      <p
+        :if={@scooters == []}
+        class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500"
+      >
+        دستگاهی برای ترخیص وجود ندارد.
+      </p>
+
+      <article :for={scooter <- @scooters} class="repair-device-card p-4">
+        <div class="grid gap-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="font-bold text-zinc-950">پلاک {scooter.plate}</p>
+              <p class="mt-1 text-xs text-zinc-500">
+                {if scooter.branch, do: scooter.branch.name, else: "-"} · {device_type_label(
+                  scooter.device_type
+                )}
+              </p>
+              <p class="mt-2 text-sm text-zinc-600">{scooter.notes}</p>
+            </div>
+            <span class={[
+              "rounded px-2 py-1 text-xs font-bold",
+              status_badge_class(scooter.status)
+            ]}>
+              {status_label(scooter.status)}
+            </span>
+          </div>
+
+          <form
+            id={"workshop-discharge-scooter-#{scooter.id}"}
+            method="post"
+            action={~p"/workshop/scooters/#{scooter}/discharge"}
+          >
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <label class="form-control mb-3">
+              <span class="label-text font-bold">قطعات مصرف‌شده</span>
+              <textarea
+                name="discharge[repair_parts_used]"
+                required
+                minlength="2"
+                class="textarea textarea-bordered min-h-24 w-full"
+                placeholder="مثلاً: تعویض دسته ترمز، لنت جلو و کابل گاز"
+              ></textarea>
+            </label>
+            <fieldset class="mb-3 rounded-xl border border-zinc-200 bg-white p-3">
+              <legend class="px-2 text-sm font-black">تعمیرکار</legend>
+              <div class="mt-2 grid gap-2">
+                <label :for={name <- ["محب صافی", "احسان طیاری", "میثاق پرتو"]} class="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 p-3">
+                  <input type="radio" name="discharge[technician_name]" value={name} required />
+                  <span class="font-bold">{name}</span>
+                </label>
+              </div>
+            </fieldset>
+            <button class="btn btn-primary min-h-11 w-full">ترخیص</button>
+          </form>
+        </div>
+      </article>
+    </section>
+  </section>
+
+
+
+  <dialog
+    id="workshop-discharge-scan-dialog"
+    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 shadow-2xl backdrop:bg-zinc-950/70"
+    aria-labelledby="workshop-discharge-scan-dialog-title"
+  >
+    <div class="grid gap-4 p-4" dir="rtl">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="workshop-discharge-scan-dialog-title" class="text-lg font-black text-zinc-950">اسکن QR</h2>
+        <button id="workshop-discharge-scan-close" type="button" class="btn btn-sm">بستن</button>
+      </div>
+
+      <video
+        id="workshop-discharge-scan-video"
+        class="aspect-square w-full rounded-xl bg-zinc-950 object-cover"
+        playsinline
+        muted
+      ></video>
+
+      <p id="workshop-discharge-scan-status" class="text-sm text-zinc-600">
+        برای شروع اسکن، دوربین را فعال کنید.
+      </p>
+
+      <button id="workshop-discharge-scan-retry" type="button" class="btn btn-neutral min-h-11 w-full">
+        تلاش دوباره
+      </button>
+    </div>
+  </dialog>
+
+  <.workshop_bottom_nav active="info" />
+</main>

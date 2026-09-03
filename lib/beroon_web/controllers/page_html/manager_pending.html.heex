@@ -1,0 +1,18 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-stone-50 px-4 py-8">
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950">
+      <p class="text-sm font-semibold text-amber-700">برون</p>
+      <h1 class="mt-2 text-2xl font-bold">در انتظار تایید ادمین</h1>
+      <p class="mt-3 text-sm leading-6">
+        ورود شما با شماره {@phone} ثبت شد. ادمین باید این شماره را به یکی از شعبه‌ها اختصاص دهد.
+      </p>
+      <p class="mt-2 text-sm leading-6">
+        بعد از تایید، دوباره وارد شوید یا صفحه را تازه‌سازی کنید.
+      </p>
+      <.link href={~p"/logout"} method="delete" class="btn mt-5 min-h-12 w-full">
+        خروج
+      </.link>
+    </div>
+  </section>
+</main>

@@ -1,0 +1,123 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-44 pt-5">
+    <header class="border-b border-zinc-200 pb-4">
+      <.link navigate={~p"/manager"} class="text-sm font-semibold text-orange-700">
+        بازگشت
+      </.link>
+      <h1 class="mt-1 text-2xl font-bold">خرابی دستگاه‌ها</h1>
+      <p class="mt-1 text-sm text-zinc-500">{@branch.name} · {@persian_today}</p>
+    </header>
+
+    <div class="mt-4 grid grid-cols-2 gap-2">
+      <.link navigate={~p"/manager/repairs"} class="btn btn-primary min-h-12 w-full">
+        دستگاه خراب
+      </.link>
+      <.link navigate={~p"/manager/repairs/receive"} class="btn btn-outline min-h-12 w-full">
+        تحویل
+      </.link>
+    </div>
+
+    <div class="mt-4 rounded-xl border border-orange-100 bg-orange-50 p-3 text-sm text-orange-900">
+      دستگاه‌های حاضر در شعبه زیر نمایش داده می‌شوند. اگر دستگاهی از شعبه دیگری نزد شماست، پلاک یا QR آن را جستجو/اسکن کنید تا بتوانید خرابی آن را ثبت کنید.
+    </div>
+
+    <form
+      id="manager-repair-search"
+      method="get"
+      action={~p"/manager/repairs"}
+      class="mt-4 grid grid-cols-[1fr_auto_auto] gap-2"
+    >
+      <input
+        id="repair-plate-search"
+        type="search"
+        name="q"
+        value={@query}
+        placeholder="جستجو بر اساس پلاک"
+        class="input input-bordered min-h-12 w-full"
+      />
+      <button class="btn btn-neutral min-h-12 px-4">جستجو</button>
+      <button id="manager-repair-scan" type="button" class="btn btn-primary min-h-12 px-4">
+        اسکن
+      </button>
+    </form>
+
+    <div class="mt-4 grid gap-3">
+      <p
+        :if={@scooters == []}
+        class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500"
+      >
+        دستگاهی با این پلاک پیدا نشد.
+      </p>
+
+      <details :for={scooter <- @scooters} class="repair-device-card">
+        <summary>
+          <div>
+            <p class="font-bold text-zinc-950">پلاک {scooter.plate}</p>
+            <p class="mt-1 text-xs text-zinc-500">{device_type_label(scooter.device_type)}</p>
+            <p :if={scooter.branch} class="mt-1 text-xs text-zinc-500">مالک: {scooter.branch.name}</p>
+            <p :if={scooter.current_branch} class="mt-1 text-xs text-zinc-500">محل ثبت‌شده فعلی: {scooter.current_branch.name}</p>
+          </div>
+          <span class={["rounded px-2 py-1 text-xs font-bold", status_badge_class(scooter.status)]}>
+            {status_label(scooter.status)}
+          </span>
+        </summary>
+
+        <form
+          method="post"
+          action={~p"/manager/repairs/#{scooter}/send"}
+          class="mt-3 grid gap-3 border-t border-zinc-100 pt-3"
+        >
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <label class="grid gap-2 text-sm font-bold text-zinc-700">
+            توضیحات خرابی <textarea
+              name="repair[notes]"
+              required
+              class="textarea textarea-bordered min-h-28 w-full"
+              placeholder="شرح خرابی دستگاه را وارد کنید"
+            >{scooter.notes}</textarea>
+          </label>
+          <label class="grid gap-2 text-sm font-bold text-zinc-700">
+            روش ارسال به تعمیرگاه
+            <select name="repair[delivery_method]" required class="select select-bordered min-h-12 w-full">
+              <option value="attendant">ارسال توسط متصدی</option>
+              <option value="van">ارسال با وانت</option>
+            </select>
+          </label>
+          <button class="btn btn-primary min-h-12 w-full">ارسال به تعمیرگاه</button>
+        </form>
+      </details>
+    </div>
+  </section>
+
+
+  <dialog
+    id="manager-repair-scan-dialog"
+    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 shadow-2xl backdrop:bg-zinc-950/70"
+    aria-labelledby="manager-repair-scan-dialog-title"
+  >
+    <div class="grid gap-4 p-4" dir="rtl">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="manager-repair-scan-dialog-title" class="text-lg font-black text-zinc-950">اسکن QR</h2>
+        <button id="manager-repair-scan-close" type="button" class="btn btn-sm">بستن</button>
+      </div>
+
+      <video
+        id="manager-repair-scan-video"
+        class="aspect-square w-full rounded-xl bg-zinc-950 object-cover"
+        playsinline
+        muted
+      ></video>
+
+      <p id="manager-repair-scan-status" class="text-sm text-zinc-600">
+        برای شروع اسکن، دوربین را فعال کنید.
+      </p>
+
+      <button id="manager-repair-scan-retry" type="button" class="btn btn-neutral min-h-11 w-full">
+        تلاش دوباره
+      </button>
+    </div>
+  </dialog>
+
+  <.manager_bottom_nav active="repairs" />
+</main>

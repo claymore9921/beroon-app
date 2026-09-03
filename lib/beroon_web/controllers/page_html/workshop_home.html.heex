@@ -1,0 +1,62 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
+    <header class="flex items-center justify-between border-b border-zinc-200 pb-4">
+      <div><p class="text-sm font-bold text-teal-700">پنل عملیاتی تعمیرگاه</p><h1 class="text-2xl font-black">{@workshop.name}</h1></div>
+      <.link href={~p"/logout"} method="delete" class="btn btn-ghost btn-sm">خروج</.link>
+    </header>
+
+    <form id="workshop-home-search" action={~p"/workshop"} method="get" class="mt-5 rounded-3xl bg-zinc-900 p-4 text-white shadow-xl">
+      <label for="workshop-home-q" class="mb-2 block text-sm font-black">دستگاه را اسکن کنید</label>
+      <div class="flex gap-2">
+        <input id="workshop-home-q" name="q" value={@query} placeholder="پلاک یا QR" inputmode="numeric" autocomplete="off" class="input input-bordered min-h-12 flex-1 bg-white text-zinc-950" />
+        <button id="workshop-home-scan" type="button" class="btn btn-primary min-h-12 px-4"><.icon name="hero-qr-code" class="size-6" /></button>
+      </div>
+      <button class="btn mt-2 min-h-11 w-full bg-white text-zinc-950">نمایش دستگاه</button>
+    </form>
+
+    <section :if={@query != "" and is_nil(@selected_scooter)} class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">دستگاهی با این پلاک یا QR پیدا نشد.</section>
+
+    <section :if={s = @selected_scooter} class="mt-4 rounded-3xl border-2 border-teal-200 bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div><p class="text-xs font-bold text-teal-700">دستگاه انتخاب‌شده</p><h2 class="text-2xl font-black">{s.plate}</h2><p class="text-sm text-zinc-500">{s.device_type && s.device_type.device_model}</p></div>
+        <span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-black">{workshop_status_label(s.status)}</span>
+      </div>
+      <div :if={s.notes not in [nil, ""]} class="mt-3 rounded-xl bg-amber-50 p-3 text-sm"><b>شرح خرابی:</b> {s.notes}</div>
+
+      <div class="mt-4 grid gap-2">
+        <form :if={s.status == "needs_service"} action={~p"/workshop/scooters/#{s}/accept"} method="post"><input type="hidden" name="_csrf_token" value={get_csrf_token()} /><button class="btn btn-primary min-h-12 w-full">پذیرش دستگاه</button></form>
+        <form :if={s.status == "awaiting_repair"} action={~p"/workshop/scooters/#{s}/start"} method="post" class="rounded-2xl bg-zinc-50 p-3">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <p class="mb-2 text-sm font-black">تعمیرکار</p>
+          <label :for={name <- @repair_technicians} class="mb-2 flex items-center gap-2 text-sm font-bold"><input type="radio" name="repair[technician_name]" value={name} /> {name}</label>
+          <button class="btn btn-primary mt-2 min-h-12 w-full">شروع تعمیر</button>
+        </form>
+        <form :if={s.status in ["repairing", "waiting_for_part"]} action={~p"/workshop/scooters/#{s}/notes"} method="post" class="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <label for={"workshop-notes-#{s.id}"} class="mb-2 block text-sm font-black text-zinc-800">توضیحات تعمیر</label>
+          <textarea id={"workshop-notes-#{s.id}"} name="repair[notes]" rows="3" placeholder="شرح خرابی، کار انجام‌شده یا نکات تعمیر..." class="textarea textarea-bordered w-full resize-none bg-white">{s.notes || ""}</textarea>
+          <button class="btn btn-neutral mt-2 min-h-11 w-full">ذخیره توضیحات</button>
+        </form>
+        <div :if={s.status in ["repairing", "waiting_for_part"]} class="grid grid-cols-2 gap-2">
+          <form action={~p"/workshop/scooters/#{s}/waiting-part"} method="post"><input type="hidden" name="_csrf_token" value={get_csrf_token()} /><button class="btn min-h-12 w-full">در انتظار قطعه</button></form>
+          <a href={~p"/workshop/discharge?q=#{s.plate}"} class="btn btn-primary min-h-12">ترخیص دستگاه</a>
+        </div>
+        <div :if={s.status == "ready_for_pickup"} class="rounded-xl bg-emerald-50 p-3 text-center font-black text-emerald-700">این دستگاه ترخیص شده و آماده تحویل است.</div>
+      </div>
+    </section>
+
+    <h2 class="mt-6 mb-3 text-lg font-black">وضعیت تعمیرگاه</h2>
+    <div class="grid grid-cols-2 gap-3">
+      <.workshop_status_box title="پذیرش" count={length(@acceptance)} items={@acceptance} />
+      <.workshop_status_box title="در حال تعمیر" count={length(@repairing)} items={@repairing} />
+      <.workshop_status_box title="در انتظار قطعه" count={length(@waiting_part)} items={@waiting_part} />
+      <.workshop_status_box title="آماده تحویل" count={length(@ready)} items={@ready} />
+    </div>
+  </section>
+
+  <dialog id="workshop-home-scan-dialog" class="m-auto w-[min(92vw,420px)] rounded-3xl bg-white p-0 shadow-2xl backdrop:bg-black/70">
+    <div class="grid gap-4 p-4"><div class="flex justify-between"><b>اسکن QR</b><button id="workshop-home-scan-close" type="button" class="btn btn-sm">بستن</button></div><video id="workshop-home-scan-video" class="aspect-square w-full rounded-xl bg-black object-cover" playsinline muted></video><p id="workshop-home-scan-status" class="text-sm text-zinc-600">دوربین را روی QR بگیرید.</p><button id="workshop-home-scan-retry" type="button" class="btn btn-neutral">تلاش دوباره</button></div>
+  </dialog>
+  <.workshop_bottom_nav active="info" />
+</main>

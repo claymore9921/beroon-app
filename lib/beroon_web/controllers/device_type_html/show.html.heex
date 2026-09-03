@@ -1,0 +1,31 @@
+<Layouts.app flash={@flash} current_admin_phone={@current_admin_phone}>
+  <section id="device-type-show-page" dir="rtl" class="space-y-4">
+    <div class="flex justify-between gap-2"><.link navigate={~p"/device_types"} class="btn btn-ghost btn-sm">بازگشت</.link><.link navigate={~p"/device_types/#{@device_type}/edit"} class="btn btn-primary btn-sm">ویرایش</.link></div>
+<article class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <dl class="grid gap-3 text-sm">
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">آیدی نوع دستگاه</dt>
+          <dd class="mt-1 font-bold text-zinc-950">
+            {@device_type.device_identifier || @device_type.code}
+          </dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">دسته‌بندی</dt>
+          <dd class="mt-1 font-bold text-zinc-950">{@device_type.category || "-"}</dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">نوع دستگاه</dt>
+          <dd class="mt-1 font-bold text-zinc-950">
+            {@device_type.device_model || @device_type.name}
+          </dd>
+        </div>
+        <div class="rounded-md bg-zinc-50 p-3">
+          <dt class="text-zinc-500">وضعیت</dt>
+          <dd class="mt-1 font-bold text-zinc-950">
+            {if @device_type.active, do: "فعال", else: "غیرفعال"}
+          </dd>
+        </div>
+      </dl>
+    </article>
+  </section>
+</Layouts.app>

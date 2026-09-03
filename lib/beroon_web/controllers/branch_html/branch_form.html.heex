@@ -1,0 +1,57 @@
+<.form
+  :let={f}
+  for={@changeset}
+  action={@action}
+  class="rounded-lg border border-zinc-200 bg-white p-4"
+>
+  <div class="grid gap-3">
+    <.input
+      field={f[:name]}
+      type="text"
+      label="نام"
+      class="input input-bordered min-h-12 w-full"
+    />
+    <.input
+      field={f[:code]}
+      type="text"
+      label="کد"
+      class="input input-bordered min-h-12 w-full"
+    />
+    <.input
+      field={f[:kind]}
+      type="select"
+      label="نوع"
+      options={[{"شعبه", "branch"}, {"تعمیرگاه", "workshop"}]}
+      class="select select-bordered min-h-12 w-full"
+    />
+    <.input
+      field={f[:manager_name]}
+      type="text"
+      label="نام مدیر"
+      class="input input-bordered min-h-12 w-full"
+    />
+    <.input
+      field={f[:manager_phone]}
+      type="text"
+      label="شماره موبایل مدیر"
+      placeholder="مثلا 09120000000"
+      class="input input-bordered min-h-12 w-full"
+    />
+
+    <.input
+      field={f[:manager_phone_secondary]}
+      type="tel"
+      label="شماره مدیر دوم / گوشی دوم"
+      placeholder="09xxxxxxxxx"
+    />
+
+    <div class="rounded-lg bg-zinc-50 p-3">
+      <.input field={f[:active]} type="checkbox" label="فعال باشد" />
+    </div>
+  </div>
+
+  <div class="mt-5 grid gap-2 sm:grid-cols-2">
+    <.button class="btn btn-primary min-h-12 w-full">ذخیره</.button>
+    <.link :if={@return_to} navigate={@return_to} class="btn min-h-12 w-full">انصراف</.link>
+  </div>
+</.form>

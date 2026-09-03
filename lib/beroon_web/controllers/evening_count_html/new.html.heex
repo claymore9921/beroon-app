@@ -1,0 +1,12 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    New Evening count
+    <:subtitle>Use this form to manage evening_count records in your database.</:subtitle>
+  </.header>
+
+  <.evening_count_form
+    changeset={@changeset}
+    action={~p"/evening_counts"}
+    return_to={~p"/evening_counts"}
+  />
+</Layouts.app>

@@ -1,0 +1,129 @@
+defmodule BeroonWeb.PageHTML do
+  @moduledoc """
+  This module contains pages rendered by PageController.
+  """
+  use BeroonWeb, :html
+
+  embed_templates "page_html/*"
+
+  attr :active, :string, default: "home"
+
+  def manager_bottom_nav(assigns) do
+    ~H"""
+    <nav class="manager-bottom-nav" aria-label="ناوبری مدیر شعبه">
+      <.link navigate={~p"/manager"} class={[@active == "home" && "is-active"]}>
+        <.icon class="size-9" name="hero-home" />
+        <span>خانه</span>
+      </.link>
+      <.link navigate={~p"/manager/dinner"} class={[@active == "dinner" && "is-active"]}>
+        <.icon class="size-9" name="hero-cake" />
+        <span>آمار شام</span>
+      </.link>
+      <.link navigate={~p"/manager/scan"} class={["is-scan", @active == "scan" && "is-active"]}>
+        <span class="manager-scan-bubble">
+          <.icon class="size-9" name="hero-qr-code" />
+        </span>
+        <span>گزارش روزانه</span>
+      </.link>
+      <.link navigate={~p"/manager/morning"} class={[@active == "checklists" && "is-active"]}>
+        <.icon class="size-9" name="hero-clipboard-document-check" />
+        <span>چک‌لیست</span>
+      </.link>
+      <.link navigate={~p"/manager/repairs"} class={[@active == "repairs" && "is-active"]}>
+        <.icon class="size-9" name="hero-wrench-screwdriver" />
+        <span>خرابی</span>
+      </.link>
+    </nav>
+    """
+  end
+
+  attr :active, :string, default: "info"
+
+  def workshop_bottom_nav(assigns) do
+    ~H"""
+    <nav class="workshop-bottom-nav" aria-label="ناوبری تعمیرگاه">
+      <.link navigate={~p"/workshop/info"} class={[@active == "info" && "is-active"]}>
+        <.icon class="size-9" name="hero-information-circle" />
+        <span>اطلاعات</span>
+      </.link>
+    </nav>
+    """
+  end
+
+  attr :title, :string, required: true
+  attr :count, :integer, required: true
+  attr :items, :list, required: true
+  def workshop_status_box(assigns) do
+    ~H"""
+    <details class="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm open:col-span-2">
+      <summary class="cursor-pointer list-none text-center"><span class="block text-sm font-black text-zinc-700">{@title}</span><strong class="mt-1 block text-3xl font-black text-teal-700">{@count}</strong></summary>
+      <div class="mt-3 grid gap-2 border-t border-zinc-100 pt-3">
+        <a :for={s <- @items} href={~p"/workshop?q=#{s.plate}"} class="flex items-center justify-between rounded-xl bg-zinc-50 p-3 text-sm"><b>{s.plate}</b><span class="text-zinc-500">{device_type_label(s.device_type)}</span></a>
+        <p :if={@items == []} class="text-center text-sm text-zinc-400">موردی وجود ندارد.</p>
+      </div>
+    </details>
+    """
+  end
+
+  def workshop_status_label("needs_service"), do: "منتظر پذیرش"
+  def workshop_status_label("awaiting_repair"), do: "پذیرش‌شده"
+  def workshop_status_label("repairing"), do: "در حال تعمیر"
+  def workshop_status_label("waiting_for_part"), do: "در انتظار قطعه"
+  def workshop_status_label("ready_for_pickup"), do: "آماده تحویل"
+  def workshop_status_label(status), do: status || "-"
+
+  def device_type_label(nil), do: "-"
+
+  def device_type_label(device_type) do
+    [
+      device_type.device_identifier || device_type.code,
+      device_type.category,
+      device_type.device_model || device_type.name
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(" - ")
+  end
+
+  def status_label("active"), do: "فعال"
+  def status_label("needs_service"), do: "خراب"
+  def status_label("awaiting_repair"), do: "در انتظار تعمیر"
+  def status_label("repairing"), do: "در حال تعمیر"
+  def status_label("waiting_for_part"), do: "در انتظار قطعه"
+  def status_label("ready_for_pickup"), do: "آماده تحویل"
+  def status_label("loaned"), do: "امانی"
+  def status_label("stolen"), do: "سرقتی"
+  def status_label(status), do: status || "-"
+
+  def morning_status_label("ready"), do: "سالم"
+  def morning_status_label("needs_service"), do: "نیازمند بررسی"
+  def morning_status_label(status), do: status || "-"
+
+  def status_badge_class("active"), do: "bg-emerald-100 text-emerald-700"
+  def status_badge_class("needs_service"), do: "bg-red-100 text-red-700"
+  def status_badge_class("awaiting_repair"), do: "bg-amber-100 text-amber-700"
+  def status_badge_class("repairing"), do: "bg-sky-100 text-sky-700"
+  def status_badge_class("waiting_for_part"), do: "bg-purple-100 text-purple-700"
+  def status_badge_class("ready_for_pickup"), do: "bg-teal-100 text-teal-700"
+  def status_badge_class("loaned"), do: "bg-red-600 text-white"
+  def status_badge_class("stolen"), do: "bg-rose-950 text-white"
+  def status_badge_class(_status), do: "bg-zinc-100 text-zinc-700"
+  def persian_datetime(datetime), do: Beroon.Calendar.persian_datetime(datetime)
+  def persian_time(datetime), do: Beroon.Calendar.persian_time(datetime)
+  def persian_numeric_date(date), do: Beroon.Calendar.persian_numeric_date(date)
+
+  attr :plate, :string, required: true
+  attr :class, :any, default: nil
+
+  def admin_plate_link(assigns) do
+    ~H"""
+    <.link
+      navigate={~p"/admin/devices/#{@plate}"}
+      class={["font-black text-orange-700 underline decoration-orange-300 underline-offset-2", @class]}
+    >
+      {@plate}
+    </.link>
+    """
+  end
+
+end

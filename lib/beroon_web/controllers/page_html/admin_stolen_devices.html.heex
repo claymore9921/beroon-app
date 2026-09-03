@@ -1,0 +1,96 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-4xl bg-stone-50 px-4 pb-24 pt-6">
+<section class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <article :for={item <- @branch_totals} class="rounded-xl border border-rose-200 bg-white p-3">
+        <p class="text-xs font-bold text-zinc-500">{item.branch_name}</p>
+        <p class="mt-1 text-2xl font-black text-rose-800">{item.quantity}</p>
+      </article>
+      <p :if={@branch_totals == []} class="col-span-full rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
+        هنوز دستگاه سرقتی فعالی ثبت نشده است.
+      </p>
+    </section>
+
+    <section class="mt-6 grid gap-4 lg:grid-cols-2">
+      <form method="post" action={~p"/admin/stolen-devices"} class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <input type="hidden" name="theft[mode]" value="plated" />
+        <h2 class="text-lg font-black">دستگاه دارای پلاک یا QR</h2>
+        <p class="mt-1 text-sm text-zinc-500">نوع دستگاه به‌صورت خودکار از پرونده پلاک دریافت می‌شود.</p>
+
+        <label class="mt-4 block text-sm font-bold">پلاک یا QR دستگاه</label>
+        <input name="theft[code]" class="input input-bordered mt-1 w-full" autocomplete="off" required />
+
+        <label class="mt-3 block text-sm font-bold">شعبه‌ای که سرقت از آن گزارش شده</label>
+        <select name="theft[branch_id]" class="select select-bordered mt-1 w-full" required>
+          <option value="">انتخاب شعبه</option>
+          <option :for={branch <- @branches} value={branch.id}>{branch.name}</option>
+        </select>
+
+        <label class="mt-3 block text-sm font-bold">توضیحات</label>
+        <textarea name="theft[notes]" class="textarea textarea-bordered mt-1 w-full" placeholder="توضیحات اختیاری"></textarea>
+
+        <button class="btn mt-4 w-full bg-rose-950 text-white hover:bg-rose-900">ثبت دستگاه سرقتی</button>
+      </form>
+
+      <form method="post" action={~p"/admin/stolen-devices"} class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <input type="hidden" name="theft[mode]" value="unplated" />
+        <h2 class="text-lg font-black">دستگاه بدون پلاک</h2>
+        <p class="mt-1 text-sm text-zinc-500">برای دستگاه‌هایی که پلاک یا پرونده جداگانه ندارند، تعداد را ثبت کنید.</p>
+
+        <label class="mt-4 block text-sm font-bold">شعبه</label>
+        <select name="theft[branch_id]" class="select select-bordered mt-1 w-full" required>
+          <option value="">انتخاب شعبه</option>
+          <option :for={branch <- @branches} value={branch.id}>{branch.name}</option>
+        </select>
+
+        <label class="mt-3 block text-sm font-bold">نوع دستگاه</label>
+        <select name="theft[device_type_id]" class="select select-bordered mt-1 w-full" required>
+          <option value="">انتخاب نوع دستگاه</option>
+          <option :for={device_type <- @device_types} value={device_type.id}>{device_type_label(device_type)}</option>
+        </select>
+
+        <label class="mt-3 block text-sm font-bold">تعداد</label>
+        <input type="number" min="1" step="1" name="theft[quantity]" value="1" class="input input-bordered mt-1 w-full" required />
+
+        <label class="mt-3 block text-sm font-bold">توضیحات</label>
+        <textarea name="theft[notes]" class="textarea textarea-bordered mt-1 w-full" placeholder="توضیحات اختیاری"></textarea>
+
+        <button class="btn mt-4 w-full bg-rose-950 text-white hover:bg-rose-900">ثبت تعداد سرقتی</button>
+      </form>
+    </section>
+
+    <section class="mt-7">
+      <h2 class="text-lg font-black">فهرست سرقتی‌های فعال</h2>
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <article :for={record <- @records} class="rounded-2xl border border-rose-200 bg-white p-4 shadow-sm">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-bold text-zinc-500">{record.branch.name}</p>
+              <h3 class="mt-1 text-lg font-black">
+                <%= if record.scooter do %>
+                  پلاک <.admin_plate_link plate={record.plate_snapshot || record.scooter.plate} />
+                <% else %>
+                  {record.quantity} دستگاه بدون پلاک
+                <% end %>
+              </h3>
+              <p class="mt-1 text-sm font-bold text-zinc-700">نوع: {device_type_label(record.device_type)}</p>
+              <p class="mt-1 text-xs text-zinc-500">ثبت: {Beroon.Calendar.persian_datetime(record.reported_at)}</p>
+            </div>
+            <span class="rounded-lg bg-rose-950 px-2.5 py-1 text-xs font-black text-white">سرقتی</span>
+          </div>
+
+          <p :if={record.notes not in [nil, ""]} class="mt-3 rounded-lg bg-zinc-50 p-3 text-sm text-zinc-700">{record.notes}</p>
+
+          <form method="post" action={~p"/admin/stolen-devices/#{record.id}/recover"} class="mt-3">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <button class="btn btn-sm btn-outline w-full" data-confirm="پیداشدن یا بازگشت این مورد ثبت شود؟">
+              ثبت پیداشدن / بازگشت
+            </button>
+          </form>
+        </article>
+      </div>
+    </section>
+  </section>
+</main>

@@ -1,0 +1,94 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-3xl bg-stone-50 px-4 pb-24 pt-6">
+<section class="mt-6 grid grid-cols-2 gap-3" aria-label="منوی مدیریت">
+      <.link navigate={~p"/admin/evening-reports"} class="admin-menu-card">
+        <.icon name="hero-clipboard-document-check" class="size-8" />
+        <span>آمارگیری شبانه</span>
+      </.link>
+      <.link navigate={~p"/admin/checklists"} class="admin-menu-card">
+        <.icon name="hero-list-bullet" class="size-8" />
+        <span>چک‌لیست صبح</span>
+      </.link>
+      <.link navigate={~p"/scooters"} class="admin-menu-card">
+        <.icon name="hero-squares-2x2" class="size-8" />
+        <span>مدیریت دستگاه‌ها</span>
+      </.link>
+      <.link navigate={~p"/device_types"} class="admin-menu-card">
+        <.icon name="hero-tag" class="size-8" />
+        <span>انواع دستگاه</span>
+      </.link>
+      <.link navigate={~p"/branches"} class="admin-menu-card">
+        <.icon name="hero-building-storefront" class="size-8" />
+        <span>مدیریت شعبه‌ها</span>
+      </.link>
+      <.link navigate={~p"/admin/managers"} class="admin-menu-card">
+        <.icon name="hero-users" class="size-8" />
+        <span>مدیران شعب</span>
+      </.link>
+      <.link navigate={~p"/admin/device-locations"} class="admin-menu-card">
+        <.icon name="hero-map-pin" class="size-8" />
+        <span>موقعیت دستگاه</span>
+      </.link>
+      <.link navigate={~p"/admin/new-device-inventory"} class="admin-menu-card">
+        <.icon name="hero-archive-box" class="size-8" />
+        <span>انبار دستگاه‌های نو</span>
+      </.link>
+      <.link navigate={~p"/admin/sales-rack"} class="admin-menu-card">
+        <.icon name="hero-building-storefront" class="size-8" />
+        <span>رگال فروش</span>
+      </.link>
+      <.link navigate={~p"/admin/new-device-sales"} class="admin-menu-card">
+        <.icon name="hero-banknotes" class="size-8" />
+        <span>فروش دستگاه</span>
+      </.link>
+      <.link navigate={~p"/admin/report-export"} class="admin-menu-card">
+        <.icon name="hero-arrow-down-tray" class="size-8" />
+        <span>خروجی گزارش Excel</span>
+      </.link>
+      <.link navigate={~p"/admin/notifications"} class="admin-menu-card">
+        <.icon name="hero-bell" class="size-8" />
+        <span>ارسال اعلان</span>
+      </.link>
+      <.link navigate={~p"/checklist_items"} class="admin-menu-card">
+        <.icon name="hero-adjustments-horizontal" class="size-8" />
+        <span>موارد چک‌لیست</span>
+      </.link>
+      <.link navigate={~p"/admin/repair-stats"} class="admin-menu-card"><.icon name="hero-wrench-screwdriver" class="size-8" /><span>آمار تعمیرات</span></.link>
+      <.link navigate={~p"/admin/loaned-scooters"} class="admin-menu-card"><.icon name="hero-hand-raised" class="size-8" /><span>دستگاه‌های امانی</span></.link>
+      <.link navigate={~p"/admin/stolen-devices"} class="admin-menu-card"><.icon name="hero-exclamation-triangle" class="size-8" /><span>سرقتی</span></.link>
+      <.link navigate={~p"/admin/catalog"} class="admin-menu-card">
+        <.icon name="hero-user-group" class="size-8" />
+        <span>کاتالوگ</span>
+        <small class="text-xs font-semibold text-zinc-500">مخاطبان فروش</small>
+      </.link>
+      <.link navigate={~p"/admin/unscanned-devices"} class="admin-menu-card">
+        <.icon name="hero-exclamation-triangle" class="size-8" />
+        <span>دستگاه‌های اسکن‌نشده</span>
+        <small class="text-xs font-semibold text-zinc-500">بیش از ۴۸ ساعت</small>
+      </.link>
+    </section>
+  </section>
+</main>
+
+<style>
+  .admin-menu-card {
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px solid #e4e4e7;
+    border-radius: 16px;
+    background: #fff;
+    padding: 16px 10px;
+    text-align: center;
+    font-weight: 900;
+    color: #18181b;
+    box-shadow: 0 4px 14px rgba(24, 24, 27, 0.05);
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .admin-menu-card:hover { transform: translateY(-2px); border-color: #fdba74; background: #fff7ed; }
+  .admin-menu-card svg { color: #ea580c; }
+</style>

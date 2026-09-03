@@ -1,0 +1,118 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-3xl bg-stone-50 px-4 pb-24 pt-6">
+<.form
+      :if={@scooters != []}
+      for={%{}}
+      as={:bulk_delete}
+      action={~p"/admin/unscanned-devices"}
+      method="delete"
+      id="bulk-delete-unscanned-form"
+      class="mt-5"
+      onsubmit="return confirm('این عملیات غیرقابل بازگشت است و تمام سوابق دستگاه‌های انتخاب‌شده را حذف می‌کند. ادامه می‌دهید؟')"
+    >
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm">
+        <label class="flex cursor-pointer items-center gap-2 text-sm font-bold">
+          <input type="checkbox" id="select-all-unscanned" />
+          انتخاب همه
+        </label>
+        <span id="selected-unscanned-count" class="text-sm font-bold text-zinc-600">۰ دستگاه انتخاب شده</span>
+      </div>
+
+      <div class="grid gap-3 sm:grid-cols-2">
+        <article :for={scooter <- @scooters} class="relative rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <label class="absolute left-3 top-3 flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-100 px-2 py-1 text-xs font-bold">
+            <input class="bulk-unscanned-checkbox" type="checkbox" name="scooter_ids[]" value={scooter.id} />
+            انتخاب
+          </label>
+
+          <div class="flex items-start justify-between gap-3 pl-20">
+            <div class="min-w-0">
+              <p class="truncate text-lg font-black">پلاک <.admin_plate_link plate={scooter.plate} /></p>
+              <p class="mt-1 break-all text-xs text-zinc-500">QR: {scooter.barcode}</p>
+            </div>
+            <span class={["shrink-0 rounded px-2 py-1 text-xs font-bold", status_badge_class(scooter.status)]}>
+              {status_label(scooter.status)}
+            </span>
+          </div>
+
+          <dl class="mt-4 grid grid-cols-2 gap-2 text-sm">
+            <div class="rounded-lg bg-zinc-50 p-3">
+              <dt class="text-zinc-500">شعبه مالک</dt>
+              <dd class="mt-1 font-bold">{if scooter.branch, do: scooter.branch.name, else: "-"}</dd>
+            </div>
+            <div class="rounded-lg bg-zinc-50 p-3">
+              <dt class="text-zinc-500">نوع دستگاه</dt>
+              <dd class="mt-1 font-bold">{device_type_label(scooter.device_type)}</dd>
+            </div>
+            <div class="col-span-2 rounded-lg bg-zinc-50 p-3">
+              <dt class="text-zinc-500">آخرین اسکن</dt>
+              <dd class="mt-1 font-bold text-red-700">
+                {if scooter.last_scan_at, do: Beroon.Calendar.persian_datetime(scooter.last_scan_at), else: "تاکنون اسکن نشده"}
+              </dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+
+      <section class="mt-6 rounded-2xl border-2 border-red-200 bg-red-50 p-4">
+        <h2 class="font-black text-red-900">حذف کامل دستگاه‌های انتخاب‌شده</h2>
+        <p class="mt-2 text-sm leading-7 text-red-800">
+          تمام سوابق آمار شب، چک‌لیست صبح، تعمیرات، حمل‌ونقل و هشدارهای مربوط به این دستگاه‌ها نیز برای همیشه حذف می‌شوند.
+        </p>
+        <label class="mt-4 block text-sm font-bold text-red-900">
+          برای تأیید عبارت <span class="font-black">حذف کامل</span> را وارد کنید:
+          <input
+            type="text"
+            name="confirmation"
+            autocomplete="off"
+            class="mt-2 w-full rounded-xl border border-red-300 bg-white px-3 py-3 text-zinc-950 outline-none focus:border-red-600"
+            placeholder="حذف کامل"
+          />
+        </label>
+        <button
+          type="submit"
+          id="bulk-delete-unscanned-button"
+          disabled
+          class="mt-4 w-full rounded-xl bg-red-700 px-4 py-3 font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          حذف کامل دستگاه‌های انتخاب‌شده
+        </button>
+      </section>
+    </.form>
+
+    <p :if={@scooters == []} class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800">
+      هیچ دستگاهی با تأخیر بیش از ۴۸ ساعت وجود ندارد.
+    </p>
+  </section>
+</main>
+
+<script>
+  (() => {
+    const setupBulkDelete = () => {
+      const selectAll = document.getElementById("select-all-unscanned")
+      const checkboxes = Array.from(document.querySelectorAll(".bulk-unscanned-checkbox"))
+      const count = document.getElementById("selected-unscanned-count")
+      const button = document.getElementById("bulk-delete-unscanned-button")
+      if (!selectAll || checkboxes.length === 0 || !count || !button) return
+
+      const update = () => {
+        const selected = checkboxes.filter((checkbox) => checkbox.checked).length
+        count.textContent = `${selected.toLocaleString("fa-IR")} دستگاه انتخاب شده`
+        button.disabled = selected === 0
+        selectAll.checked = selected === checkboxes.length
+        selectAll.indeterminate = selected > 0 && selected < checkboxes.length
+      }
+
+      selectAll.addEventListener("change", () => {
+        checkboxes.forEach((checkbox) => { checkbox.checked = selectAll.checked })
+        update()
+      })
+      checkboxes.forEach((checkbox) => checkbox.addEventListener("change", update))
+      update()
+    }
+
+    document.addEventListener("DOMContentLoaded", setupBulkDelete, {once: true})
+    document.addEventListener("phx:page-loading-stop", setupBulkDelete)
+  })()
+</script>

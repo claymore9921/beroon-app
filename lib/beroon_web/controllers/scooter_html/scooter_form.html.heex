@@ -1,0 +1,110 @@
+<.form
+  for={@form}
+  action={@action}
+  id="scooter-form"
+  class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
+>
+  <div class="grid gap-3">
+    <.input
+      field={@form[:plate]}
+      type="text"
+      label="پلاک دستگاه"
+      placeholder="مثلا 456789"
+      id="scooter-plate-input"
+      class="input input-bordered min-h-12 w-full"
+    />
+    <div>
+      <button id="scooter-scan-button" type="button" class="btn btn-neutral min-h-12 w-full">
+        اسکن پلاک با دوربین
+      </button>
+      <p class="mt-2 text-xs text-zinc-500">
+        اگر QR دارید، اسکن کنید یا پلاک را دستی وارد کنید.
+      </p>
+    </div>
+    <.input
+      field={@form[:barcode]}
+      type="text"
+      label="بارکد / مقدار قابل اسکن"
+      placeholder="اگر با پلاک یکی است همان پلاک را وارد کنید"
+      id="scooter-barcode-input"
+      class="input input-bordered min-h-12 w-full"
+    />
+    <.input
+      field={@form[:device_type_id]}
+      type="select"
+      label="نوع دستگاه"
+      prompt="انتخاب نوع دستگاه"
+      options={Enum.map(@device_types, &{device_type_label(&1), &1.id})}
+      class="select select-bordered min-h-12 w-full"
+    />
+    <.input
+      field={@form[:branch_id]}
+      type="select"
+      label="شعبه دستگاه"
+      prompt="انتخاب شعبه"
+      options={Enum.map(@branches, &{&1.name, &1.id})}
+      class="select select-bordered min-h-12 w-full"
+    />
+    <.input
+      field={@form[:status]}
+      type="select"
+      label="وضعیت"
+      options={[
+        {"فعال", "active"},
+        {"خراب", "needs_service"},
+        {"در انتظار تعمیر", "awaiting_repair"},
+        {"در حال تعمیر", "repairing"},
+        {"در انتظار قطعه", "waiting_for_part"},
+        {"آماده تحویل", "ready_for_pickup"}
+      ]}
+      class="select select-bordered min-h-12 w-full"
+    />
+    <.input
+      field={@form[:notes]}
+      type="textarea"
+      label="توضیحات"
+      placeholder="برای وضعیت خراب و در انتظار قطعه اجباری است"
+      class="textarea textarea-bordered min-h-28 w-full"
+    />
+  </div>
+
+  <div class="mt-5 grid gap-2 sm:grid-cols-2">
+    <.button class="btn btn-primary min-h-12 w-full">ذخیره</.button>
+    <.link :if={@return_to} navigate={@return_to} class="btn min-h-12 w-full">انصراف</.link>
+  </div>
+</.form>
+
+<dialog
+  id="scooter-scan-dialog"
+  class="modal modal-bottom sm:modal-middle"
+  aria-labelledby="scooter-scan-dialog-title"
+>
+  <div class="modal-box m-auto w-[92vw] max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h2 id="scooter-scan-dialog-title" class="text-lg font-black text-zinc-950">اسکن پلاک</h2>
+        <p class="mt-1 text-sm text-zinc-600">
+          دوربین را روی QR بگیرید تا مقدار آن در پلاک ثبت شود.
+        </p>
+      </div>
+      <button id="scooter-scan-close" type="button" class="btn btn-ghost btn-sm">بستن</button>
+    </div>
+
+    <video
+      id="scooter-scan-video"
+      class="mt-4 max-h-[60vh] w-full rounded-xl bg-black object-cover"
+      playsinline
+    >
+    </video>
+
+    <div class="modal-action mt-4 justify-between">
+      <p id="scooter-scan-status" class="text-sm text-zinc-600">
+        برای شروع اسکن، دوربین را فعال کنید.
+      </p>
+      <button id="scooter-scan-retry" type="button" class="btn btn-neutral">شروع دوباره</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button aria-label="بستن"></button>
+  </form>
+</dialog>

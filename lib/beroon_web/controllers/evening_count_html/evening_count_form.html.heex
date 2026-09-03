@@ -1,0 +1,16 @@
+<.form :let={f} for={@changeset} action={@action}>
+  <.input field={f[:counted_on]} type="date" label="Counted on" />
+  <.input field={f[:counted_at]} type="datetime-local" label="Counted at" />
+  <.input field={f[:branch_id]} type="number" label="Branch ID" />
+  <.input field={f[:manager_name]} type="text" label="Manager name" />
+  <.input field={f[:total_count]} type="number" label="Total count" />
+  <.input field={f[:available_count]} type="number" label="Available count" />
+  <.input field={f[:rented_count]} type="number" label="Rented count" />
+  <.input field={f[:damaged_count]} type="number" label="Damaged count" />
+  <.input field={f[:missing_count]} type="number" label="Missing count" />
+  <.input field={f[:notes]} type="textarea" label="Notes" />
+  <footer>
+    <.button variant="primary">Save Evening count</.button>
+    <.button :if={@return_to} href={@return_to}>Cancel</.button>
+  </footer>
+</.form>

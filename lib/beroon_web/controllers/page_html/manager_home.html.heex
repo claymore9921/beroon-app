@@ -1,0 +1,119 @@
+<Layouts.flash_group flash={@flash} />
+<main class="manager-dashboard-shell min-h-screen text-zinc-950" dir="rtl">
+  <section class="manager-dashboard mx-auto min-h-screen w-full max-w-md px-4 pb-32 pt-6">
+    <section class="manager-hero">
+      <div class="manager-date-actions">
+        <p>{@persian_today}</p>
+        <.link href={~p"/logout"} method="delete" class="manager-logout">
+          <.icon name="hero-arrow-left-on-rectangle" class="size-9" /> خروج
+        </.link>
+      </div>
+
+      <div class="manager-greeting">
+        <h1>سلام {@manager_name} عزیز!</h1>
+        <span>مدیریت شعبه {@branch.name}</span>
+      </div>
+    </section>
+
+    <section class="manager-dashboard-divider" aria-hidden="true">
+      <span></span>
+      <div>
+        <.icon name="hero-qr-code" class="size-9" />
+      </div>
+      <span></span>
+    </section>
+
+    <section class="manager-status-grid">
+      <article class="manager-status-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-clipboard-document-list" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>چک لیست روزانه</h2>
+          <p class={["manager-state", if(@morning_submitted, do: "is-success", else: "is-danger")]}>
+            <span>{if @morning_submitted, do: "ثبت شده", else: "ثبت نشده"}</span>
+            <.icon :if={@morning_submitted} name="hero-check-circle" class="size-9" />
+            <.icon :if={!@morning_submitted} name="hero-x-circle" class="size-9" />
+          </p>
+          <small>{if @morning_submitted, do: "انجام شده", else: "در انتظار ثبت"}</small>
+        </div>
+      </article>
+
+      <article class="manager-status-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-clipboard-document-check" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>آمار شب</h2>
+          <p class={["manager-state", if(@evening_submitted, do: "is-success", else: "is-danger")]}>
+            <span>{if @evening_submitted, do: "ثبت شده", else: "ثبت نشده"}</span>
+            <.icon :if={@evening_submitted} name="hero-check-circle" class="size-9" />
+            <.icon :if={!@evening_submitted} name="hero-x-circle" class="size-9" />
+          </p>
+          <small>{if @evening_submitted, do: "انجام شده", else: "در انتظار ثبت"}</small>
+        </div>
+      </article>
+
+      <.link navigate={~p"/manager/scooters/active"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-bolt" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>دستگاه‌های فعال</h2>
+          <strong>{@scooter_counts.active}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link
+        navigate={~p"/manager/scooters"}
+        class="manager-stat-card"
+        aria-label="لیست دستگاه‌های شعبه من"
+      >
+        <div class="manager-card-icon">
+          <.icon name="hero-map-pin" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>دستگاه‌های شعبه من</h2>
+          <strong>{@scooter_counts.all}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/manager/scooters/workshop"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-exclamation-triangle" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>تعمیرگاه</h2>
+          <strong>{@scooter_counts.workshop}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/manager/unhealthy-scooters"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-shield-exclamation" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>دستگاه‌های ناسالم</h2>
+          <span class="inline-flex w-fit items-center rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-bold text-zinc-700">مشاهده</span>
+          <span>خرابی‌های چک‌لیست امروز</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/manager/scooters/waiting_for_part"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-wrench-screwdriver" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>در انتظار قطعه</h2>
+          <strong>{@scooter_counts.waiting_for_part}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+    </section>
+  </section>
+
+  <.manager_bottom_nav active="home" />
+</main>

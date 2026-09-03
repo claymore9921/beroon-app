@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: beroon_devices_prod
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d beroon_devices_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PHX_HOST: ${PHX_HOST:-localhost}
+      PORT: 4000
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      DATABASE_URL: ecto://postgres:${POSTGRES_PASSWORD:-postgres}@db/beroon_devices_prod
+      POOL_SIZE: ${POOL_SIZE:-5}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    ports:
+      - "4000:4000"
+
+volumes:
+  postgres_data:
