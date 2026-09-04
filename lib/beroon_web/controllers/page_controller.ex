@@ -791,53 +791,36 @@ defmodule BeroonWeb.PageController do
       branch: branch,
       selected_date: selected_date,
       audit: audit,
-      audit_export_json: evening_audit_export_json(branch, selected_date, audit)
+      audit_export_json: evening_finance_export_json(branch, selected_date)
     )
   end
 
-  defp evening_audit_export_json(branch, date, audit) do
-    category = fn item ->
-      %{
-        plate: item.plate,
-        barcode: item.barcode,
-        device_type:
-          [item[:device_type_identifier], item[:device_type_category], item[:device_type_name]]
-          |> Enum.reject(&(&1 in [nil, ""]))
-          |> Enum.join(" - "),
-        reason: Map.get(item, :accounted_reason)
-      }
-    end
-
-    build_category = fn key, title, color, list ->
-      items = Enum.map(list, category)
-
-      device_type_summary =
-        items
-        |> Enum.frequencies_by(fn item ->
-          if item.device_type == "", do: "بدون نوع دستگاه", else: item.device_type
-        end)
-        |> Enum.map(fn {label, count} -> %{label: label, count: count} end)
-        |> Enum.sort_by(& &1.label)
-
-      %{key: key, title: title, color: color, items: items, device_type_summary: device_type_summary}
-    end
-
+  defp evening_finance_export_json(branch, date) do
+    summary = Reports.branch_evening_finance_summary(branch.id, date)
     revenue = Reports.get_daily_revenue(branch.id, date)
+
+    rows =
+      Enum.map(summary.rows, fn row ->
+        %{
+          label: row.label,
+          scanned_count: row.scanned_count,
+          waiting_for_part_count: row.waiting_for_part_count,
+          workshop_count: row.workshop_count,
+          loaned_count: row.loaned_count,
+          stolen_count: row.stolen_count
+        }
+      end)
 
     Jason.encode!(%{
       branch_name: branch.name,
       date_label: Beroon.Calendar.persian_numeric_date(date),
-      submitted: audit.submitted,
+      submitted: summary.submitted,
       revenue: %{
         cash_amount: (revenue && revenue.cash_amount) || 0,
         card_to_card_amount: (revenue && revenue.card_to_card_amount) || 0
       },
-      categories: [
-        build_category.("scanned", "اسکن‌شده", "#059669", audit.scanned),
-        build_category.("moved", "جابجا شده", "#0284c7", audit.moved),
-        build_category.("workshop", "تعمیرگاه، امانی، سرقتی", "#7c3aed", audit.workshop),
-        build_category.("needs_review", "نیاز به بررسی", "#dc2626", audit.needs_review)
-      ]
+      rows: rows,
+      totals: summary.totals
     })
   end
 

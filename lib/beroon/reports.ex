@@ -850,6 +850,117 @@ defmodule Beroon.Reports do
     end
   end
 
+  @doc """
+  خلاصه‌ی مالی آمار شب یک شعبه برای یک تاریخ، به تفکیک نوع دستگاه — برای
+  گزارش تصویری خروجی به واحد مالی.
+
+  ستون «اسکن‌شده» بر اساس محل فیزیکی اسکن است، نه مالکیت: هر دستگاهی که
+  امشب در آمار همین شعبه اسکن خورده باشد (چه متعلق به خود شعبه، چه یک
+  دستگاه مهمان از شعبه‌ی دیگر) در این ستون شمرده می‌شود. ستون‌های بعدی
+  (در انتظار قطعه/تعمیرگاه/امانی/سرقتی) فقط دستگاه‌های متعلق به همین شعبه
+  را نشان می‌دهند، چون مفهوم مالکیت دارند. جابجایی‌ها عمداً نمایش داده
+  نمی‌شوند.
+  """
+  def branch_evening_finance_summary(branch_id, %Date{} = date) do
+    {window_start, window_end} = evening_window_utc_bounds(date)
+
+    own_count_id =
+      EveningCount
+      |> where(
+        [e],
+        e.branch_id == ^branch_id and e.counted_at >= ^window_start and e.counted_at < ^window_end
+      )
+      |> select([e], e.id)
+      |> Repo.one()
+
+    scanned_counts =
+      if is_nil(own_count_id) do
+        %{}
+      else
+        EveningCountItem
+        |> join(:inner, [i], s in Scooter, on: s.id == i.scooter_id)
+        |> where(
+          [i],
+          i.evening_count_id == ^own_count_id and
+            (i.scan_result in ["expected", "foreign"] or is_nil(i.scan_result))
+        )
+        |> group_by([i, s], s.device_type_id)
+        |> select([i, s], {s.device_type_id, count(s.id, :distinct)})
+        |> Repo.all()
+        |> Map.new()
+      end
+
+    owned_status_counts = fn statuses ->
+      Scooter
+      |> where([s], s.branch_id == ^branch_id and s.status in ^statuses)
+      |> group_by([s], s.device_type_id)
+      |> select([s], {s.device_type_id, count(s.id)})
+      |> Repo.all()
+      |> Map.new()
+    end
+
+    waiting_for_part_counts = owned_status_counts.(["waiting_for_part"])
+    workshop_counts = owned_status_counts.(["needs_service", "awaiting_repair", "repairing", "ready_for_pickup"])
+    loaned_counts = owned_status_counts.(["loaned"])
+    stolen_counts = owned_status_counts.(["stolen"])
+
+    device_type_ids =
+      [scanned_counts, waiting_for_part_counts, workshop_counts, loaned_counts, stolen_counts]
+      |> Enum.flat_map(&Map.keys/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    device_types_by_id =
+      if device_type_ids == [] do
+        %{}
+      else
+        DeviceType
+        |> where([d], d.id in ^device_type_ids)
+        |> Repo.all()
+        |> Map.new(&{&1.id, &1})
+      end
+
+    rows =
+      device_type_ids
+      |> Enum.map(fn id ->
+        %{
+          device_type_id: id,
+          label: finance_device_type_label(Map.get(device_types_by_id, id)),
+          scanned_count: Map.get(scanned_counts, id, 0),
+          waiting_for_part_count: Map.get(waiting_for_part_counts, id, 0),
+          workshop_count: Map.get(workshop_counts, id, 0),
+          loaned_count: Map.get(loaned_counts, id, 0),
+          stolen_count: Map.get(stolen_counts, id, 0)
+        }
+      end)
+      |> Enum.sort_by(& &1.label)
+
+    %{
+      date: date,
+      submitted: not is_nil(own_count_id),
+      rows: rows,
+      totals: %{
+        scanned_count: Enum.reduce(rows, 0, &(&1.scanned_count + &2)),
+        waiting_for_part_count: Enum.reduce(rows, 0, &(&1.waiting_for_part_count + &2)),
+        workshop_count: Enum.reduce(rows, 0, &(&1.workshop_count + &2)),
+        loaned_count: Enum.reduce(rows, 0, &(&1.loaned_count + &2)),
+        stolen_count: Enum.reduce(rows, 0, &(&1.stolen_count + &2))
+      }
+    }
+  end
+
+  defp finance_device_type_label(nil), do: "بدون نوع دستگاه"
+
+  defp finance_device_type_label(device_type) do
+    [device_type.device_identifier, device_type.category, device_type.device_model]
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join(" - ")
+    |> case do
+      "" -> "بدون نوع دستگاه"
+      label -> label
+    end
+  end
+
   def get_evening_count_report!(id) do
     count =
       EveningCount

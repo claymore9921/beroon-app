@@ -749,15 +749,6 @@ const roundRect = (ctx, x, y, w, h, r) => {
   ctx.closePath()
 }
 
-const hexWithAlpha = (hex, alpha) => {
-  const clean = (hex || "#334155").replace("#", "")
-  const bigint = parseInt(clean, 16)
-  const r = (bigint >> 16) & 255
-  const g = (bigint >> 8) & 255
-  const b = bigint & 255
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
 const renderEveningAuditCanvas = async (payload) => {
   if (document.fonts?.load) {
     await Promise.all([
@@ -771,73 +762,28 @@ const renderEveningAuditCanvas = async (payload) => {
 
   const width = 900
   const padding = 32
-  const chipHeight = 30
-  const chipGapX = 8
-  const chipGapY = 10
-  const sectionGapTop = 26
   const headerHeight = 118
-
-  const measureCanvas = document.createElement("canvas")
-  const mctx = measureCanvas.getContext("2d")
-  mctx.font = "700 13px Peyda, sans-serif"
-
-  const buildChipLabel = (item) => item.plate + (item.reason ? ` · ${item.reason}` : "")
-  const summaryChipHeight = 28
-  const summaryGapY = 8
-
   const contentWidth = width - padding * 2
 
-  const layoutWrap = (chipList, gapX, availableWidth) => {
-    const rows = []
-    let currentRow = []
-    let currentWidth = 0
-    for (const chip of chipList) {
-      if (currentWidth + chip.width + gapX > availableWidth && currentRow.length > 0) {
-        rows.push(currentRow)
-        currentRow = []
-        currentWidth = 0
-      }
-      currentRow.push(chip)
-      currentWidth += chip.width + gapX
-    }
-    if (currentRow.length > 0) rows.push(currentRow)
-    return rows
-  }
+  const columns = [
+    {key: "label", title: "نوع دستگاه", width: 300, align: "right"},
+    {key: "scanned_count", title: "اسکن‌شده", width: 130, align: "center"},
+    {key: "waiting_for_part_count", title: "در انتظار قطعه", width: 130, align: "center"},
+    {key: "workshop_count", title: "تعمیرگاه", width: 100, align: "center"},
+    {key: "loaned_count", title: "امانی", width: 88, align: "center"},
+    {key: "stolen_count", title: "سرقتی", width: 88, align: "center"},
+  ]
 
-  const sections = payload.categories.map((category) => {
-    mctx.font = "700 13px Peyda, sans-serif"
-    const chips = category.items.map((item) => {
-      const label = buildChipLabel(item)
-      const textWidth = mctx.measureText(label).width
-      return {label, width: Math.min(textWidth + 24, contentWidth)}
-    })
+  const headerRowHeight = 44
+  const dataRowHeight = 38
+  const totalsRowHeight = 44
+  const rows = payload.rows || []
+  const tableHeight = headerRowHeight + Math.max(rows.length, 1) * dataRowHeight + totalsRowHeight
 
-    mctx.font = "800 13px Peyda, sans-serif"
-    const summaryChips = (category.device_type_summary || []).map((entry) => {
-      const label = `${entry.label} × ${entry.count}`
-      const textWidth = mctx.measureText(label).width
-      return {label, width: Math.min(textWidth + 28, contentWidth)}
-    })
-
-    return {...category, chips, summaryChips}
-  })
-
-  const layoutRows = sections.map((section) => layoutWrap(section.chips, chipGapX, contentWidth))
-  const summaryLayoutRows = sections.map((section) => layoutWrap(section.summaryChips, chipGapX, contentWidth))
-
-  let totalHeight = headerHeight
-  sections.forEach((section, idx) => {
-    const rows = layoutRows[idx]
-    const summaryRows = summaryLayoutRows[idx]
-    totalHeight += sectionGapTop + 40
-    if (summaryRows.length > 0) {
-      totalHeight += summaryRows.length * (summaryChipHeight + summaryGapY) + 6
-    }
-    totalHeight += section.items.length === 0 ? 28 : rows.length * (chipHeight + chipGapY)
-  })
+  const revenueGapTop = 30
   const revenueBoxHeight = 108
-  totalHeight += sectionGapTop + revenueBoxHeight
-  totalHeight += padding
+
+  const totalHeight = headerHeight + tableHeight + revenueGapTop + revenueBoxHeight + padding
 
   const scale = 2
   const canvas = document.createElement("canvas")
@@ -849,93 +795,89 @@ const renderEveningAuditCanvas = async (payload) => {
   const ctx = canvas.getContext("2d")
   ctx.scale(scale, scale)
   ctx.direction = "rtl"
-  ctx.textAlign = "right"
 
   ctx.fillStyle = "#f8fafc"
   ctx.fillRect(0, 0, width, totalHeight)
 
   ctx.fillStyle = "#0f172a"
   ctx.font = "800 24px Peyda, sans-serif"
-  ctx.fillText(`آمار شب شعبه ${payload.branch_name}`, width - padding, padding + 26)
+  ctx.textAlign = "right"
+  ctx.fillText(`آمار مالی شب شعبه ${payload.branch_name}`, width - padding, padding + 26)
 
   ctx.fillStyle = "#475569"
   ctx.font = "700 15px Peyda, sans-serif"
   ctx.fillText(`تاریخ: ${payload.date_label}`, width - padding, padding + 52)
   ctx.fillText(payload.submitted ? "وضعیت ثبت: ثبت شده" : "وضعیت ثبت: ثبت نشده", width - padding, padding + 74)
 
-  let y = headerHeight
-
-  sections.forEach((section, idx) => {
-    y += sectionGapTop
-
-    ctx.fillStyle = section.color || "#334155"
-    ctx.font = "700 17px Peyda, sans-serif"
-    ctx.textAlign = "right"
-    ctx.fillText(`${section.title} (${section.items.length})`, width - padding, y + 16)
-    y += 40
-
-    const summaryRows = summaryLayoutRows[idx]
-    if (summaryRows.length > 0) {
-      summaryRows.forEach((row) => {
-        let x = width - padding
-        row.forEach((chip) => {
-          const chipX = x - chip.width
-
-          ctx.fillStyle = section.color || "#334155"
-          roundRect(ctx, chipX, y, chip.width, summaryChipHeight, 8)
-          ctx.fill()
-
-          ctx.fillStyle = "#ffffff"
-          ctx.font = "800 12px Peyda, sans-serif"
-          ctx.textAlign = "center"
-          ctx.fillText(chip.label, chipX + chip.width / 2, y + summaryChipHeight / 2 + 4, chip.width - 10)
-          ctx.textAlign = "right"
-
-          x = chipX - chipGapX
-        })
-        y += summaryChipHeight + summaryGapY
-      })
-      y += 6
-    }
-
-    const rows = layoutRows[idx]
-
-    if (section.items.length === 0) {
-      ctx.fillStyle = "#94a3b8"
-      ctx.font = "600 13px Peyda, sans-serif"
-      ctx.fillText("موردی وجود ندارد.", width - padding, y + 14)
-      y += 28
-      return
-    }
-
-    rows.forEach((row) => {
-      let x = width - padding
-      row.forEach((chip) => {
-        const chipX = x - chip.width
-
-        ctx.fillStyle = hexWithAlpha(section.color, 0.12)
-        roundRect(ctx, chipX, y, chip.width, chipHeight, 8)
-        ctx.fill()
-
-        ctx.strokeStyle = hexWithAlpha(section.color, 0.4)
-        ctx.lineWidth = 1
-        roundRect(ctx, chipX, y, chip.width, chipHeight, 8)
-        ctx.stroke()
-
-        ctx.fillStyle = "#1e293b"
-        ctx.font = "700 12px Peyda, sans-serif"
-        ctx.textAlign = "center"
-        ctx.fillText(chip.label, chipX + chip.width / 2, y + chipHeight / 2 + 4, chip.width - 10)
-        ctx.textAlign = "right"
-
-        x = chipX - chipGapX
-      })
-      y += chipHeight + chipGapY
-    })
+  // ستون‌ها از راست به چپ چیده می‌شوند (منطبق با نگارش راست‌به‌چپ فارسی).
+  const columnStartX = []
+  let cursorX = width - padding
+  columns.forEach((col) => {
+    columnStartX.push(cursorX - col.width)
+    cursorX -= col.width
   })
 
+  let y = headerHeight
+
+  // ردیف سربرگ
+  ctx.fillStyle = "#0f172a"
+  roundRect(ctx, padding, y, contentWidth, headerRowHeight, 10)
+  ctx.fill()
+
+  columns.forEach((col, idx) => {
+    ctx.fillStyle = "#f8fafc"
+    ctx.font = "700 14px Peyda, sans-serif"
+    ctx.textAlign = col.align
+    const textX = col.align === "center" ? columnStartX[idx] + col.width / 2 : columnStartX[idx] + col.width - 14
+    ctx.fillText(col.title, textX, y + headerRowHeight / 2 + 5)
+  })
+
+  y += headerRowHeight
+
+  if (rows.length === 0) {
+    ctx.fillStyle = "#94a3b8"
+    ctx.font = "600 14px Peyda, sans-serif"
+    ctx.textAlign = "center"
+    ctx.fillText("موردی برای نمایش وجود ندارد.", width / 2, y + dataRowHeight / 2 + 5)
+    y += dataRowHeight
+  } else {
+    rows.forEach((row, rowIdx) => {
+      ctx.fillStyle = rowIdx % 2 === 0 ? "#ffffff" : "#f1f5f9"
+      ctx.fillRect(padding, y, contentWidth, dataRowHeight)
+
+      columns.forEach((col, idx) => {
+        ctx.fillStyle = "#1e293b"
+        ctx.font = col.key === "label" ? "700 13px Peyda, sans-serif" : "700 14px Peyda, sans-serif"
+        ctx.textAlign = col.align
+        const textX = col.align === "center" ? columnStartX[idx] + col.width / 2 : columnStartX[idx] + col.width - 14
+        const value = col.key === "label" ? row.label : Number(row[col.key] || 0).toLocaleString("fa-IR")
+        ctx.fillText(String(value), textX, y + dataRowHeight / 2 + 5, col.width - 16)
+      })
+
+      y += dataRowHeight
+    })
+  }
+
+  // ردیف جمع کل
+  const totals = payload.totals || {}
+  ctx.fillStyle = "#e2e8f0"
+  ctx.fillRect(padding, y, contentWidth, totalsRowHeight)
+  ctx.strokeStyle = "#94a3b8"
+  ctx.lineWidth = 1
+  ctx.strokeRect(padding, y, contentWidth, totalsRowHeight)
+
+  columns.forEach((col, idx) => {
+    ctx.fillStyle = "#0f172a"
+    ctx.font = "800 14px Peyda, sans-serif"
+    ctx.textAlign = col.align
+    const textX = col.align === "center" ? columnStartX[idx] + col.width / 2 : columnStartX[idx] + col.width - 14
+    const value = col.key === "label" ? "جمع کل" : Number(totals[col.key] || 0).toLocaleString("fa-IR")
+    ctx.fillText(String(value), textX, y + totalsRowHeight / 2 + 5, col.width - 16)
+  })
+
+  y += totalsRowHeight + revenueGapTop
+
   // بخش پایانی گزارش: درآمد نقدی و کارت‌به‌کارت همان شب
-  y += sectionGapTop
   const revenue = payload.revenue || {cash_amount: 0, card_to_card_amount: 0}
   const total = (revenue.cash_amount || 0) + (revenue.card_to_card_amount || 0)
   const formatToman = (n) => `${Number(n || 0).toLocaleString("fa-IR")} تومان`
