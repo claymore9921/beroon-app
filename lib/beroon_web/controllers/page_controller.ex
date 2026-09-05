@@ -7,6 +7,7 @@ defmodule BeroonWeb.PageController do
   alias Beroon.Logistics
   alias Beroon.Inventory
   alias Beroon.Operations
+  alias Beroon.Parts
   alias Beroon.Repo
   alias Beroon.Reports
   alias Beroon.Thefts
@@ -305,7 +306,8 @@ defmodule BeroonWeb.PageController do
         repairing: Fleet.list_scooters_by_statuses(["awaiting_repair", "repairing"]),
         waiting_part: Fleet.list_scooters_by_statuses(["waiting_for_part"]),
         ready: Fleet.list_scooters_by_statuses(["ready_for_pickup"]),
-        repair_technicians: @repair_technicians
+        repair_technicians: @repair_technicians,
+        parts: Parts.list_parts()
       )
     end
   end
@@ -391,38 +393,23 @@ defmodule BeroonWeb.PageController do
     )
   end
 
-  def workshop_update_notes(conn, %{"id" => id} = params) do
-    scooter = Fleet.get_scooter!(id)
-    notes = params |> get_in(["repair", "notes"]) |> to_string() |> String.trim()
-
-    if scooter.status in ["repairing", "waiting_for_part", "awaiting_repair"] do
-      case Fleet.update_scooter(scooter, %{notes: notes}) do
-        {:ok, _} ->
-          conn
-          |> put_flash(:info, "توضیحات دستگاه ذخیره شد.")
-          |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
-
-        {:error, _} ->
-          conn
-          |> put_flash(:error, "ذخیره توضیحات انجام نشد.")
-          |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
-      end
-    else
-      conn
-      |> put_flash(:error, "در وضعیت فعلی امکان ویرایش توضیحات تعمیر وجود ندارد.")
-      |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
-    end
-  end
-
-
   def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
-    parts_used = params |> Map.get("repair_parts_used", "") |> String.trim()
     technician = params |> Map.get("technician_name", "") |> String.trim()
+
+    parts_input =
+      params
+      |> Map.get("parts", [])
+      |> List.wrap()
+      |> Enum.map(fn p ->
+        %{part_id: p["part_id"], quantity: parse_money(p["quantity"])}
+      end)
+      |> Enum.reject(fn %{part_id: part_id, quantity: qty} -> part_id in [nil, ""] or qty <= 0 end)
+
     scooter = Fleet.get_scooter!(id)
 
     cond do
-      parts_used == "" ->
-        conn |> put_flash(:error, "ثبت قطعات مصرف‌شده برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
+      parts_input == [] ->
+        conn |> put_flash(:error, "ثبت حداقل یک قطعه مصرف‌شده برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
 
       technician not in @repair_technicians ->
         conn |> put_flash(:error, "انتخاب تعمیرکار برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
@@ -430,17 +417,20 @@ defmodule BeroonWeb.PageController do
       true ->
         workshop = Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone)
         attrs =
-          %{status: "ready_for_pickup", repair_parts_used: parts_used, repair_technician: technician}
+          %{status: "ready_for_pickup", repair_technician: technician}
           |> then(fn a -> if workshop, do: Map.put(a, :current_branch_id, workshop.id), else: a end)
 
         case Fleet.update_scooter(scooter, attrs) do
           {:ok, _} ->
-            record_workshop_event(
-              scooter.id,
-              "discharged",
-              conn.assigns.current_user_phone,
-              %{technician_name: technician, repair_parts_used: parts_used}
-            )
+            {:ok, event} =
+              record_workshop_event(
+                scooter.id,
+                "discharged",
+                conn.assigns.current_user_phone,
+                %{technician_name: technician}
+              )
+
+            Parts.record_usages(event.id, parts_input)
 
             conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
 
@@ -1466,7 +1456,16 @@ defmodule BeroonWeb.PageController do
 
   defp workshop_discharge_sheet_rows(date) do
     discharges = Reports.workshop_discharges_for_date(date)
+    usages_by_event = Parts.usages_by_event(Enum.map(discharges, & &1.event_id))
     technicians = ["محب صافی", "احسان طیاری", "میثاق پرتو"]
+
+    format_parts = fn event_id ->
+      case Map.get(usages_by_event, event_id) do
+        nil -> "-"
+        [] -> "-"
+        usages -> usages |> Enum.map(&"#{&1.part_name}×#{&1.quantity}") |> Enum.join("، ")
+      end
+    end
 
     detail_rows =
       discharges
@@ -1481,7 +1480,7 @@ defmodule BeroonWeb.PageController do
           index,
           item.plate || "-",
           type_label,
-          item.repair_parts_used || "-",
+          format_parts.(item.event_id),
           item.technician_name || "ثبت نشده",
           Beroon.Calendar.persian_datetime(item.discharged_at)
         ]
@@ -1907,7 +1906,9 @@ defmodule BeroonWeb.PageController do
       render(conn, template,
         workshop: workshop,
         query: query,
-        scooters: Fleet.list_scooters_by_statuses(statuses, query)
+        scooters: Fleet.list_scooters_by_statuses(statuses, query),
+        parts: Parts.list_parts(),
+        repair_technicians: @repair_technicians
       )
     end
   end

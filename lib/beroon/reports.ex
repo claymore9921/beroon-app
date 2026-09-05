@@ -1923,6 +1923,7 @@ defmodule Beroon.Reports do
     |> join(:left, [e, s], d in DeviceType, on: d.id == s.device_type_id)
     |> order_by([e, s, d], asc: e.event_at, asc: s.plate)
     |> select([e, s, d], %{
+      event_id: e.id,
       plate: s.plate,
       barcode: s.barcode,
       device_type: %{
@@ -1931,7 +1932,6 @@ defmodule Beroon.Reports do
         device_identifier: d.device_identifier
       },
       technician_name: e.technician_name,
-      repair_parts_used: e.repair_parts_used,
       discharged_at: e.event_at
     })
     |> Repo.all()

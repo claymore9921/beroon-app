@@ -57,33 +57,15 @@
             </span>
           </div>
 
-          <form
-            id={"workshop-discharge-scooter-#{scooter.id}"}
-            method="post"
-            action={~p"/workshop/scooters/#{scooter}/discharge"}
+          <button
+            type="button"
+            class="discharge-trigger btn btn-primary min-h-11 w-full"
+            data-scooter-id={scooter.id}
+            data-plate={scooter.plate}
+            data-action={~p"/workshop/scooters/#{scooter}/discharge"}
           >
-            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-            <label class="form-control mb-3">
-              <span class="label-text font-bold">قطعات مصرف‌شده</span>
-              <textarea
-                name="discharge[repair_parts_used]"
-                required
-                minlength="2"
-                class="textarea textarea-bordered min-h-24 w-full"
-                placeholder="مثلاً: تعویض دسته ترمز، لنت جلو و کابل گاز"
-              ></textarea>
-            </label>
-            <fieldset class="mb-3 rounded-xl border border-zinc-200 bg-white p-3">
-              <legend class="px-2 text-sm font-black">تعمیرکار</legend>
-              <div class="mt-2 grid gap-2">
-                <label :for={name <- ["محب صافی", "احسان طیاری", "میثاق پرتو"]} class="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 p-3">
-                  <input type="radio" name="discharge[technician_name]" value={name} required />
-                  <span class="font-bold">{name}</span>
-                </label>
-              </div>
-            </fieldset>
-            <button class="btn btn-primary min-h-11 w-full">ترخیص</button>
-          </form>
+            ترخیص
+          </button>
         </div>
       </article>
     </section>
@@ -119,5 +101,6 @@
     </div>
   </dialog>
 
+  <.discharge_modal repair_technicians={@repair_technicians} parts={@parts} />
   <.workshop_bottom_nav active="info" />
 </main>

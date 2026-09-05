@@ -126,4 +126,64 @@ defmodule BeroonWeb.PageHTML do
     """
   end
 
+  attr :repair_technicians, :list, required: true
+  attr :parts, :list, required: true
+
+  def discharge_modal(assigns) do
+    ~H"""
+    <dialog id="discharge-modal" class="modal modal-bottom sm:modal-middle">
+      <div class="modal-box w-[92vw] m-auto max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-black text-zinc-950">ترخیص دستگاه</h2>
+            <p id="discharge-modal-plate" class="mt-1 text-sm text-zinc-500"></p>
+          </div>
+          <button type="button" id="discharge-modal-close" class="btn btn-ghost btn-sm">بستن</button>
+        </div>
+
+        <form id="discharge-modal-form" method="post" action="#">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+
+          <fieldset class="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <legend class="px-2 text-sm font-black">تعمیرکار</legend>
+            <div class="mt-2 grid gap-2">
+              <label :for={name <- @repair_technicians} class="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white p-3">
+                <input type="radio" name="discharge[technician_name]" value={name} required />
+                <span class="font-bold">{name}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="mt-4">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-black">قطعات مصرف‌شده</span>
+              <button type="button" id="discharge-add-part" class="btn btn-sm btn-neutral gap-1">
+                <.icon name="hero-plus" class="size-4" />افزودن قطعه
+              </button>
+            </div>
+
+            <div id="discharge-part-picker" class="mt-3 hidden rounded-xl border border-teal-200 bg-teal-50 p-3">
+              <select id="discharge-part-select" class="select select-bordered w-full">
+                <option value="">-- انتخاب قطعه --</option>
+                <option :for={part <- @parts} value={part.id} data-name={part.name}>
+                  {part.name} (موجودی: {part.quantity})
+                </option>
+              </select>
+              <div class="mt-2 flex gap-2">
+                <input id="discharge-part-qty" type="number" min="1" value="1" class="input input-bordered w-24" placeholder="تعداد" />
+                <button type="button" id="discharge-part-confirm" class="btn btn-primary flex-1">افزودن به لیست</button>
+              </div>
+            </div>
+
+            <div id="discharge-parts-rows" class="mt-3 grid gap-2"></div>
+            <p id="discharge-parts-empty" class="mt-2 text-sm text-zinc-500">هنوز قطعه‌ای اضافه نشده است.</p>
+          </div>
+
+          <button type="submit" class="btn btn-primary mt-5 min-h-12 w-full">ترخیص دستگاه</button>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button aria-label="بستن"></button></form>
+    </dialog>
+    """
+  end
 end

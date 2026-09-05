@@ -57,18 +57,6 @@
             </span>
           </div>
 
-          <form
-            :if={scooter.status in ["repairing", "waiting_for_part"]}
-            method="post"
-            action={~p"/workshop/scooters/#{scooter}/notes"}
-            class="rounded-xl border border-zinc-200 bg-zinc-50 p-3"
-          >
-            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-            <label for={"repair-notes-#{scooter.id}"} class="mb-2 block text-sm font-bold">توضیحات تعمیر</label>
-            <textarea id={"repair-notes-#{scooter.id}"} name="repair[notes]" rows="3" class="textarea textarea-bordered w-full resize-none bg-white" placeholder="توضیحات تعمیر را وارد کنید...">{scooter.notes || ""}</textarea>
-            <button class="btn btn-neutral mt-2 min-h-10 w-full">ذخیره توضیحات</button>
-          </form>
-
           <div class="grid grid-cols-2 gap-2">
             <form
               :if={scooter.status == "awaiting_repair"}

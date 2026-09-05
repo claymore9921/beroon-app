@@ -984,12 +984,120 @@ const setupDinnerForm = () => {
   countInput.addEventListener("input", () => renderFields(countInput.value))
 }
 
+const setupDischargeModal = () => {
+  const modal = document.getElementById("discharge-modal")
+  if (!modal) return
+  if (modal.dataset.bound === "true") return
+  modal.dataset.bound = "true"
+
+  const form = document.getElementById("discharge-modal-form")
+  const plateLabel = document.getElementById("discharge-modal-plate")
+  const closeBtn = document.getElementById("discharge-modal-close")
+  const addPartBtn = document.getElementById("discharge-add-part")
+  const picker = document.getElementById("discharge-part-picker")
+  const select = document.getElementById("discharge-part-select")
+  const qtyInput = document.getElementById("discharge-part-qty")
+  const confirmBtn = document.getElementById("discharge-part-confirm")
+  const rowsContainer = document.getElementById("discharge-parts-rows")
+  const emptyLabel = document.getElementById("discharge-parts-empty")
+
+  const updateEmptyLabel = () => {
+    emptyLabel.style.display = rowsContainer.children.length === 0 ? "block" : "none"
+  }
+
+  const resetPicker = () => {
+    picker.classList.add("hidden")
+    select.value = ""
+    qtyInput.value = "1"
+  }
+
+  const resetForm = () => {
+    form.reset()
+    rowsContainer.innerHTML = ""
+    resetPicker()
+    updateEmptyLabel()
+  }
+
+  document.querySelectorAll(".discharge-trigger").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      resetForm()
+      plateLabel.textContent = `پلاک ${btn.dataset.plate || ""}`
+      form.action = btn.dataset.action || "#"
+      modal.showModal()
+    })
+  })
+
+  closeBtn.addEventListener("click", () => modal.close())
+
+  addPartBtn.addEventListener("click", () => {
+    picker.classList.remove("hidden")
+  })
+
+  confirmBtn.addEventListener("click", () => {
+    const partId = select.value
+    const selectedOption = select.selectedOptions[0]
+    const partName = selectedOption ? selectedOption.dataset.name : ""
+    const qty = Number(qtyInput.value)
+
+    if (!partId) {
+      alert("یک قطعه انتخاب کنید.")
+      return
+    }
+    if (!qty || qty < 1) {
+      alert("تعداد معتبر وارد کنید.")
+      return
+    }
+
+    const row = document.createElement("div")
+    row.className = "flex items-center justify-between gap-2 rounded-lg bg-zinc-50 p-2"
+
+    const label = document.createElement("span")
+    label.className = "text-sm font-bold"
+    label.textContent = `${partName} × ${qty}`
+
+    const removeBtn = document.createElement("button")
+    removeBtn.type = "button"
+    removeBtn.className = "btn btn-xs btn-error btn-outline"
+    removeBtn.textContent = "حذف"
+    removeBtn.addEventListener("click", () => {
+      row.remove()
+      updateEmptyLabel()
+    })
+
+    const hiddenPartId = document.createElement("input")
+    hiddenPartId.type = "hidden"
+    hiddenPartId.name = "discharge[parts][][part_id]"
+    hiddenPartId.value = partId
+
+    const hiddenQty = document.createElement("input")
+    hiddenQty.type = "hidden"
+    hiddenQty.name = "discharge[parts][][quantity]"
+    hiddenQty.value = String(qty)
+
+    row.appendChild(label)
+    row.appendChild(removeBtn)
+    row.appendChild(hiddenPartId)
+    row.appendChild(hiddenQty)
+    rowsContainer.appendChild(row)
+    updateEmptyLabel()
+    resetPicker()
+  })
+
+  form.addEventListener("submit", (event) => {
+    if (rowsContainer.children.length === 0) {
+      event.preventDefault()
+      alert("حداقل یک قطعه را ثبت کنید.")
+    }
+  })
+}
+
 const bootScannerPages = () => {
   setupMorningChecklist()
   setupEveningScanner()
   setupScooterFormScanner()
   setupEveningAuditExport()
   setupDinnerForm()
+  setupDischargeModal()
 
   setupSearchScanner({
     buttonId: "manager-repair-scan",

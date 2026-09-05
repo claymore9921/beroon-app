@@ -79,7 +79,6 @@ defmodule BeroonWeb.Router do
     post "/workshop/scooters/:id/accept", PageController, :workshop_accept_scooter
     post "/workshop/scooters/:id/start", PageController, :workshop_start_repair
     post "/workshop/scooters/:id/waiting-part", PageController, :workshop_waiting_part
-    post "/workshop/scooters/:id/notes", PageController, :workshop_update_notes
     post "/workshop/scooters/:id/discharge", PageController, :workshop_discharge_scooter
   end
 
@@ -123,6 +122,7 @@ defmodule BeroonWeb.Router do
     get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports
     post "/admin/evening-reports/branches/:id/reopen", PageController, :reopen_branch_evening_report
     get "/admin/dinner", PageController, :admin_dinner
+    resources "/admin/parts", PartController, only: [:index, :create, :update, :delete]
 
     get "/admin/checklists/branches/:id/unchecked",
         PageController,
