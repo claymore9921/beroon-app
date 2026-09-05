@@ -179,6 +179,20 @@ defmodule BeroonWeb.PageHTML do
             <p id="discharge-parts-empty" class="mt-2 text-sm text-zinc-500">هنوز قطعه‌ای اضافه نشده است.</p>
           </div>
 
+          <label class="mt-4 block">
+            <span class="mb-1 block text-sm font-black">توضیحات</span>
+            <span class="mb-2 block text-xs font-semibold text-zinc-500">
+              اگر دستگاه نیازی به قطعه نداشت، کارهایی که برای تعمیر انجام شده را اینجا بنویسید.
+            </span>
+            <textarea
+              id="discharge-notes"
+              name="discharge[notes]"
+              rows="3"
+              class="textarea textarea-bordered w-full resize-none"
+              placeholder="مثلاً: تنظیم ترمز و روغن‌کاری زنجیر"
+            ></textarea>
+          </label>
+
           <button type="submit" class="btn btn-primary mt-5 min-h-12 w-full">ترخیص دستگاه</button>
         </form>
       </div>

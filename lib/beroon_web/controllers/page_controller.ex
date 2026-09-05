@@ -395,6 +395,7 @@ defmodule BeroonWeb.PageController do
 
   def workshop_discharge_scooter(conn, %{"id" => id, "discharge" => params}) do
     technician = params |> Map.get("technician_name", "") |> String.trim()
+    notes = params |> Map.get("notes", "") |> String.trim()
 
     parts_input =
       params
@@ -408,8 +409,10 @@ defmodule BeroonWeb.PageController do
     scooter = Fleet.get_scooter!(id)
 
     cond do
-      parts_input == [] ->
-        conn |> put_flash(:error, "ثبت حداقل یک قطعه مصرف‌شده برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
+      parts_input == [] and notes == "" ->
+        conn
+        |> put_flash(:error, "یا حداقل یک قطعه مصرف‌شده را ثبت کنید یا در کادر توضیحات بنویسید چه کاری برای تعمیر انجام شده است.")
+        |> redirect(to: ~p"/workshop/discharge")
 
       technician not in @repair_technicians ->
         conn |> put_flash(:error, "انتخاب تعمیرکار برای ترخیص الزامی است.") |> redirect(to: ~p"/workshop/discharge")
@@ -427,12 +430,18 @@ defmodule BeroonWeb.PageController do
                 scooter.id,
                 "discharged",
                 conn.assigns.current_user_phone,
-                %{technician_name: technician}
+                %{technician_name: technician, discharge_notes: if(notes == "", do: nil, else: notes)}
               )
 
-            Parts.record_usages(event.id, parts_input)
+            case Parts.record_usages(event.id, parts_input) do
+              {:ok, _usages} ->
+                conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
 
-            conn |> put_flash(:info, "دستگاه آماده تحویل شد.") |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
+              {:error, _reason} ->
+                conn
+                |> put_flash(:error, "دستگاه ترخیص شد اما ثبت قطعات مصرف‌شده با خطا مواجه شد؛ لطفاً به ادمین اطلاع دهید.")
+                |> redirect(to: ~p"/workshop?q=#{scooter.plate}")
+            end
 
           {:error, _} ->
             conn |> put_flash(:error, "ترخیص دستگاه انجام نشد.") |> redirect(to: ~p"/workshop/discharge")
@@ -590,10 +599,16 @@ defmodule BeroonWeb.PageController do
 
     case Reports.create_evening_count_with_items(attrs, scanned_scooters) do
       {:ok, _count} ->
-        record_evening_revenue(branch, conn.assigns.current_user_phone, attrs["counted_on"], params)
+        base_message = "آمار شب با مجموع #{total_count} دستگاه ثبت شد."
+
+        message =
+          case record_evening_revenue(branch, conn.assigns.current_user_phone, attrs["counted_on"], params) do
+            {:ok, _revenue} -> base_message
+            {:error, _reason} -> base_message <> " توجه: ثبت درآمد امشب با خطا مواجه شد؛ لطفاً دوباره از صفحه آمار شب ثبت کنید."
+          end
 
         conn
-        |> put_flash(:info, "آمار شب با مجموع #{total_count} دستگاه ثبت شد.")
+        |> put_flash(:info, message)
         |> redirect(to: ~p"/manager/evening")
 
       {:error, changeset} ->
@@ -969,15 +984,21 @@ defmodule BeroonWeb.PageController do
   def admin_repair_stats(conn, params) do
     from_date = parse_date(params["from"])
     to_date = parse_date(params["to"] || params["from"])
-    render(conn, :admin_repair_stats, from_date: from_date, to_date: to_date, rows: Reports.workshop_stats(from_date, to_date))
+    render(conn, :admin_repair_stats, from_date: from_date, to_date: to_date)
   end
 
   def download_admin_repair_stats(conn, params) do
     from_date = parse_date(params["from"])
     to_date = parse_date(params["to"] || params["from"])
-    rows = Reports.workshop_stats(from_date, to_date)
-    html = repair_stats_xls(rows)
-    conn |> put_resp_content_type("application/vnd.ms-excel; charset=utf-8") |> put_resp_header("content-disposition", ~s(attachment; filename="repair-stats.xls")) |> send_resp(200, html)
+
+    from_label = String.replace(Beroon.Calendar.persian_numeric_date(from_date), "/", "-")
+    to_label = String.replace(Beroon.Calendar.persian_numeric_date(to_date), "/", "-")
+    filename = "beroon-repair-stats-#{from_label}-تا-#{to_label}.xlsx"
+
+    conn
+    |> put_resp_content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
+    |> send_resp(200, repair_stats_workbook(from_date, to_date))
   end
 
   def admin_loaned_scooters(conn, _params) do
@@ -1481,6 +1502,7 @@ defmodule BeroonWeb.PageController do
           item.plate || "-",
           type_label,
           format_parts.(item.event_id),
+          item.discharge_notes || "-",
           item.technician_name || "ثبت نشده",
           Beroon.Calendar.persian_datetime(item.discharged_at)
         ]
@@ -1496,7 +1518,7 @@ defmodule BeroonWeb.PageController do
       [{"گزارش ترخیص تعمیرگاه", "Title"}],
       [{"تاریخ گزارش: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
       [],
-      Enum.map(["ردیف", "پلاک", "نوع دستگاه", "قطعات مصرف‌شده", "تعمیرکار", "زمان ترخیص"], &{&1, "Header"})
+      Enum.map(["ردیف", "پلاک", "نوع دستگاه", "قطعات مصرف‌شده", "توضیحات", "تعمیرکار", "زمان ترخیص"], &{&1, "Header"})
     ] ++
       detail_rows ++
       [[], [{"جمع کل ترخیص", "Total"}, {length(discharges), "Total"}]] ++
@@ -1798,15 +1820,74 @@ defmodule BeroonWeb.PageController do
     Reports.create_workshop_event(Map.merge(attrs, extra))
   end
 
-  defp repair_stats_xls(rows) do
-    body =
-      rows
-      |> Enum.map(fn row ->
-        "<tr><td>#{Beroon.Calendar.persian_numeric_date(row.date)}</td><td>#{row.accepted}</td><td>#{row.repair_started}</td><td>#{row.discharged}</td></tr>"
-      end)
-      |> Enum.join()
+  defp repair_stats_workbook(from_date, to_date) do
+    {from_date, to_date} =
+      if Date.compare(from_date, to_date) == :gt, do: {to_date, from_date}, else: {from_date, to_date}
 
-    "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><table border=\"1\"><thead><tr><th>تاریخ</th><th>پذیرش</th><th>شروع تعمیر</th><th>ترخیص</th></tr></thead><tbody>#{body}</tbody></table></body></html>"
+    from_date
+    |> Date.range(to_date)
+    |> Enum.map(fn date ->
+      sheet_name = date |> Beroon.Calendar.persian_numeric_date() |> String.replace("/", "-")
+      {sheet_name, repair_day_sheet_rows(date)}
+    end)
+    |> xlsx_workbook()
+  end
+
+  defp repair_day_sheet_rows(date) do
+    discharges =
+      date
+      |> Reports.workshop_discharges_for_date()
+      |> Enum.sort_by(&{&1.technician_name || "", &1.discharged_at})
+
+    usages_by_event = Parts.usages_by_event(Enum.map(discharges, & &1.event_id))
+
+    format_parts = fn event_id ->
+      case Map.get(usages_by_event, event_id, []) do
+        [] -> "-"
+        usages -> usages |> Enum.map(&"#{&1.part_name}×#{&1.quantity}") |> Enum.join("، ")
+      end
+    end
+
+    header = [
+      [{"آمار تعمیرات روز #{Beroon.Calendar.persian_date(date)}", "Title"}],
+      []
+    ]
+
+    if discharges == [] do
+      header ++ [[{"در این روز ترخیصی ثبت نشده است.", "Label"}]]
+    else
+      detail_rows =
+        discharges
+        |> Enum.with_index(1)
+        |> Enum.map(fn {item, index} ->
+          type_label =
+            [item.device_type.category, item.device_type.device_model, item.device_type.device_identifier]
+            |> Enum.reject(&(&1 in [nil, ""]))
+            |> Enum.join(" ")
+
+          [
+            index,
+            item.technician_name || "ثبت نشده",
+            item.plate || "-",
+            type_label,
+            format_parts.(item.event_id),
+            item.discharge_notes || "-",
+            Beroon.Calendar.persian_datetime(item.discharged_at)
+          ]
+        end)
+
+      technician_totals =
+        discharges
+        |> Enum.group_by(&(&1.technician_name || "ثبت نشده"))
+        |> Enum.sort_by(fn {tech, _} -> tech end)
+        |> Enum.map(fn {tech, items} -> [{"تعداد ترخیص #{tech}", "Label"}, {length(items), "Number"}] end)
+
+      header ++
+        [Enum.map(["ردیف", "تعمیرکار", "پلاک", "نوع دستگاه", "قطعات مصرف‌شده", "توضیحات", "زمان ترخیص"], &{&1, "Header"})] ++
+        detail_rows ++
+        [[], [{"جمع کل ترخیص این روز", "Total"}, {length(discharges), "Total"}]] ++
+        technician_totals
+    end
   end
 
   defp first_error(changeset) do

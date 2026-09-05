@@ -1,7 +1,27 @@
 <Layouts.flash_group flash={@flash} />
-<main class="min-h-screen bg-zinc-950" dir="rtl"><section class="mx-auto min-h-screen w-full max-w-3xl bg-stone-50 p-5">
-<.link navigate={~p"/admin/reports"} class="text-sm font-bold text-orange-700">بازگشت</.link><h1 class="mt-2 text-2xl font-black">آمار تعمیرات</h1>
-<form method="get" class="mt-4 grid gap-3 rounded-xl bg-white p-4 sm:grid-cols-3"><input name="from" value={Beroon.Calendar.persian_numeric_date(@from_date)} class="input input-bordered" placeholder="از تاریخ شمسی"/><input name="to" value={Beroon.Calendar.persian_numeric_date(@to_date)} class="input input-bordered" placeholder="تا تاریخ شمسی"/><button class="btn btn-neutral">استخراج</button></form>
-<.link href={~p"/admin/repair-stats/download?from=#{Beroon.Calendar.persian_numeric_date(@from_date)}&to=#{Beroon.Calendar.persian_numeric_date(@to_date)}"} class="btn btn-primary mt-3">خروجی Excel</.link>
-<div class="mt-4 overflow-x-auto rounded-xl bg-white"><table class="table"><thead><tr><th>تاریخ</th><th>پذیرش</th><th>شروع تعمیر</th><th>ترخیص</th></tr></thead><tbody><tr :for={row <- @rows}><td>{Beroon.Calendar.persian_numeric_date(row.date)}</td><td>{row.accepted}</td><td>{row.repair_started}</td><td>{row.discharged}</td></tr></tbody></table></div>
-</section></main>
+<main class="min-h-screen bg-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-md bg-stone-50 p-5">
+    <.link navigate={~p"/admin/reports"} class="text-sm font-bold text-orange-700">بازگشت</.link>
+    <h1 class="mt-2 text-2xl font-black">آمار تعمیرات</h1>
+    <p class="mt-1 text-sm text-zinc-500">بازه را انتخاب کنید؛ خروجی اکسل به ازای هر روز یک شیت جداگانه خواهد داشت.</p>
+
+    <form method="get" class="mt-4 grid gap-3 rounded-xl bg-white p-4">
+      <label class="form-control">
+        <span class="label-text mb-1 font-bold">از تاریخ شمسی</span>
+        <input name="from" value={Beroon.Calendar.persian_numeric_date(@from_date)} class="input input-bordered w-full" placeholder="مثال: ۱۴۰۵/۰۵/۰۱" />
+      </label>
+      <label class="form-control">
+        <span class="label-text mb-1 font-bold">تا تاریخ شمسی</span>
+        <input name="to" value={Beroon.Calendar.persian_numeric_date(@to_date)} class="input input-bordered w-full" placeholder="مثال: ۱۴۰۵/۰۵/۰۳" />
+      </label>
+      <button class="btn btn-neutral min-h-11">به‌روزرسانی بازه</button>
+    </form>
+
+    <.link
+      href={~p"/admin/repair-stats/download?from=#{Beroon.Calendar.persian_numeric_date(@from_date)}&to=#{Beroon.Calendar.persian_numeric_date(@to_date)}"}
+      class="btn btn-primary mt-4 min-h-12 w-full gap-2"
+    >
+      <.icon name="hero-arrow-down-tray" class="size-5" />خروجی
+    </.link>
+  </section>
+</main>

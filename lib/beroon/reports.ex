@@ -1932,6 +1932,7 @@ defmodule Beroon.Reports do
         device_identifier: d.device_identifier
       },
       technician_name: e.technician_name,
+      discharge_notes: e.discharge_notes,
       discharged_at: e.event_at
     })
     |> Repo.all()

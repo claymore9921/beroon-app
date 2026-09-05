@@ -1084,9 +1084,13 @@ const setupDischargeModal = () => {
   })
 
   form.addEventListener("submit", (event) => {
-    if (rowsContainer.children.length === 0) {
+    const notesInput = document.getElementById("discharge-notes")
+    const hasParts = rowsContainer.children.length > 0
+    const hasNotes = notesInput && notesInput.value.trim() !== ""
+
+    if (!hasParts && !hasNotes) {
       event.preventDefault()
-      alert("حداقل یک قطعه را ثبت کنید.")
+      alert("یا حداقل یک قطعه ثبت کنید یا در کادر توضیحات بنویسید چه کاری انجام شده است.")
     }
   })
 }
