@@ -59,6 +59,18 @@ defmodule BeroonWeb.AdminAuth do
     end
   end
 
+  def call(conn, :require_reporter) do
+    if conn.assigns[:current_user_role] in ["reporter", "admin"] do
+      conn
+    else
+      conn
+      |> put_session(:user_return_to, current_path(conn))
+      |> put_flash(:error, "برای دسترسی به این بخش وارد شوید.")
+      |> redirect(to: ~p"/login")
+      |> halt()
+    end
+  end
+
   def log_in_user(conn, %{phone: phone, role: role}) do
     conn
     |> configure_session(renew: true)

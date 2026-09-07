@@ -1,0 +1,78 @@
+<Layouts.flash_group flash={@flash} />
+<.reporter_layout active="dashboard">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-black text-[#12283b]">داشبورد</h1>
+      <p class="mt-1 text-sm font-medium text-[#6b7280]">آمار لحظه‌ای بر اساس آخرین شب عملیاتی — {Beroon.Calendar.persian_date(@report_date)}</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <form method="get" class="flex items-center gap-2">
+        <input
+          type="text"
+          name="date"
+          value={Beroon.Calendar.persian_numeric_date(@report_date)}
+          placeholder="۱۴۰۵/۰۵/۰۱"
+          class="w-36 rounded-lg border border-[#dcd4bf] bg-white px-3 py-2 text-sm font-semibold text-[#12283b] focus:border-[#c9a24b] focus:outline-none"
+        />
+        <button class="rounded-lg bg-[#12283b] px-4 py-2 text-sm font-black text-white hover:bg-[#0f2942]">نمایش</button>
+      </form>
+      <.reporter_export_buttons export_json={@export_json} download_url={~p"/reports/dashboard/download?date=#{Beroon.Calendar.persian_numeric_date(@report_date)}"} />
+    </div>
+  </div>
+
+  <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div class="rounded-2xl border border-[#e4ddcd] bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-[#12283b]"><.icon name="hero-truck" class="size-6 text-[#c9a24b]" /></span>
+        <p class="text-sm font-semibold text-[#6b7280]">تعداد کل دستگاه‌های ناوگان</p>
+      </div>
+      <p class="mt-4 text-4xl font-black text-[#12283b]">{@total_fleet}</p>
+      <p class="mt-1 text-xs font-medium text-[#8a8171]">جمع اسکن‌شده‌ی شعب و تعمیرگاه</p>
+    </div>
+
+    <div class="rounded-2xl border border-[#e4ddcd] bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-[#eaf1f8]"><.icon name="hero-credit-card" class="size-6 text-[#2563a8]" /></span>
+        <p class="text-sm font-semibold text-[#6b7280]">جمع کل کارت به کارت</p>
+      </div>
+      <p class="mt-4 text-4xl font-black text-[#2563a8]">{@total_card}</p>
+      <p class="mt-1 text-xs font-medium text-[#8a8171]">تومان</p>
+    </div>
+
+    <div class="rounded-2xl border border-[#e4ddcd] bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-[#eaf3ec]"><.icon name="hero-banknotes" class="size-6 text-[#2f7a4f]" /></span>
+        <p class="text-sm font-semibold text-[#6b7280]">جمع کل نقدی</p>
+      </div>
+      <p class="mt-4 text-4xl font-black text-[#2f7a4f]">{@total_cash}</p>
+      <p class="mt-1 text-xs font-medium text-[#8a8171]">تومان</p>
+    </div>
+
+    <div class="rounded-2xl border border-[#e4ddcd] bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-[#f2eaf8]"><.icon name="hero-check-badge" class="size-6 text-[#6d3fa0]" /></span>
+        <p class="text-sm font-semibold text-[#6b7280]">جمع کل دستگاه‌های تعمیر شده</p>
+      </div>
+      <p class="mt-4 text-4xl font-black text-[#6d3fa0]">{@total_repaired}</p>
+      <p class="mt-1 text-xs font-medium text-[#8a8171]">ترخیص‌شده در این تاریخ</p>
+    </div>
+
+    <div class="rounded-2xl border border-[#e4ddcd] bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-[#eaf3ec]"><.icon name="hero-qr-code" class="size-6 text-[#2f7a4f]" /></span>
+        <p class="text-sm font-semibold text-[#6b7280]">دستگاه‌های اسکن‌شده در شعب</p>
+      </div>
+      <p class="mt-4 text-4xl font-black text-[#2f7a4f]">{@total_scanned}</p>
+      <p class="mt-1 text-xs font-medium text-[#8a8171]">مجموع همه‌ی شعب</p>
+    </div>
+
+    <div class="rounded-2xl border border-[#e4ddcd] bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-[#f2eaf8]"><.icon name="hero-wrench-screwdriver" class="size-6 text-[#6d3fa0]" /></span>
+        <p class="text-sm font-semibold text-[#6b7280]">دستگاه‌های داخل تعمیرگاه</p>
+      </div>
+      <p class="mt-4 text-4xl font-black text-[#6d3fa0]">{@total_workshop}</p>
+      <p class="mt-1 text-xs font-medium text-[#8a8171]">خراب، در انتظار تعمیر، در حال تعمیر، آماده تحویل</p>
+    </div>
+  </div>
+</.reporter_layout>

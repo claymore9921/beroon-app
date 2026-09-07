@@ -36,6 +36,7 @@ defmodule BeroonWeb.PageController do
   def home(conn, _params) do
     case conn.assigns[:current_user_role] do
       "admin" -> redirect(conn, to: ~p"/admin/reports")
+      "reporter" -> redirect(conn, to: ~p"/reports")
       "branch_manager" -> redirect(conn, to: ~p"/manager")
       "workshop_manager" -> redirect(conn, to: ~p"/workshop")
       "branch_manager_pending" -> redirect(conn, to: ~p"/manager/pending")
@@ -829,6 +830,314 @@ defmodule BeroonWeb.PageController do
     })
   end
 
+  # سویه‌ی گزارش‌دهی: دسترسی فقط‌خواندنی به آمار روزانه‌ی ناوگان.
+  def reporter_dashboard(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    stats = reporter_dashboard_stats(date)
+
+    render(conn, :reporter_dashboard,
+      report_date: date,
+      total_fleet: stats.total_fleet,
+      total_card: stats.total_card,
+      total_cash: stats.total_cash,
+      total_repaired: stats.total_repaired,
+      total_scanned: stats.total_scanned,
+      total_workshop: stats.total_workshop,
+      export_json: reporter_dashboard_export_json(date, stats)
+    )
+  end
+
+  def reporter_dashboard_download(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    stats = reporter_dashboard_stats(date)
+
+    rows = [
+      ["تعداد کل دستگاه‌های ناوگان", stats.total_fleet],
+      ["جمع کل کارت به کارت (تومان)", stats.total_card],
+      ["جمع کل نقدی (تومان)", stats.total_cash],
+      ["جمع کل دستگاه‌های تعمیر شده", stats.total_repaired],
+      ["دستگاه‌های اسکن‌شده در شعب", stats.total_scanned],
+      ["دستگاه‌های داخل تعمیرگاه", stats.total_workshop]
+    ]
+
+    binary = simple_report_xlsx("داشبورد", "خلاصه داشبورد", date, ["شاخص", "مقدار"], rows)
+    send_xlsx_file(conn, "beroon-dashboard", date, binary)
+  end
+
+  defp reporter_dashboard_stats(date) do
+    export = Reports.evening_inventory_export(date)
+    discharges_count = date |> Reports.workshop_discharges_for_date() |> length()
+    total_cash = Enum.reduce(export.revenue_details, 0, &(&1.cash_amount + &2))
+    total_card = Enum.reduce(export.revenue_details, 0, &(&1.card_to_card_amount + &2))
+
+    %{
+      total_fleet: export.totals.branches_total_count + export.totals.workshop_total_count,
+      total_card: total_card,
+      total_cash: total_cash,
+      total_repaired: discharges_count,
+      total_scanned: export.totals.branches_total_count,
+      total_workshop: export.totals.workshop_total_count
+    }
+  end
+
+  defp reporter_dashboard_export_json(date, stats) do
+    Jason.encode!(%{
+      title: "داشبورد",
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      columns: [
+        %{key: "label", title: "شاخص", width: 340, align: "right"},
+        %{key: "value", title: "مقدار", width: 200, align: "center"}
+      ],
+      rows: [
+        %{label: "تعداد کل دستگاه‌های ناوگان", value: stats.total_fleet},
+        %{label: "جمع کل کارت به کارت (تومان)", value: stats.total_card},
+        %{label: "جمع کل نقدی (تومان)", value: stats.total_cash},
+        %{label: "جمع کل دستگاه‌های تعمیر شده", value: stats.total_repaired},
+        %{label: "دستگاه‌های اسکن‌شده در شعب", value: stats.total_scanned},
+        %{label: "دستگاه‌های داخل تعمیرگاه", value: stats.total_workshop}
+      ]
+    })
+  end
+
+  def reporter_daily_report(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    rows = reporter_daily_rows(date)
+
+    render(conn, :reporter_daily_report,
+      report_date: date,
+      rows: rows,
+      export_json: reporter_daily_export_json(date, rows)
+    )
+  end
+
+  def reporter_daily_download(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    rows = reporter_daily_rows(date)
+
+    data_rows =
+      Enum.map(rows, fn row ->
+        [
+          row.branch_name,
+          if(row.submitted, do: "ثبت شده", else: "ثبت نشده"),
+          row.scanned_count,
+          row.workshop_count,
+          row.waiting_for_part_count,
+          row.loaned_count,
+          row.stolen_count
+        ]
+      end)
+
+    headers = ["شعبه", "وضعیت ثبت", "اسکن‌شده", "تعمیرگاه", "در انتظار قطعه", "امانی", "سرقتی"]
+    binary = simple_report_xlsx("گزارش روزانه", "گزارش روزانه شعب", date, headers, data_rows)
+    send_xlsx_file(conn, "beroon-daily-report", date, binary)
+  end
+
+  defp reporter_daily_rows(date) do
+    Operations.list_active_transport_branches()
+    |> Enum.map(fn branch ->
+      summary = Reports.branch_evening_finance_summary(branch.id, date)
+
+      %{
+        branch_name: branch.name,
+        submitted: summary.submitted,
+        scanned_count: summary.totals.scanned_count,
+        workshop_count: summary.totals.workshop_count,
+        waiting_for_part_count: summary.totals.waiting_for_part_count,
+        loaned_count: summary.totals.loaned_count,
+        stolen_count: summary.totals.stolen_count
+      }
+    end)
+  end
+
+  defp reporter_daily_export_json(date, rows) do
+    Jason.encode!(%{
+      title: "گزارش روزانه",
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      columns: [
+        %{key: "branch_name", title: "شعبه", width: 190, align: "right"},
+        %{key: "status_label", title: "وضعیت", width: 100, align: "center"},
+        %{key: "scanned_count", title: "اسکن‌شده", width: 100, align: "center"},
+        %{key: "workshop_count", title: "تعمیرگاه", width: 100, align: "center"},
+        %{key: "waiting_for_part_count", title: "در انتظار قطعه", width: 120, align: "center"},
+        %{key: "loaned_count", title: "امانی", width: 90, align: "center"},
+        %{key: "stolen_count", title: "سرقتی", width: 90, align: "center"}
+      ],
+      rows:
+        Enum.map(rows, fn r ->
+          %{
+            branch_name: r.branch_name,
+            status_label: if(r.submitted, do: "ثبت شده", else: "ثبت نشده"),
+            scanned_count: r.scanned_count,
+            workshop_count: r.workshop_count,
+            waiting_for_part_count: r.waiting_for_part_count,
+            loaned_count: r.loaned_count,
+            stolen_count: r.stolen_count
+          }
+        end)
+    })
+  end
+
+  def reporter_revenue_report(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    revenue_details = Reports.list_daily_revenues_for_date(date)
+
+    render(conn, :reporter_revenue_report,
+      report_date: date,
+      revenue_details: revenue_details,
+      export_json: reporter_revenue_export_json(date, revenue_details)
+    )
+  end
+
+  def reporter_revenue_download(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
+    revenue_details = Reports.list_daily_revenues_for_date(date)
+
+    data_rows =
+      Enum.map(revenue_details, fn r ->
+        [r.branch_name, r.card_to_card_amount, r.cash_amount, r.total_amount]
+      end)
+
+    totals = [
+      {"جمع کل", "Total"},
+      {Enum.reduce(revenue_details, 0, &(&1.card_to_card_amount + &2)), "Total"},
+      {Enum.reduce(revenue_details, 0, &(&1.cash_amount + &2)), "Total"},
+      {Enum.reduce(revenue_details, 0, &(&1.total_amount + &2)), "Total"}
+    ]
+
+    headers = ["شعبه", "کارت به کارت (تومان)", "نقدی (تومان)", "جمع (تومان)"]
+    binary = simple_report_xlsx("نقدی و کارت به کارت", "گزارش درآمد شعب", date, headers, data_rows, totals)
+    send_xlsx_file(conn, "beroon-revenue", date, binary)
+  end
+
+  defp reporter_revenue_export_json(date, revenue_details) do
+    Jason.encode!(%{
+      title: "نقدی و کارت به کارت",
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      columns: [
+        %{key: "branch_name", title: "شعبه", width: 200, align: "right"},
+        %{key: "card_to_card_amount", title: "کارت به کارت", width: 150, align: "center"},
+        %{key: "cash_amount", title: "نقدی", width: 150, align: "center"},
+        %{key: "total_amount", title: "جمع", width: 150, align: "center"}
+      ],
+      rows:
+        Enum.map(revenue_details, fn r ->
+          %{
+            branch_name: r.branch_name,
+            card_to_card_amount: r.card_to_card_amount,
+            cash_amount: r.cash_amount,
+            total_amount: r.total_amount
+          }
+        end),
+      totals: %{
+        branch_name: "جمع کل",
+        card_to_card_amount: Enum.reduce(revenue_details, 0, &(&1.card_to_card_amount + &2)),
+        cash_amount: Enum.reduce(revenue_details, 0, &(&1.cash_amount + &2)),
+        total_amount: Enum.reduce(revenue_details, 0, &(&1.total_amount + &2))
+      }
+    })
+  end
+
+  def reporter_workshop_report(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+    discharges = Reports.workshop_discharges_for_date(date)
+    usages_by_event = Parts.usages_by_event(Enum.map(discharges, & &1.event_id))
+
+    render(conn, :reporter_workshop_report,
+      report_date: date,
+      discharges: discharges,
+      usages_by_event: usages_by_event,
+      export_json: reporter_workshop_export_json(date, discharges, usages_by_event)
+    )
+  end
+
+  def reporter_workshop_download(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+    discharges = Reports.workshop_discharges_for_date(date)
+    usages_by_event = Parts.usages_by_event(Enum.map(discharges, & &1.event_id))
+
+    data_rows =
+      Enum.map(discharges, fn item ->
+        type_label =
+          [item.device_type.category, item.device_type.device_model, item.device_type.device_identifier]
+          |> Enum.reject(&(&1 in [nil, ""]))
+          |> Enum.join(" ")
+
+        [
+          item.plate || "-",
+          type_label,
+          item.technician_name || "ثبت نشده",
+          reporter_format_parts(usages_by_event, item.event_id),
+          item.discharge_notes || "-",
+          Beroon.Calendar.persian_datetime(item.discharged_at)
+        ]
+      end)
+
+    headers = ["پلاک", "نوع دستگاه", "تعمیرکار", "قطعات مصرف‌شده", "توضیحات", "زمان ترخیص"]
+    binary = simple_report_xlsx("عملکرد تعمیرگاه", "گزارش عملکرد تعمیرگاه", date, headers, data_rows)
+    send_xlsx_file(conn, "beroon-workshop", date, binary)
+  end
+
+  defp reporter_format_parts(usages_by_event, event_id) do
+    case Map.get(usages_by_event, event_id, []) do
+      [] -> "-"
+      usages -> usages |> Enum.map(&"#{&1.part_name}×#{&1.quantity}") |> Enum.join("، ")
+    end
+  end
+
+  defp reporter_workshop_export_json(date, discharges, usages_by_event) do
+    Jason.encode!(%{
+      title: "عملکرد تعمیرگاه",
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      columns: [
+        %{key: "plate", title: "پلاک", width: 130, align: "right"},
+        %{key: "device_type", title: "نوع دستگاه", width: 150, align: "right"},
+        %{key: "technician_name", title: "تعمیرکار", width: 120, align: "center"},
+        %{key: "parts", title: "قطعات مصرف‌شده", width: 220, align: "right"},
+        %{key: "notes", title: "توضیحات", width: 200, align: "right"},
+        %{key: "discharged_at", title: "زمان ترخیص", width: 140, align: "center"}
+      ],
+      rows:
+        Enum.map(discharges, fn item ->
+          type_label =
+            [item.device_type.category, item.device_type.device_model, item.device_type.device_identifier]
+            |> Enum.reject(&(&1 in [nil, ""]))
+            |> Enum.join(" ")
+
+          %{
+            plate: item.plate || "-",
+            device_type: type_label,
+            technician_name: item.technician_name || "ثبت نشده",
+            parts: reporter_format_parts(usages_by_event, item.event_id),
+            notes: item.discharge_notes || "-",
+            discharged_at: Beroon.Calendar.persian_datetime(item.discharged_at)
+          }
+        end)
+    })
+  end
+
+  defp simple_report_xlsx(sheet_name, title, date, headers, rows, totals \\ nil) do
+    content =
+      [
+        [{title, "Title"}],
+        [{"تاریخ: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
+        [],
+        Enum.map(headers, &{&1, "Header"})
+      ] ++
+        rows ++
+        if(totals, do: [[], totals], else: [])
+
+    xlsx_workbook([{sheet_name, content}])
+  end
+
+  defp send_xlsx_file(conn, filename_prefix, date, binary) do
+    filename = "#{filename_prefix}-#{String.replace(Beroon.Calendar.persian_numeric_date(date), "/", "-")}.xlsx"
+
+    conn
+    |> put_resp_content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
+    |> send_resp(200, binary)
+  end
+
   def admin_evening_report_detail(conn, %{"id" => id}) do
     report = Reports.get_evening_count_report!(id)
     branch = Operations.get_branch!(report.branch_id)
@@ -1266,38 +1575,16 @@ defmodule BeroonWeb.PageController do
         :daily
       )
 
-    loan_rows = loan_details_sheet_rows(export.loan_details)
-
-    summary_rows =
-      summary_sheet_rows("خلاصه مدیریتی گزارش روزانه", export.date, [
-        {"تعداد دستگاه‌های اسکن‌شده همه شعب", export.totals.branches_total_count},
-        {"تعداد دستگاه‌های تعمیرگاه", export.totals.workshop_total_count},
-        {"تعداد دستگاه‌های در انتظار قطعه", export.totals.waiting_for_part_count},
-        {"تعداد دستگاه‌های امانی", export.totals.loaned_count},
-        {"تعداد دستگاه‌های سرقتی", export.totals.stolen_count},
-        {"موقعیت معلوم / جابه‌جایی ثبت‌شده", export.totals.location_known_count},
-        {"جمع کل تعیین تکلیف شده‌ها", export.totals.accounted_total_count},
-        {"نیاز به بررسی (خارج از جمع کل)", export.totals.needs_review_count},
-        {"جمع کل ناوگان (بدون نیاز به بررسی، انبار نو و فروش)", export.totals.operational_total_count},
-        {"موجودی انبار نو (جدا از ناوگان)", export.totals.new_stock_count},
-        {"موجودی رگال فروش (جدا از ناوگان)", export.totals.sales_rack_count},
-        {"جمع موجودی انبار نو و رگال فروش", export.totals.new_stock_count + export.totals.sales_rack_count},
-        {"فروش ثبت‌شده (جدا از ناوگان)", export.totals.sold_count}
-      ])
-
     workshop_rows = workshop_discharge_sheet_rows(export.date)
-    revenue_rows = revenue_sheet_rows(export.date, export.revenue_details)
+    revenue_appendix = revenue_rows_appendix(export.revenue_details)
 
     xlsx_workbook([
-      {"گزارش روزانه", main_rows},
-      {"دستگاه‌های امانی", loan_rows},
-      {"خلاصه مدیریتی", summary_rows},
-      {"تعمیرگاه", workshop_rows},
-      {"درآمد شعب", revenue_rows}
+      {"گزارش روزانه", main_rows ++ revenue_appendix},
+      {"تعمیرگاه", workshop_rows}
     ])
   end
 
-  defp revenue_sheet_rows(date, revenue_details) do
+  defp revenue_rows_appendix(revenue_details) do
     headers = ["ردیف", "شعبه", "کارت به کارت (تومان)", "نقدی (تومان)", "جمع (تومان)"]
 
     rows =
@@ -1318,9 +1605,9 @@ defmodule BeroonWeb.PageController do
     total_all = total_cash + total_card
 
     [
-      [{"درآمد نقدی و کارت‌به‌کارت شعب", "Title"}],
-      [{"تاریخ گزارش: #{Beroon.Calendar.persian_date(date)}", "Subtitle"}],
       [],
+      [],
+      [{"درآمد نقدی و کارت‌به‌کارت شعب", "Title"}],
       Enum.map(headers, &{&1, "Header"})
     ] ++
       rows ++
@@ -1337,15 +1624,7 @@ defmodule BeroonWeb.PageController do
           "تعمیرگاه",
           "در انتظار قطعه",
           "امانی",
-          "سرقتی",
-          "موقعیت معلوم / جابه‌جایی",
-          "جمع کل ناوگان",
-          "انبار نو",
-          "رگال فروش",
-          "فروش",
-          "جمع کل اسکن‌شده‌ها",
-          "جمع کل تعیین تکلیف شده‌ها",
-          "جمع کل نیاز به بررسی"
+          "سرقتی"
         ]
       end
 
@@ -1373,15 +1652,7 @@ defmodule BeroonWeb.PageController do
                 row.workshop_total_count,
                 row.waiting_for_part_count,
                 row.loaned_count,
-                row.stolen_count,
-                row.location_known_count,
-                row.operational_total_count,
-                row.new_stock_count,
-                row.sales_rack_count,
-                row.sold_count,
-                row.branches_total_count,
-                row.accounted_total_count,
-                row.needs_review_count
+                row.stolen_count
               ]
           end
 
@@ -1408,15 +1679,7 @@ defmodule BeroonWeb.PageController do
             totals.workshop_total_count,
             totals.waiting_for_part_count,
             totals.loaned_count,
-            totals.stolen_count,
-            totals.location_known_count,
-            totals.operational_total_count,
-            totals.new_stock_count,
-            totals.sales_rack_count,
-            totals.sold_count,
-            totals.branches_total_count,
-            totals.accounted_total_count,
-            totals.needs_review_count
+            totals.stolen_count
           ]
       end
 

@@ -1668,3 +1668,137 @@ main.manager-dashboard-shell > .manager-dashboard > * {
   position: relative;
   z-index: 1;
 }
+
+/* ===== Reporter portal (desktop-first, sidebar layout) ===== */
+.reporter-app {
+  display: flex;
+  min-height: 100vh;
+  background: #f6f4ef;
+}
+
+.reporter-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 264px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #0f2942, #0b1f33);
+  padding: 24px 16px;
+  gap: 8px;
+}
+
+.reporter-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 12px;
+}
+
+.reporter-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.reporter-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  color: #b7c6d3;
+  font-weight: 700;
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.reporter-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.reporter-nav-link.is-active {
+  background: #c9a24b;
+  color: #12283b;
+}
+
+.reporter-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  color: #f0a0a0;
+  font-weight: 700;
+  font-size: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 12px;
+  padding-top: 16px;
+}
+
+.reporter-logout:hover {
+  color: #ffffff;
+  background: rgba(220, 38, 38, 0.25);
+}
+
+.reporter-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.reporter-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 40px;
+}
+
+@media (max-width: 900px) {
+  .reporter-app {
+    flex-direction: column;
+  }
+
+  .reporter-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 16px;
+  }
+
+  .reporter-sidebar-brand {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding: 0;
+  }
+
+  .reporter-nav {
+    flex-direction: row;
+    flex: 1;
+    overflow-x: auto;
+  }
+
+  .reporter-nav-link span {
+    display: none;
+  }
+
+  .reporter-logout {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .reporter-logout span {
+    display: none;
+  }
+
+  .reporter-content {
+    height: auto;
+  }
+
+  .reporter-container {
+    padding: 20px;
+  }
+}

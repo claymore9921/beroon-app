@@ -112,6 +112,36 @@ defmodule BeroonWeb.PageHTML do
   def persian_time(datetime), do: Beroon.Calendar.persian_time(datetime)
   def persian_numeric_date(date), do: Beroon.Calendar.persian_numeric_date(date)
 
+  def format_parts_used(usages_by_event, event_id) do
+    case Map.get(usages_by_event, event_id, []) do
+      [] -> "-"
+      usages -> usages |> Enum.map(&"#{&1.part_name}×#{&1.quantity}") |> Enum.join("، ")
+    end
+  end
+
+  attr :export_json, :string, required: true
+  attr :download_url, :string, required: true
+
+  def reporter_export_buttons(assigns) do
+    ~H"""
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="export-report-image flex items-center gap-2 rounded-lg border border-[#c9a24b] bg-white px-4 py-2 text-sm font-black text-[#12283b] hover:bg-[#faf3e2]"
+        data-export={@export_json}
+      >
+        <.icon name="hero-photo" class="size-4" />دانلود عکس
+      </button>
+      <.link
+        href={@download_url}
+        class="flex items-center gap-2 rounded-lg bg-[#c9a24b] px-4 py-2 text-sm font-black text-[#12283b] hover:bg-[#b8923f]"
+      >
+        <.icon name="hero-arrow-down-tray" class="size-4" />دانلود اکسل
+      </.link>
+    </div>
+    """
+  end
+
   attr :plate, :string, required: true
   attr :class, :any, default: nil
 
@@ -198,6 +228,49 @@ defmodule BeroonWeb.PageHTML do
       </div>
       <form method="dialog" class="modal-backdrop"><button aria-label="بستن"></button></form>
     </dialog>
+    """
+  end
+
+  attr :active, :string, required: true
+  slot :inner_block, required: true
+
+  def reporter_layout(assigns) do
+    ~H"""
+    <div class="reporter-app" dir="rtl">
+      <aside class="reporter-sidebar">
+        <div class="reporter-sidebar-brand">
+          <div>
+            <p class="text-base font-black text-white">برون</p>
+            <p class="text-[11px] font-semibold text-[#93a9bd]">پرتال گزارش‌دهی</p>
+          </div>
+        </div>
+
+        <nav class="reporter-nav">
+          <.link navigate={~p"/reports"} class={["reporter-nav-link", @active == "dashboard" && "is-active"]}>
+            <.icon name="hero-squares-2x2" class="size-5" /><span>داشبورد</span>
+          </.link>
+          <.link navigate={~p"/reports/daily"} class={["reporter-nav-link", @active == "daily" && "is-active"]}>
+            <.icon name="hero-calendar-days" class="size-5" /><span>گزارش روزانه</span>
+          </.link>
+          <.link navigate={~p"/reports/revenue"} class={["reporter-nav-link", @active == "revenue" && "is-active"]}>
+            <.icon name="hero-banknotes" class="size-5" /><span>نقدی و کارت به کارت</span>
+          </.link>
+          <.link navigate={~p"/reports/workshop"} class={["reporter-nav-link", @active == "workshop" && "is-active"]}>
+            <.icon name="hero-wrench-screwdriver" class="size-5" /><span>عملکرد تعمیرگاه</span>
+          </.link>
+        </nav>
+
+        <.link href={~p"/logout"} method="delete" class="reporter-logout">
+          <.icon name="hero-arrow-left-on-rectangle" class="size-5" /><span>خروج</span>
+        </.link>
+      </aside>
+
+      <div class="reporter-content">
+        <div class="reporter-container">
+          {render_slot(@inner_block)}
+        </div>
+      </div>
+    </div>
     """
   end
 end

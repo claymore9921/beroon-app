@@ -905,6 +905,159 @@ const renderEveningAuditCanvas = async (payload) => {
   return canvas
 }
 
+const renderGenericTableCanvas = async (payload) => {
+  if (document.fonts?.load) {
+    await Promise.all([
+      document.fonts.load("800 24px Peyda"),
+      document.fonts.load("700 16px Peyda"),
+      document.fonts.load("700 14px Peyda"),
+      document.fonts.load("700 12px Peyda"),
+    ]).catch(() => {})
+    await document.fonts.ready.catch(() => {})
+  }
+
+  const columns = payload.columns || []
+  const rows = payload.rows || []
+  const totals = payload.totals || null
+
+  const padding = 32
+  const headerHeight = 96
+  const headerRowHeight = 44
+  const dataRowHeight = 38
+  const totalsRowHeight = totals ? 44 : 0
+
+  const contentWidth = columns.reduce((sum, col) => sum + col.width, 0)
+  const width = contentWidth + padding * 2
+  const tableHeight = headerRowHeight + Math.max(rows.length, 1) * dataRowHeight + totalsRowHeight
+  const totalHeight = headerHeight + tableHeight + padding
+
+  const scale = 2
+  const canvas = document.createElement("canvas")
+  canvas.width = width * scale
+  canvas.height = totalHeight * scale
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${totalHeight}px`
+
+  const ctx = canvas.getContext("2d")
+  ctx.scale(scale, scale)
+  ctx.direction = "rtl"
+
+  ctx.fillStyle = "#f6f4ef"
+  ctx.fillRect(0, 0, width, totalHeight)
+
+  ctx.fillStyle = "#12283b"
+  ctx.font = "800 22px Peyda, sans-serif"
+  ctx.textAlign = "right"
+  ctx.fillText(payload.title || "", width - padding, padding + 24)
+
+  ctx.fillStyle = "#6b7280"
+  ctx.font = "700 14px Peyda, sans-serif"
+  ctx.fillText(`تاریخ: ${payload.date_label || ""}`, width - padding, padding + 48)
+
+  const columnStartX = []
+  let cursorX = width - padding
+  columns.forEach((col) => {
+    columnStartX.push(cursorX - col.width)
+    cursorX -= col.width
+  })
+
+  let y = headerHeight
+
+  ctx.fillStyle = "#12283b"
+  roundRect(ctx, padding, y, contentWidth, headerRowHeight, 10)
+  ctx.fill()
+
+  columns.forEach((col, idx) => {
+    ctx.fillStyle = "#f6f4ef"
+    ctx.font = "700 13px Peyda, sans-serif"
+    ctx.textAlign = col.align
+    const textX = col.align === "center" ? columnStartX[idx] + col.width / 2 : columnStartX[idx] + col.width - 14
+    ctx.fillText(col.title, textX, y + headerRowHeight / 2 + 5)
+  })
+
+  y += headerRowHeight
+
+  if (rows.length === 0) {
+    ctx.fillStyle = "#8a8171"
+    ctx.font = "600 13px Peyda, sans-serif"
+    ctx.textAlign = "center"
+    ctx.fillText("موردی برای نمایش وجود ندارد.", width / 2, y + dataRowHeight / 2 + 5)
+    y += dataRowHeight
+  } else {
+    rows.forEach((row, rowIdx) => {
+      ctx.fillStyle = rowIdx % 2 === 0 ? "#ffffff" : "#faf8f2"
+      ctx.fillRect(padding, y, contentWidth, dataRowHeight)
+
+      columns.forEach((col, idx) => {
+        ctx.fillStyle = "#1e293b"
+        ctx.font = "700 13px Peyda, sans-serif"
+        ctx.textAlign = col.align
+        const textX = col.align === "center" ? columnStartX[idx] + col.width / 2 : columnStartX[idx] + col.width - 14
+        const value = row[col.key]
+        ctx.fillText(String(value === null || value === undefined ? "-" : value), textX, y + dataRowHeight / 2 + 5, col.width - 16)
+      })
+
+      y += dataRowHeight
+    })
+  }
+
+  if (totals) {
+    ctx.fillStyle = "#eee7d8"
+    ctx.fillRect(padding, y, contentWidth, totalsRowHeight)
+    ctx.strokeStyle = "#c9a24b"
+    ctx.lineWidth = 1
+    ctx.strokeRect(padding, y, contentWidth, totalsRowHeight)
+
+    columns.forEach((col, idx) => {
+      ctx.fillStyle = "#12283b"
+      ctx.font = "800 13px Peyda, sans-serif"
+      ctx.textAlign = col.align
+      const textX = col.align === "center" ? columnStartX[idx] + col.width / 2 : columnStartX[idx] + col.width - 14
+      const value = totals[col.key]
+      ctx.fillText(String(value === null || value === undefined ? "" : value), textX, y + totalsRowHeight / 2 + 5, col.width - 16)
+    })
+  }
+
+  return canvas
+}
+
+const setupGenericImageExport = () => {
+  document.querySelectorAll(".export-report-image").forEach((button) => {
+    if (button.dataset.exportBound === "true") return
+    button.dataset.exportBound = "true"
+
+    button.addEventListener("click", async () => {
+      let payload
+      try {
+        payload = JSON.parse(button.dataset.export || "")
+      } catch (error) {
+        console.error("Report export data parse error:", error)
+        alert("داده‌ای برای ساخت عکس پیدا نشد.")
+        return
+      }
+
+      const originalHTML = button.innerHTML
+      button.disabled = true
+      button.textContent = "در حال آماده‌سازی..."
+
+      try {
+        const canvas = await renderGenericTableCanvas(payload)
+        const filename = `${payload.title || "گزارش"}-${payload.date_label || ""}`.replace(/[\s/]+/g, "-")
+        const link = document.createElement("a")
+        link.download = `${filename}.png`
+        link.href = canvas.toDataURL("image/png")
+        link.click()
+      } catch (error) {
+        console.error("Report image export error:", error)
+        alert("ساخت عکس انجام نشد. دوباره تلاش کنید.")
+      } finally {
+        button.disabled = false
+        button.innerHTML = originalHTML
+      }
+    })
+  })
+}
+
 const setupEveningAuditExport = () => {
   const button = document.getElementById("export-evening-audit-image")
   if (!button) return
@@ -1100,6 +1253,7 @@ const bootScannerPages = () => {
   setupEveningScanner()
   setupScooterFormScanner()
   setupEveningAuditExport()
+  setupGenericImageExport()
   setupDinnerForm()
   setupDischargeModal()
 

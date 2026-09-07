@@ -19,6 +19,10 @@ defmodule BeroonWeb.Router do
     plug BeroonWeb.AdminAuth, :require_admin
   end
 
+  pipeline :require_reporter do
+    plug BeroonWeb.AdminAuth, :require_reporter
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -136,6 +140,20 @@ defmodule BeroonWeb.Router do
     resources "/checklist_items", ChecklistItemController
     resources "/morning_inspections", MorningInspectionController
     resources "/evening_counts", EveningCountController
+  end
+
+  scope "/", BeroonWeb do
+    pipe_through [:browser, :require_reporter]
+
+    get "/reports", PageController, :reporter_dashboard
+    get "/reports/dashboard/download", PageController, :reporter_dashboard_download
+    get "/reports/daily", PageController, :reporter_daily_report
+    get "/reports/daily/download", PageController, :reporter_daily_download
+    get "/reports/revenue", PageController, :reporter_revenue_report
+    get "/reports/revenue/download", PageController, :reporter_revenue_download
+    get "/reports/workshop", PageController, :reporter_workshop_report
+    get "/reports/workshop/download", PageController, :reporter_workshop_download
+    get "/reports/export/download", PageController, :download_admin_report_export
   end
 
   if Application.compile_env(:beroon, :dev_routes) do
