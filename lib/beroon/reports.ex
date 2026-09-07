@@ -51,6 +51,14 @@ defmodule Beroon.Reports do
   end
 
   @doc """
+  آمار شام فقط پنجشنبه و جمعه (به وقت تهران) برای مدیران شعبه باز است.
+  """
+  def dinner_window_open?(now \\ DateTime.utc_now()) do
+    weekday = now |> tehran_now() |> DateTime.to_date() |> Date.day_of_week()
+    weekday in [4, 5]
+  end
+
+  @doc """
   Returns the evening cycle an admin/manager should currently inspect.
   Between 06:00 and 20:59 the latest completed cycle is the previous date.
   """

@@ -17,7 +17,17 @@
       آمار شام امروز با {@dinner_report.attendant_count} نفر قبلاً ثبت شده است. در صورت تغییر تعداد یا نام‌ها، دوباره ثبت کنید تا جایگزین شود.
     </div>
 
+    <div
+      :if={!@window_open}
+      class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-900"
+    >
+      <p class="font-bold">ثبت آمار شام در حال حاضر بسته است.</p>
+      <p class="mt-1 text-sm">آمار شام فقط روزهای پنجشنبه و جمعه قابل ثبت است.</p>
+      <.link navigate={~p"/manager"} class="btn mt-4 min-h-12 w-full">بازگشت به پنل</.link>
+    </div>
+
     <.form
+      :if={@window_open}
       :let={f}
       for={%{}}
       as={:dinner}

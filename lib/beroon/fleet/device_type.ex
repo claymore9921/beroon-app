@@ -4,7 +4,7 @@ defmodule Beroon.Fleet.DeviceType do
 
   schema "device_types" do
     has_one :new_device_stock, Beroon.Inventory.NewDeviceStock
-    has_one :sales_rack_stock, Beroon.Inventory.SalesRackStock
+    has_many :sales_rack_stocks, Beroon.Inventory.SalesRackStock
     field :name, :string
     field :code, :string
     field :device_identifier, :string

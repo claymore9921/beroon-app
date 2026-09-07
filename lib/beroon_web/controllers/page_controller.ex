@@ -639,6 +639,7 @@ defmodule BeroonWeb.PageController do
       render(conn, :manager_dinner,
         branch: branch,
         persian_today: Beroon.Calendar.persian_date(today),
+        window_open: Reports.dinner_window_open?(),
         dinner_report: Reports.get_dinner_report(branch.id, today)
       )
     end
@@ -655,26 +656,33 @@ defmodule BeroonWeb.PageController do
       |> Enum.map(&String.trim(to_string(&1 || "")))
       |> Enum.reject(&(&1 == ""))
 
-    if is_nil(branch) do
-      redirect(conn, to: ~p"/manager/pending")
-    else
-      case Reports.upsert_dinner_report(%{
-             branch_id: branch.id,
-             reported_on: today,
-             attendant_count: length(names),
-             attendant_names: names,
-             registered_by_phone: conn.assigns.current_user_phone
-           }) do
-        {:ok, _report} ->
-          conn
-          |> put_flash(:info, "آمار شام با #{length(names)} نفر ثبت شد.")
-          |> redirect(to: ~p"/manager/dinner")
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
 
-        {:error, changeset} ->
-          conn
-          |> put_flash(:error, "ثبت آمار شام انجام نشد: #{first_error(changeset)}")
-          |> redirect(to: ~p"/manager/dinner")
-      end
+      not Reports.dinner_window_open?() ->
+        conn
+        |> put_flash(:error, "ثبت آمار شام فقط پنجشنبه و جمعه فعال است.")
+        |> redirect(to: ~p"/manager/dinner")
+
+      true ->
+        case Reports.upsert_dinner_report(%{
+               branch_id: branch.id,
+               reported_on: today,
+               attendant_count: length(names),
+               attendant_names: names,
+               registered_by_phone: conn.assigns.current_user_phone
+             }) do
+          {:ok, _report} ->
+            conn
+            |> put_flash(:info, "آمار شام با #{length(names)} نفر ثبت شد.")
+            |> redirect(to: ~p"/manager/dinner")
+
+          {:error, changeset} ->
+            conn
+            |> put_flash(:error, "ثبت آمار شام انجام نشد: #{first_error(changeset)}")
+            |> redirect(to: ~p"/manager/dinner")
+        end
     end
   end
 
@@ -901,79 +909,72 @@ defmodule BeroonWeb.PageController do
 
   def reporter_daily_report(conn, params) do
     date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
-    rows = reporter_daily_rows(date)
+    export = Reports.evening_inventory_export(date)
 
     render(conn, :reporter_daily_report,
       report_date: date,
-      rows: rows,
-      export_json: reporter_daily_export_json(date, rows)
+      branches: export.branches,
+      rows: export.rows,
+      export_json: reporter_daily_export_json(date, export)
     )
   end
 
   def reporter_daily_download(conn, params) do
     date = parse_optional_date(params["date"]) || Reports.current_evening_cycle_date()
-    rows = reporter_daily_rows(date)
+    export = Reports.evening_inventory_export(date)
+
+    headers =
+      ["نوع دستگاه"] ++
+        Enum.map(export.branches, & &1.name) ++
+        ["تعمیرگاه", "در انتظار قطعه", "امانی", "سرقتی"]
 
     data_rows =
-      Enum.map(rows, fn row ->
-        [
-          row.branch_name,
-          if(row.submitted, do: "ثبت شده", else: "ثبت نشده"),
-          row.scanned_count,
-          row.workshop_count,
-          row.waiting_for_part_count,
-          row.loaned_count,
-          row.stolen_count
-        ]
+      Enum.map(export.rows, fn row ->
+        [BeroonWeb.PageHTML.device_type_label(row.device_type)] ++
+          Enum.map(export.branches, &Map.get(row.branch_counts, &1.id, 0)) ++
+          [row.workshop_total_count, row.waiting_for_part_count, row.loaned_count, row.stolen_count]
       end)
 
-    headers = ["شعبه", "وضعیت ثبت", "اسکن‌شده", "تعمیرگاه", "در انتظار قطعه", "امانی", "سرقتی"]
-    binary = simple_report_xlsx("گزارش روزانه", "گزارش روزانه شعب", date, headers, data_rows)
+    binary = simple_report_xlsx("گزارش روزانه", "گزارش روزانه به تفکیک نوع دستگاه", date, headers, data_rows)
     send_xlsx_file(conn, "beroon-daily-report", date, binary)
   end
 
-  defp reporter_daily_rows(date) do
-    Operations.list_active_transport_branches()
-    |> Enum.map(fn branch ->
-      summary = Reports.branch_evening_finance_summary(branch.id, date)
+  defp reporter_daily_export_json(date, export) do
+    branch_columns =
+      Enum.map(export.branches, fn b ->
+        %{key: "branch_#{b.id}", title: b.name, width: 110, align: "center"}
+      end)
 
-      %{
-        branch_name: branch.name,
-        submitted: summary.submitted,
-        scanned_count: summary.totals.scanned_count,
-        workshop_count: summary.totals.workshop_count,
-        waiting_for_part_count: summary.totals.waiting_for_part_count,
-        loaned_count: summary.totals.loaned_count,
-        stolen_count: summary.totals.stolen_count
-      }
-    end)
-  end
+    columns =
+      [%{key: "label", title: "نوع دستگاه", width: 220, align: "right"}] ++
+        branch_columns ++
+        [
+          %{key: "workshop_total_count", title: "تعمیرگاه", width: 100, align: "center"},
+          %{key: "waiting_for_part_count", title: "در انتظار قطعه", width: 120, align: "center"},
+          %{key: "loaned_count", title: "امانی", width: 90, align: "center"},
+          %{key: "stolen_count", title: "سرقتی", width: 90, align: "center"}
+        ]
 
-  defp reporter_daily_export_json(date, rows) do
+    rows =
+      Enum.map(export.rows, fn row ->
+        base = %{
+          "label" => BeroonWeb.PageHTML.device_type_label(row.device_type),
+          "workshop_total_count" => row.workshop_total_count,
+          "waiting_for_part_count" => row.waiting_for_part_count,
+          "loaned_count" => row.loaned_count,
+          "stolen_count" => row.stolen_count
+        }
+
+        Enum.reduce(export.branches, base, fn b, acc ->
+          Map.put(acc, "branch_#{b.id}", Map.get(row.branch_counts, b.id, 0))
+        end)
+      end)
+
     Jason.encode!(%{
       title: "گزارش روزانه",
       date_label: Beroon.Calendar.persian_numeric_date(date),
-      columns: [
-        %{key: "branch_name", title: "شعبه", width: 190, align: "right"},
-        %{key: "status_label", title: "وضعیت", width: 100, align: "center"},
-        %{key: "scanned_count", title: "اسکن‌شده", width: 100, align: "center"},
-        %{key: "workshop_count", title: "تعمیرگاه", width: 100, align: "center"},
-        %{key: "waiting_for_part_count", title: "در انتظار قطعه", width: 120, align: "center"},
-        %{key: "loaned_count", title: "امانی", width: 90, align: "center"},
-        %{key: "stolen_count", title: "سرقتی", width: 90, align: "center"}
-      ],
-      rows:
-        Enum.map(rows, fn r ->
-          %{
-            branch_name: r.branch_name,
-            status_label: if(r.submitted, do: "ثبت شده", else: "ثبت نشده"),
-            scanned_count: r.scanned_count,
-            workshop_count: r.workshop_count,
-            waiting_for_part_count: r.waiting_for_part_count,
-            loaned_count: r.loaned_count,
-            stolen_count: r.stolen_count
-          }
-        end)
+      columns: columns,
+      rows: rows
     })
   end
 
@@ -1082,6 +1083,103 @@ defmodule BeroonWeb.PageController do
       [] -> "-"
       usages -> usages |> Enum.map(&"#{&1.part_name}×#{&1.quantity}") |> Enum.join("، ")
     end
+  end
+
+  def reporter_new_stock(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+    stocks = Inventory.list_stocks()
+
+    render(conn, :reporter_new_stock,
+      report_date: date,
+      stocks: stocks,
+      export_json: reporter_new_stock_export_json(date, stocks)
+    )
+  end
+
+  def reporter_new_stock_download(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+    stocks = Inventory.list_stocks()
+
+    rows =
+      Enum.map(stocks, fn type ->
+        [BeroonWeb.PageHTML.device_type_label(type), reporter_new_stock_qty(type)]
+      end)
+
+    binary = simple_report_xlsx("انبار نو", "موجودی انبار نو", date, ["نوع دستگاه", "موجودی"], rows)
+    send_xlsx_file(conn, "beroon-new-stock", date, binary)
+  end
+
+  defp reporter_new_stock_qty(type), do: (type.new_device_stock && type.new_device_stock.quantity) || 0
+
+  defp reporter_new_stock_export_json(date, stocks) do
+    Jason.encode!(%{
+      title: "انبار نو",
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      columns: [
+        %{key: "label", title: "نوع دستگاه", width: 260, align: "right"},
+        %{key: "quantity", title: "موجودی", width: 150, align: "center"}
+      ],
+      rows:
+        Enum.map(stocks, fn type ->
+          %{label: BeroonWeb.PageHTML.device_type_label(type), quantity: reporter_new_stock_qty(type)}
+        end)
+    })
+  end
+
+  def reporter_sales_rack(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+    branches = Operations.list_active_transport_branches()
+    device_types = Inventory.list_sales_rack_stocks()
+    counts = Inventory.sales_rack_counts_by_device_type_and_branch()
+
+    render(conn, :reporter_sales_rack,
+      report_date: date,
+      branches: branches,
+      device_types: device_types,
+      counts: counts,
+      export_json: reporter_sales_rack_export_json(date, branches, device_types, counts)
+    )
+  end
+
+  def reporter_sales_rack_download(conn, params) do
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+    branches = Operations.list_active_transport_branches()
+    device_types = Inventory.list_sales_rack_stocks()
+    counts = Inventory.sales_rack_counts_by_device_type_and_branch()
+
+    headers = ["نوع دستگاه"] ++ Enum.map(branches, & &1.name)
+
+    rows =
+      Enum.map(device_types, fn type ->
+        [BeroonWeb.PageHTML.device_type_label(type)] ++
+          Enum.map(branches, &Map.get(counts, {type.id, &1.id}, 0))
+      end)
+
+    binary = simple_report_xlsx("رگال فروش", "موجودی رگال فروش هر شعبه", date, headers, rows)
+    send_xlsx_file(conn, "beroon-sales-rack", date, binary)
+  end
+
+  defp reporter_sales_rack_export_json(date, branches, device_types, counts) do
+    branch_columns =
+      Enum.map(branches, fn b -> %{key: "branch_#{b.id}", title: b.name, width: 110, align: "center"} end)
+
+    columns = [%{key: "label", title: "نوع دستگاه", width: 240, align: "right"}] ++ branch_columns
+
+    rows =
+      Enum.map(device_types, fn type ->
+        base = %{"label" => BeroonWeb.PageHTML.device_type_label(type)}
+
+        Enum.reduce(branches, base, fn b, acc ->
+          Map.put(acc, "branch_#{b.id}", Map.get(counts, {type.id, b.id}, 0))
+        end)
+      end)
+
+    Jason.encode!(%{
+      title: "رگال فروش",
+      date_label: Beroon.Calendar.persian_numeric_date(date),
+      columns: columns,
+      rows: rows
+    })
   end
 
   defp reporter_workshop_export_json(date, discharges, usages_by_event) do
@@ -1212,7 +1310,10 @@ defmodule BeroonWeb.PageController do
   end
 
   def admin_sales_rack(conn, _params) do
-    render(conn, :admin_sales_rack, stocks: Inventory.list_sales_rack_stocks())
+    render(conn, :admin_sales_rack,
+      stocks: Inventory.list_sales_rack_stocks(),
+      branches: Operations.list_active_transport_branches()
+    )
   end
 
   def update_sales_rack_stock(conn, %{"stock" => params}) do
@@ -1222,7 +1323,7 @@ defmodule BeroonWeb.PageController do
         _ -> -1
       end
 
-    case Inventory.set_sales_rack_stock(params["device_type_id"], quantity) do
+    case Inventory.set_sales_rack_stock(params["device_type_id"], params["branch_id"], quantity) do
       {:ok, _} ->
         conn
         |> put_flash(:info, "موجودی رگال فروش به‌روزرسانی شد.")
@@ -2179,6 +2280,7 @@ defmodule BeroonWeb.PageController do
       needs_service: Map.get(by_status, "needs_service", 0),
       awaiting_repair: Map.get(by_status, "awaiting_repair", 0),
       workshop: Enum.sum(Enum.map(@manager_workshop_statuses, &Map.get(by_status, &1, 0))),
+      ready_for_pickup: Map.get(by_status, "ready_for_pickup", 0),
       waiting_for_part: Map.get(by_status, "waiting_for_part", 0)
     }
   end
@@ -2295,6 +2397,9 @@ defmodule BeroonWeb.PageController do
 
   defp manager_scooters_title("waiting_for_part"),
     do: "دستگاه‌های در انتظار قطعه"
+
+  defp manager_scooters_title("ready_for_pickup"),
+    do: "دستگاه‌های تعمیر شده"
 
   defp manager_scooters_title(_status), do: "لیست دستگاه‌های شعبه من"
 end

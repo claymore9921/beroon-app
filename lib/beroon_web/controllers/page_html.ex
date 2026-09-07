@@ -258,6 +258,12 @@ defmodule BeroonWeb.PageHTML do
           <.link navigate={~p"/reports/workshop"} class={["reporter-nav-link", @active == "workshop" && "is-active"]}>
             <.icon name="hero-wrench-screwdriver" class="size-5" /><span>عملکرد تعمیرگاه</span>
           </.link>
+          <.link navigate={~p"/reports/new-stock"} class={["reporter-nav-link", @active == "new_stock" && "is-active"]}>
+            <.icon name="hero-archive-box" class="size-5" /><span>انبار نو</span>
+          </.link>
+          <.link navigate={~p"/reports/sales-rack"} class={["reporter-nav-link", @active == "sales_rack" && "is-active"]}>
+            <.icon name="hero-building-storefront" class="size-5" /><span>رگال فروش</span>
+          </.link>
         </nav>
 
         <.link href={~p"/logout"} method="delete" class="reporter-logout">

@@ -3,7 +3,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 class="text-2xl font-black text-[#12283b]">گزارش روزانه</h1>
-      <p class="mt-1 text-sm font-medium text-[#6b7280]">تاریخ: {Beroon.Calendar.persian_date(@report_date)}</p>
+      <p class="mt-1 text-sm font-medium text-[#6b7280]">تاریخ: {Beroon.Calendar.persian_date(@report_date)} — به تفکیک نوع دستگاه</p>
     </div>
     <div class="flex items-center gap-3">
       <form method="get" class="flex items-center gap-2">
@@ -24,36 +24,39 @@
     <table class="w-full text-right">
       <thead>
         <tr class="border-b border-[#eee7d8] text-xs font-semibold text-[#8a8171]">
-          <th class="px-6 py-3">شعبه</th>
-          <th class="px-6 py-3">وضعیت ثبت</th>
-          <th class="px-6 py-3">اسکن‌شده</th>
-          <th class="px-6 py-3">تعمیرگاه</th>
-          <th class="px-6 py-3">در انتظار قطعه</th>
-          <th class="px-6 py-3">امانی</th>
-          <th class="px-6 py-3">سرقتی</th>
+          <th class="px-6 py-3">نوع دستگاه</th>
+          <th :for={branch <- @branches} class="px-4 py-3 text-center">{branch.name}</th>
+          <th class="px-4 py-3 text-center">تعمیرگاه</th>
+          <th class="px-4 py-3 text-center">در انتظار قطعه</th>
+          <th class="px-4 py-3 text-center">امانی</th>
+          <th class="px-4 py-3 text-center">سرقتی</th>
         </tr>
       </thead>
       <tbody>
         <tr :for={row <- @rows} class="border-b border-[#f3efe3] last:border-0 hover:bg-[#faf8f2]">
-          <td class="px-6 py-4 font-black text-[#12283b]">{row.branch_name}</td>
-          <td class="px-6 py-4">
-            <span class={[
-              "rounded-full px-3 py-1 text-xs font-black",
-              if(row.submitted, do: "bg-[#eaf3ec] text-[#2f7a4f]", else: "bg-[#faeaea] text-[#a5423a]")
-            ]}>
-              {if row.submitted, do: "ثبت شده", else: "ثبت نشده"}
-            </span>
-          </td>
-          <td class="px-6 py-4 font-black text-[#12283b]">{row.scanned_count}</td>
-          <td class="px-6 py-4 font-black text-[#12283b]">{row.workshop_count}</td>
-          <td class="px-6 py-4 font-black text-[#12283b]">{row.waiting_for_part_count}</td>
-          <td class="px-6 py-4 font-black text-[#12283b]">{row.loaned_count}</td>
-          <td class="px-6 py-4 font-black text-[#12283b]">{row.stolen_count}</td>
+          <td class="px-6 py-4 font-black text-[#12283b]">{device_type_label(row.device_type)}</td>
+          <td :for={branch <- @branches} class="px-4 py-4 text-center font-black text-[#12283b]">{Map.get(row.branch_counts, branch.id, 0)}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{row.workshop_total_count}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{row.waiting_for_part_count}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{row.loaned_count}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{row.stolen_count}</td>
         </tr>
         <tr :if={@rows == []}>
-          <td colspan="7" class="px-6 py-10 text-center text-sm text-[#8a8171]">شعبه‌ی فعالی ثبت نشده است.</td>
+          <td colspan={4 + length(@branches)} class="px-6 py-10 text-center text-sm text-[#8a8171]">نوع دستگاهی ثبت نشده است.</td>
         </tr>
       </tbody>
+      <tfoot :if={@rows != []}>
+        <tr class="border-t-2 border-[#e4ddcd] bg-[#faf8f2]">
+          <td class="px-6 py-4 font-black text-[#12283b]">جمع کل</td>
+          <td :for={branch <- @branches} class="px-4 py-4 text-center font-black text-[#12283b]">
+            {Enum.reduce(@rows, 0, &(Map.get(&1.branch_counts, branch.id, 0) + &2))}
+          </td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{Enum.reduce(@rows, 0, &(&1.workshop_total_count + &2))}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{Enum.reduce(@rows, 0, &(&1.waiting_for_part_count + &2))}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{Enum.reduce(@rows, 0, &(&1.loaned_count + &2))}</td>
+          <td class="px-4 py-4 text-center font-black text-[#12283b]">{Enum.reduce(@rows, 0, &(&1.stolen_count + &2))}</td>
+        </tr>
+      </tfoot>
     </table>
   </section>
 </.reporter_layout>

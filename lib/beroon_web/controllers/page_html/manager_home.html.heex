@@ -54,6 +54,21 @@
         </div>
       </article>
 
+      <.link
+        navigate={~p"/manager/scooters"}
+        class="manager-stat-card"
+        aria-label="لیست دستگاه‌های شعبه من"
+      >
+        <div class="manager-card-icon">
+          <.icon name="hero-map-pin" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>کل دستگاه‌های شعبه</h2>
+          <strong>{@scooter_counts.all}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
       <.link navigate={~p"/manager/scooters/active"} class="manager-stat-card">
         <div class="manager-card-icon">
           <.icon name="hero-bolt" class="size-9" />
@@ -65,17 +80,13 @@
         </div>
       </.link>
 
-      <.link
-        navigate={~p"/manager/scooters"}
-        class="manager-stat-card"
-        aria-label="لیست دستگاه‌های شعبه من"
-      >
+      <.link navigate={~p"/manager/scooters/needs_service"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-map-pin" class="size-9" />
+          <.icon name="hero-exclamation-circle" class="size-9" />
         </div>
         <div class="manager-card-body">
-          <h2>دستگاه‌های شعبه من</h2>
-          <strong>{@scooter_counts.all}</strong>
+          <h2>دستگاه‌های خراب</h2>
+          <strong>{@scooter_counts.needs_service}</strong>
           <span>دستگاه</span>
         </div>
       </.link>
@@ -91,14 +102,14 @@
         </div>
       </.link>
 
-      <.link navigate={~p"/manager/unhealthy-scooters"} class="manager-stat-card">
+      <.link navigate={~p"/manager/scooters/ready_for_pickup"} class="manager-stat-card">
         <div class="manager-card-icon">
-          <.icon name="hero-shield-exclamation" class="size-9" />
+          <.icon name="hero-check-badge" class="size-9" />
         </div>
         <div class="manager-card-body">
-          <h2>دستگاه‌های ناسالم</h2>
-          <span class="inline-flex w-fit items-center rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-bold text-zinc-700">مشاهده</span>
-          <span>خرابی‌های چک‌لیست امروز</span>
+          <h2>تعمیر شده</h2>
+          <strong>{@scooter_counts.ready_for_pickup}</strong>
+          <span>دستگاه</span>
         </div>
       </.link>
 

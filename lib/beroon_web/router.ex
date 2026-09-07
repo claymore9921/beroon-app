@@ -153,6 +153,10 @@ defmodule BeroonWeb.Router do
     get "/reports/revenue/download", PageController, :reporter_revenue_download
     get "/reports/workshop", PageController, :reporter_workshop_report
     get "/reports/workshop/download", PageController, :reporter_workshop_download
+    get "/reports/new-stock", PageController, :reporter_new_stock
+    get "/reports/new-stock/download", PageController, :reporter_new_stock_download
+    get "/reports/sales-rack", PageController, :reporter_sales_rack
+    get "/reports/sales-rack/download", PageController, :reporter_sales_rack_download
     get "/reports/export/download", PageController, :download_admin_report_export
   end
 

@@ -12,8 +12,15 @@ defmodule Beroon.Inventory do
     DeviceType
     |> where([d], d.active == true)
     |> order_by([d], asc: d.category, asc: d.device_model)
-    |> preload([d], [:sales_rack_stock])
+    |> preload(sales_rack_stocks: :branch)
     |> Repo.all()
+  end
+
+  def sales_rack_counts_by_device_type_and_branch do
+    SalesRackStock
+    |> select([s], {{s.device_type_id, s.branch_id}, s.quantity})
+    |> Repo.all()
+    |> Map.new()
   end
 
   def list_sales do
@@ -27,10 +34,10 @@ defmodule Beroon.Inventory do
     end
   end
 
-  def set_sales_rack_stock(device_type_id, quantity) do
-    attrs = %{device_type_id: device_type_id, quantity: quantity}
+  def set_sales_rack_stock(device_type_id, branch_id, quantity) do
+    attrs = %{device_type_id: device_type_id, branch_id: branch_id, quantity: quantity}
 
-    case Repo.get_by(SalesRackStock, device_type_id: device_type_id) do
+    case Repo.get_by(SalesRackStock, device_type_id: device_type_id, branch_id: branch_id) do
       nil -> %SalesRackStock{} |> SalesRackStock.changeset(attrs) |> Repo.insert()
       stock -> stock |> SalesRackStock.changeset(attrs) |> Repo.update()
     end
