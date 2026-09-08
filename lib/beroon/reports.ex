@@ -51,11 +51,13 @@ defmodule Beroon.Reports do
   end
 
   @doc """
-  آمار شام فقط پنجشنبه و جمعه (به وقت تهران) برای مدیران شعبه باز است.
+  آمار شام برای هر شعبه فقط در روزهای هفته‌ای که خودِ همان شعبه در
+  `dinner_open_weekdays` دارد باز است (پیش‌فرض: پنجشنبه و جمعه).
   """
-  def dinner_window_open?(now \\ DateTime.utc_now()) do
+  def dinner_window_open?(branch, now \\ DateTime.utc_now()) do
     weekday = now |> tehran_now() |> DateTime.to_date() |> Date.day_of_week()
-    weekday in [4, 5]
+    allowed_weekdays = (branch && branch.dinner_open_weekdays) || [4, 5]
+    weekday in allowed_weekdays
   end
 
   @doc """

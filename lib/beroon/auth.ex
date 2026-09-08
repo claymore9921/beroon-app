@@ -14,6 +14,7 @@ defmodule Beroon.Auth do
   @max_attempts 5
 
   @reporter_phone "09010901543"
+  @courier_phone "09102236086"
 
   def admin_phone do
     config() |> Keyword.get(:admin_phone, "09399644901") |> normalize_phone()
@@ -25,6 +26,10 @@ defmodule Beroon.Auth do
 
   def reporter_phone?(phone), do: normalize_phone(phone) == reporter_phone()
 
+  def courier_phone, do: normalize_phone(@courier_phone)
+
+  def courier_phone?(phone), do: normalize_phone(phone) == courier_phone()
+
   def role_for_phone(phone) do
     cond do
       admin_phone?(phone) ->
@@ -32,6 +37,9 @@ defmodule Beroon.Auth do
 
       reporter_phone?(phone) ->
         :reporter
+
+      courier_phone?(phone) ->
+        :courier
 
       Operations.get_branch_for_manager_phone(normalize_phone(phone)) ->
         :branch_manager

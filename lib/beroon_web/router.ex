@@ -23,6 +23,10 @@ defmodule BeroonWeb.Router do
     plug BeroonWeb.AdminAuth, :require_reporter
   end
 
+  pipeline :require_courier do
+    plug BeroonWeb.AdminAuth, :require_courier
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -63,6 +67,7 @@ defmodule BeroonWeb.Router do
     get "/manager/scan", PageController, :manager_scan
     get "/manager/scooters", PageController, :manager_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
+    post "/manager/scooters/:id/receive", PageController, :manager_receive_ready_scooter
     get "/manager/unhealthy-scooters", PageController, :manager_unhealthy_scooters
     get "/manager/repairs", PageController, :manager_repairs
     post "/manager/repairs/:id/send", PageController, :send_scooter_to_workshop
@@ -126,6 +131,10 @@ defmodule BeroonWeb.Router do
     get "/admin/evening-reports/branches/:id", PageController, :admin_branch_evening_reports
     post "/admin/evening-reports/branches/:id/reopen", PageController, :reopen_branch_evening_report
     get "/admin/dinner", PageController, :admin_dinner
+    get "/admin/dinner/settings", PageController, :admin_dinner_settings
+    post "/admin/dinner/settings/:branch_id", PageController, :update_dinner_settings
+    get "/admin/dinner/branches/:branch_id/edit", PageController, :edit_admin_dinner_report
+    post "/admin/dinner/branches/:branch_id/edit", PageController, :update_admin_dinner_report
     resources "/admin/parts", PartController, only: [:index, :create, :update, :delete]
 
     get "/admin/checklists/branches/:id/unchecked",
@@ -158,6 +167,15 @@ defmodule BeroonWeb.Router do
     get "/reports/sales-rack", PageController, :reporter_sales_rack
     get "/reports/sales-rack/download", PageController, :reporter_sales_rack_download
     get "/reports/export/download", PageController, :download_admin_report_export
+  end
+
+  scope "/", BeroonWeb do
+    pipe_through [:browser, :require_courier]
+
+    get "/courier", PageController, :courier_dashboard
+    get "/courier/transport", PageController, :courier_transport
+    post "/courier/scooters/:id/pickup", PageController, :courier_pickup_scooter
+    post "/courier/scooters/:id/deliver", PageController, :courier_deliver_scooter
   end
 
   if Application.compile_env(:beroon, :dev_routes) do

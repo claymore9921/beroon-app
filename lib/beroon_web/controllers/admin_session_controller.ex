@@ -57,6 +57,7 @@ defmodule BeroonWeb.AdminSessionController do
 
   defp role_home_path(:admin), do: ~p"/admin/reports"
   defp role_home_path(:reporter), do: ~p"/reports"
+  defp role_home_path(:courier), do: ~p"/courier"
   defp role_home_path(:branch_manager), do: ~p"/manager"
   defp role_home_path(:workshop_manager), do: ~p"/workshop"
   defp role_home_path(:branch_manager_pending), do: ~p"/manager/pending"

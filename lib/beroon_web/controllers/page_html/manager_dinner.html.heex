@@ -12,22 +12,29 @@
 
     <div
       :if={@dinner_report}
-      class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800"
+      class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"
     >
-      آمار شام امروز با {@dinner_report.attendant_count} نفر قبلاً ثبت شده است. در صورت تغییر تعداد یا نام‌ها، دوباره ثبت کنید تا جایگزین شود.
+      <p class="text-sm font-bold text-emerald-800">
+        آمار شام امروز با {@dinner_report.attendant_count} نفر ثبت شده و دیگر قابل ویرایش نیست (فقط ادمین می‌تواند تغییرش دهد).
+      </p>
+      <div :if={@dinner_report.attendant_names != []} class="mt-3 grid gap-1.5">
+        <p :for={{name, index} <- Enum.with_index(@dinner_report.attendant_names, 1)} class="rounded-lg bg-white px-3 py-2 text-sm">
+          <span class="ml-1 font-black text-emerald-400">{index}.</span>{name}
+        </p>
+      </div>
     </div>
 
     <div
-      :if={!@window_open}
+      :if={!@dinner_report && !@window_open}
       class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-900"
     >
-      <p class="font-bold">ثبت آمار شام در حال حاضر بسته است.</p>
-      <p class="mt-1 text-sm">آمار شام فقط روزهای پنجشنبه و جمعه قابل ثبت است.</p>
+      <p class="font-bold">ثبت آمار شام امروز برای این شعبه باز نیست.</p>
+      <p class="mt-1 text-sm">روزهای مجاز ثبت آمار شام برای این شعبه توسط ادمین تعیین می‌شود.</p>
       <.link navigate={~p"/manager"} class="btn mt-4 min-h-12 w-full">بازگشت به پنل</.link>
     </div>
 
     <.form
-      :if={@window_open}
+      :if={!@dinner_report && @window_open}
       :let={f}
       for={%{}}
       as={:dinner}
@@ -45,7 +52,7 @@
           max="40"
           step="1"
           inputmode="numeric"
-          value={@dinner_report && @dinner_report.attendant_count || 0}
+          value={0}
           class="input input-bordered min-h-12 w-full"
         />
       </label>

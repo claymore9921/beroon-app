@@ -37,6 +37,7 @@ defmodule BeroonWeb.PageController do
     case conn.assigns[:current_user_role] do
       "admin" -> redirect(conn, to: ~p"/admin/reports")
       "reporter" -> redirect(conn, to: ~p"/reports")
+      "courier" -> redirect(conn, to: ~p"/courier")
       "branch_manager" -> redirect(conn, to: ~p"/manager")
       "workshop_manager" -> redirect(conn, to: ~p"/workshop")
       "branch_manager_pending" -> redirect(conn, to: ~p"/manager/pending")
@@ -329,7 +330,7 @@ defmodule BeroonWeb.PageController do
   end
 
   def workshop_acceptance(conn, params) do
-    render_workshop_section(conn, params, :workshop_acceptance, ["needs_service"])
+    render_workshop_section(conn, params, :workshop_acceptance, ["needs_service", "transport_pickup"])
   end
 
   def workshop_repairing(conn, params) do
@@ -348,7 +349,7 @@ defmodule BeroonWeb.PageController do
     with %{} = workshop <-
            Operations.get_workshop_for_manager_phone(conn.assigns.current_user_phone),
          scooter <- Fleet.get_scooter_with_details!(id),
-         true <- scooter.status == "needs_service",
+         true <- scooter.status in ["needs_service", "transport_pickup"],
          {:ok, _scooter} <-
            Fleet.update_scooter(scooter, %{
              status: "awaiting_repair",
@@ -639,7 +640,7 @@ defmodule BeroonWeb.PageController do
       render(conn, :manager_dinner,
         branch: branch,
         persian_today: Beroon.Calendar.persian_date(today),
-        window_open: Reports.dinner_window_open?(),
+        window_open: Reports.dinner_window_open?(branch),
         dinner_report: Reports.get_dinner_report(branch.id, today)
       )
     end
@@ -660,9 +661,14 @@ defmodule BeroonWeb.PageController do
       is_nil(branch) ->
         redirect(conn, to: ~p"/manager/pending")
 
-      not Reports.dinner_window_open?() ->
+      not Reports.dinner_window_open?(branch) ->
         conn
-        |> put_flash(:error, "ثبت آمار شام فقط پنجشنبه و جمعه فعال است.")
+        |> put_flash(:error, "ثبت آمار شام امروز برای این شعبه باز نیست.")
+        |> redirect(to: ~p"/manager/dinner")
+
+      not is_nil(Reports.get_dinner_report(branch.id, today)) ->
+        conn
+        |> put_flash(:error, "آمار شام امروز قبلاً ثبت شده و فقط قابل مشاهده است.")
         |> redirect(to: ~p"/manager/dinner")
 
       true ->
@@ -693,6 +699,74 @@ defmodule BeroonWeb.PageController do
       selected_date: date,
       dinner_reports: Reports.list_dinner_reports_for_date(date)
     )
+  end
+
+  def admin_dinner_settings(conn, _params) do
+    render(conn, :admin_dinner_settings, branches: Operations.list_active_transport_branches())
+  end
+
+  def update_dinner_settings(conn, %{"branch_id" => id} = params) do
+    branch = Operations.get_branch!(id)
+
+    weekdays =
+      params
+      |> get_in(["branch", "dinner_open_weekdays"])
+      |> List.wrap()
+      |> Enum.map(&String.to_integer/1)
+      |> Enum.sort()
+
+    case Operations.update_branch(branch, %{dinner_open_weekdays: weekdays}) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "روزهای مجاز آمار شام «#{branch.name}» ذخیره شد.")
+        |> redirect(to: ~p"/admin/dinner/settings")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "ذخیره انجام نشد.")
+        |> redirect(to: ~p"/admin/dinner/settings")
+    end
+  end
+
+  def edit_admin_dinner_report(conn, %{"branch_id" => id} = params) do
+    branch = Operations.get_branch!(id)
+    date = parse_optional_date(params["date"]) || Reports.iran_today()
+
+    render(conn, :edit_admin_dinner_report,
+      branch: branch,
+      selected_date: date,
+      dinner_report: Reports.get_dinner_report(branch.id, date)
+    )
+  end
+
+  def update_admin_dinner_report(conn, %{"branch_id" => id, "dinner" => params} = full_params) do
+    branch = Operations.get_branch!(id)
+    date = parse_optional_date(full_params["date"]) || Reports.iran_today()
+
+    names =
+      params
+      |> Map.get("attendant_names", [])
+      |> List.wrap()
+      |> Enum.map(&String.trim(to_string(&1 || "")))
+      |> Enum.reject(&(&1 == ""))
+
+    case Reports.upsert_dinner_report(%{
+           branch_id: branch.id,
+           reported_on: date,
+           attendant_count: length(names),
+           attendant_names: names,
+           registered_by_phone: conn.assigns.current_user_phone
+         }) do
+      {:ok, _report} ->
+        conn
+        |> put_flash(:info, "آمار شام «#{branch.name}» ذخیره شد.")
+        |> redirect(to: ~p"/admin/dinner?date=#{Beroon.Calendar.persian_numeric_date(date)}")
+
+      {:error, changeset} ->
+        conn
+        |> put_flash(:error, "ذخیره انجام نشد: #{first_error(changeset)}")
+        |> redirect(to: ~p"/admin/dinner/branches/#{branch.id}/edit?date=#{Beroon.Calendar.persian_numeric_date(date)}")
+    end
   end
 
   def admin_stale_unscanned_scooters(conn, _params) do
@@ -1234,6 +1308,58 @@ defmodule BeroonWeb.PageController do
     |> put_resp_content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     |> put_resp_header("content-disposition", ~s(attachment; filename="#{filename}"))
     |> send_resp(200, binary)
+  end
+
+  def courier_dashboard(conn, _params) do
+    render(conn, :courier_dashboard)
+  end
+
+  def courier_transport(conn, _params) do
+    broken_by_branch =
+      ["needs_service"]
+      |> Fleet.list_scooters_by_statuses()
+      |> Enum.group_by(& &1.branch)
+      |> Enum.sort_by(fn {branch, _} -> (branch && branch.name) || "" end)
+
+    ready_by_branch =
+      ["ready_for_pickup"]
+      |> Fleet.list_scooters_by_statuses()
+      |> Enum.group_by(& &1.branch)
+      |> Enum.sort_by(fn {branch, _} -> (branch && branch.name) || "" end)
+
+    render(conn, :courier_transport, broken_by_branch: broken_by_branch, ready_by_branch: ready_by_branch)
+  end
+
+  def courier_pickup_scooter(conn, %{"id" => id}) do
+    scooter = Fleet.get_scooter!(id)
+
+    if scooter.status == "needs_service" do
+      {:ok, _} = Fleet.update_scooter(scooter, %{status: "transport_pickup"})
+
+      conn
+      |> put_flash(:info, "تحویل‌گیری دستگاه #{scooter.plate} ثبت شد؛ در وضعیت «وانت حمل و نقل» قرار گرفت.")
+      |> redirect(to: ~p"/courier/transport")
+    else
+      conn
+      |> put_flash(:error, "این دستگاه دیگر در وضعیت خراب نیست.")
+      |> redirect(to: ~p"/courier/transport")
+    end
+  end
+
+  def courier_deliver_scooter(conn, %{"id" => id}) do
+    scooter = Fleet.get_scooter!(id)
+
+    if scooter.status == "ready_for_pickup" do
+      {:ok, _} = Fleet.update_scooter(scooter, %{status: "awaiting_delivery"})
+
+      conn
+      |> put_flash(:info, "ترخیص دستگاه #{scooter.plate} برای تحویل به شعبه ثبت شد.")
+      |> redirect(to: ~p"/courier/transport")
+    else
+      conn
+      |> put_flash(:error, "این دستگاه دیگر آماده تحویل نیست.")
+      |> redirect(to: ~p"/courier/transport")
+    end
   end
 
   def admin_evening_report_detail(conn, %{"id" => id}) do
@@ -2300,8 +2426,39 @@ defmodule BeroonWeb.PageController do
     |> Enum.sort_by(fn group -> String.downcase(group.label) end)
   end
 
+  def manager_receive_ready_scooter(conn, %{"id" => id}) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    scooter = Fleet.get_scooter!(id)
+
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
+
+      scooter.branch_id != branch.id ->
+        conn
+        |> put_flash(:error, "این دستگاه متعلق به شعبه شما نیست.")
+        |> redirect(to: ~p"/manager/scooters/ready_for_pickup")
+
+      scooter.status not in ["ready_for_pickup", "awaiting_delivery"] ->
+        conn
+        |> put_flash(:error, "این دستگاه در وضعیت قابل تحویل نیست.")
+        |> redirect(to: ~p"/manager/scooters/ready_for_pickup")
+
+      true ->
+        {:ok, _} =
+          Fleet.update_scooter(scooter, %{status: "active", notes: nil, current_branch_id: branch.id})
+
+        conn
+        |> put_flash(:info, "تحویل دستگاه #{scooter.plate} ثبت شد.")
+        |> redirect(to: ~p"/manager/scooters/ready_for_pickup")
+    end
+  end
+
   defp manager_scooters_for_status(branch_id, "workshop"),
     do: Fleet.list_scooters_for_branch_by_statuses(branch_id, @manager_workshop_statuses)
+
+  defp manager_scooters_for_status(branch_id, "ready_for_pickup"),
+    do: Fleet.list_scooters_for_branch_by_statuses(branch_id, ["ready_for_pickup", "awaiting_delivery"])
 
   defp manager_scooters_for_status(branch_id, status),
     do: Fleet.list_scooters_for_branch_with_details(branch_id, status)

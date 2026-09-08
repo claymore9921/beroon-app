@@ -12,6 +12,8 @@ defmodule Beroon.Fleet.Scooter do
     "repairing",
     "waiting_for_part",
     "ready_for_pickup",
+    "transport_pickup",
+    "awaiting_delivery",
     "loaned",
     "stolen"
   ]

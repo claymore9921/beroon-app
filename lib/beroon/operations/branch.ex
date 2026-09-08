@@ -10,6 +10,7 @@ defmodule Beroon.Operations.Branch do
     field :manager_phone_secondary, :string
     field :kind, :string, default: "branch"
     field :active, :boolean, default: false
+    field :dinner_open_weekdays, {:array, :integer}, default: [4, 5]
 
     timestamps(type: :utc_datetime)
   end
@@ -17,7 +18,7 @@ defmodule Beroon.Operations.Branch do
   @doc false
   def changeset(branch, attrs) do
     branch
-    |> cast(attrs, [:name, :code, :manager_name, :manager_phone, :manager_phone_secondary, :kind, :active])
+    |> cast(attrs, [:name, :code, :manager_name, :manager_phone, :manager_phone_secondary, :kind, :active, :dinner_open_weekdays])
     |> validate_required([:name, :code, :manager_name, :kind, :active])
     |> validate_inclusion(:kind, ["branch", "workshop"])
   end
