@@ -34,7 +34,7 @@
       </thead>
       <tbody>
         <tr :for={row <- @rows} class="border-b border-[#f3efe3] last:border-0 hover:bg-[#faf8f2]">
-          <td class="px-6 py-4 font-black text-[#12283b]">{device_type_label(row.device_type)}</td>
+          <td class="px-6 py-4 font-black text-[#12283b]">{row.device_type.label}</td>
           <td :for={branch <- @branches} class="px-4 py-4 text-center font-black text-[#12283b]">{Map.get(row.branch_counts, branch.id, 0)}</td>
           <td class="px-4 py-4 text-center font-black text-[#12283b]">{row.workshop_total_count}</td>
           <td class="px-4 py-4 text-center font-black text-[#12283b]">{row.waiting_for_part_count}</td>

@@ -930,7 +930,7 @@ defmodule BeroonWeb.PageController do
 
     data_rows =
       Enum.map(export.rows, fn row ->
-        [BeroonWeb.PageHTML.device_type_label(row.device_type)] ++
+        [row.device_type.label] ++
           Enum.map(export.branches, &Map.get(row.branch_counts, &1.id, 0)) ++
           [row.workshop_total_count, row.waiting_for_part_count, row.loaned_count, row.stolen_count]
       end)
@@ -958,7 +958,7 @@ defmodule BeroonWeb.PageController do
     rows =
       Enum.map(export.rows, fn row ->
         base = %{
-          "label" => BeroonWeb.PageHTML.device_type_label(row.device_type),
+          "label" => row.device_type.label,
           "workshop_total_count" => row.workshop_total_count,
           "waiting_for_part_count" => row.waiting_for_part_count,
           "loaned_count" => row.loaned_count,
