@@ -1,0 +1,75 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <div class="mx-auto min-h-screen w-full max-w-md bg-stone-50 px-4 pb-28 pt-5">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <.link navigate={~p"/manager"} class="text-sm text-orange-700">بازگشت</.link>
+        <h1 class="mt-1 text-2xl font-bold">درخواست کالای مصرفی</h1>
+        <p class="mt-1 text-sm font-bold text-zinc-500">{@branch.name}</p>
+      </div>
+      <.icon name="hero-inbox-arrow-down" class="size-9 text-sky-600" />
+    </div>
+
+    <form method="post" action={~p"/manager/requests"} id="stock-movement-form" class="mt-5 rounded-xl border border-zinc-200 bg-white p-5">
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-black">اقلام درخواست</span>
+        <button type="button" id="stock-movement-add" class="btn btn-sm btn-neutral gap-1">
+          <.icon name="hero-plus" class="size-4" />افزودن
+        </button>
+      </div>
+
+      <div id="stock-movement-picker" class="mt-3 hidden rounded-xl border border-sky-200 bg-sky-50 p-3">
+        <select id="stock-movement-select" class="select select-bordered w-full">
+          <option value="">-- انتخاب کالا --</option>
+          <option :for={item <- @consumables} value={item.id} data-name={item.name}>{item.name}</option>
+        </select>
+        <div class="mt-2 flex gap-2">
+          <input id="stock-movement-qty" type="number" min="1" value="1" class="input input-bordered w-24" placeholder="تعداد" />
+          <button type="button" id="stock-movement-confirm" class="btn btn-primary flex-1">افزودن به لیست</button>
+        </div>
+      </div>
+
+      <div id="stock-movement-rows" class="mt-3 grid gap-2"></div>
+      <p id="stock-movement-empty" class="mt-2 text-sm text-zinc-500">هنوز کالایی اضافه نشده است.</p>
+
+      <button type="submit" class="btn btn-primary mt-5 min-h-14 w-full">ثبت درخواست</button>
+    </form>
+
+    <section class="mt-8">
+      <h2 class="text-lg font-black">درخواست‌های قبلی</h2>
+      <p :if={@requests == []} class="mt-3 rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
+        هنوز درخواستی ثبت نکرده‌اید.
+      </p>
+      <div class="mt-3 grid gap-2">
+        <article :for={request <- @requests} class="rounded-xl border border-zinc-200 bg-white p-3">
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-xs font-bold text-zinc-500">{Beroon.Calendar.persian_datetime(request.requested_at)}</p>
+            <span class={[
+              "rounded-full px-3 py-1 text-xs font-black",
+              case request.status do
+                "pending" -> "bg-sky-100 text-sky-800"
+                "approved" -> "bg-emerald-100 text-emerald-800"
+                _ -> "bg-zinc-100 text-zinc-600"
+              end
+            ]}>
+              {case request.status do
+                "pending" -> "در انتظار بررسی"
+                "approved" -> "تأیید شده"
+                _ -> "رد شده"
+              end}
+            </span>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span :for={item <- request.items} class="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-bold text-zinc-700">
+              {item.consumable_name} × {item.quantity}
+            </span>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <.manager_bottom_nav active="requests" />
+</main>

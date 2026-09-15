@@ -1,0 +1,110 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-2xl bg-stone-50 px-4 pb-24 pt-5">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-black">انبار مصرفی</h1>
+        <p class="mt-1 text-sm text-zinc-500">موجودی کالاهای مصرفی (دستمال کاغذی، زیرکلاهی و...)</p>
+      </div>
+      <button type="button" class="btn btn-primary gap-1" onclick="document.getElementById('add-consumable-dialog').showModal()">
+        <.icon name="hero-plus" class="size-5" />افزودن کالا
+      </button>
+    </div>
+
+    <div class="mt-3 grid grid-cols-3 gap-3">
+      <.link navigate={~p"/admin/consumables/consumption"} class="flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-2 py-3 text-xs font-black text-rose-800">
+        <.icon name="hero-clipboard-document-list" class="size-5" />حواله مصرف
+      </.link>
+      <.link navigate={~p"/admin/consumables/purchases"} class="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-2 py-3 text-xs font-black text-emerald-800">
+        <.icon name="hero-shopping-cart" class="size-5" />خرید
+      </.link>
+      <.link navigate={~p"/admin/consumables/requests"} class="flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-2 py-3 text-xs font-black text-sky-800">
+        <.icon name="hero-inbox-arrow-down" class="size-5" />درخواست‌های شعب
+      </.link>
+    </div>
+
+    <% low_stock = Enum.filter(@consumables, &(&1.quantity <= 30)) %>
+    <div :if={low_stock != []} class="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+      <p class="flex items-center gap-2 font-black text-amber-900">
+        <.icon name="hero-exclamation-triangle" class="size-5" />هشدار موجودی رو به اتمام
+      </p>
+      <p class="mt-1 text-sm text-amber-800">
+        موجودی این کالاها به ۳۰ یا کمتر رسیده؛ هرچه زودتر خرید کنید:
+        {Enum.map_join(low_stock, "، ", &"#{&1.name} (#{&1.quantity})")}
+      </p>
+    </div>
+
+    <section class="mt-5 grid gap-2">
+      <p :if={@consumables == []} class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
+        هنوز کالای مصرفی ثبت نشده است.
+      </p>
+
+      <article :for={item <- @consumables} class={["flex items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm", if(item.quantity <= 30, do: "border-amber-300 bg-amber-50", else: "border-zinc-200")]}>
+        <div>
+          <p class="font-black text-zinc-950">{item.name}</p>
+          <p class="mt-1 text-sm text-zinc-500">موجودی: {item.quantity}</p>
+          <p :if={item.quantity <= 30} class="mt-1 flex items-center gap-1 text-xs font-black text-amber-700">
+            <.icon name="hero-exclamation-triangle" class="size-4" />موجودی رو به اتمام
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-sm gap-1"
+            onclick={"document.getElementById('edit-consumable-dialog-#{item.id}').showModal()"}
+          >
+            <.icon name="hero-pencil-square" class="size-4" />ویرایش
+          </button>
+          <.link
+            href={~p"/admin/consumables/#{item.id}"}
+            method="delete"
+            data-confirm="آیا از حذف این کالا مطمئن هستید؟"
+            class="btn btn-sm btn-error btn-outline"
+          >
+            حذف
+          </.link>
+        </div>
+      </article>
+    </section>
+  </section>
+
+  <dialog id="add-consumable-dialog" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box w-[92vw] m-auto max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="flex items-start justify-between gap-3">
+        <h2 class="text-lg font-black text-zinc-950">افزودن کالای مصرفی جدید</h2>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('add-consumable-dialog').close()">بستن</button>
+      </div>
+
+      <.form :let={f} for={@form} action={~p"/admin/consumables"} class="mt-4 grid gap-3">
+        <.input field={f[:name]} type="text" label="نام کالا" class="input input-bordered w-full" required />
+        <.input field={f[:quantity]} type="number" label="تعداد موجودی" min="0" value={0} class="input input-bordered w-full" required />
+        <.button class="btn btn-primary mt-2 min-h-11 w-full">ثبت کالا</.button>
+      </.form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-label="بستن"></button></form>
+  </dialog>
+
+  <dialog :for={item <- @consumables} id={"edit-consumable-dialog-#{item.id}"} class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box w-[92vw] m-auto max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="flex items-start justify-between gap-3">
+        <h2 class="text-lg font-black text-zinc-950">ویرایش «{item.name}»</h2>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={"document.getElementById('edit-consumable-dialog-#{item.id}').close()"}>بستن</button>
+      </div>
+
+      <form method="post" action={~p"/admin/consumables/#{item.id}"} class="mt-4 grid gap-3">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <input type="hidden" name="_method" value="put" />
+        <label class="form-control">
+          <span class="label-text mb-1 font-bold">نام کالا</span>
+          <input type="text" name="consumable[name]" value={item.name} class="input input-bordered w-full" required />
+        </label>
+        <label class="form-control">
+          <span class="label-text mb-1 font-bold">تعداد موجودی</span>
+          <input type="number" name="consumable[quantity]" value={item.quantity} min="0" class="input input-bordered w-full" required />
+        </label>
+        <button class="btn btn-primary mt-2 min-h-11 w-full">ذخیره</button>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-label="بستن"></button></form>
+  </dialog>
+</main>

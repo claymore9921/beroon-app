@@ -24,7 +24,7 @@
     </section>
 
     <section class="manager-status-grid">
-      <article class="manager-status-card">
+      <.link navigate={~p"/manager/morning"} class="manager-status-card">
         <div class="manager-card-icon">
           <.icon name="hero-clipboard-document-list" class="size-9" />
         </div>
@@ -37,7 +37,7 @@
           </p>
           <small>{if @morning_submitted, do: "انجام شده", else: "در انتظار ثبت"}</small>
         </div>
-      </article>
+      </.link>
 
       <article class="manager-status-card">
         <div class="manager-card-icon">
@@ -120,6 +120,17 @@
         <div class="manager-card-body">
           <h2>در انتظار قطعه</h2>
           <strong>{@scooter_counts.waiting_for_part}</strong>
+          <span>دستگاه</span>
+        </div>
+      </.link>
+
+      <.link navigate={~p"/manager/scooters/moved"} class="manager-stat-card">
+        <div class="manager-card-icon">
+          <.icon name="hero-map-pin" class="size-9" />
+        </div>
+        <div class="manager-card-body">
+          <h2>جابجا شده</h2>
+          <strong>{@scooter_counts.moved}</strong>
           <span>دستگاه</span>
         </div>
       </.link>

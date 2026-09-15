@@ -8,6 +8,7 @@ defmodule Beroon.Fleet do
 
   alias Beroon.Fleet.Scooter
   alias Beroon.Fleet.DeviceType
+  alias Beroon.LocationHistory.LocationEvent
   alias Beroon.Operations.Branch
 
   def list_device_types do
@@ -183,6 +184,42 @@ defmodule Beroon.Fleet do
     |> where([s], s.status in ^List.wrap(statuses))
     |> order_by([s], asc: s.plate)
     |> preload([:branch, :device_type])
+    |> Repo.all()
+  end
+
+  @doc """
+  دستگاه‌های متعلق به این شعبه که آخرین محل مشاهده‌شان (اسکن) شعبه‌ی دیگری
+  بوده است؛ به همراه تاریخ آخرین اسکن و نام شعبه‌ی محل فعلی.
+  """
+  def list_moved_scooters_for_branch(nil), do: []
+
+  def list_moved_scooters_for_branch(branch_id) do
+    last_seen_query =
+      from(e in LocationEvent,
+        group_by: e.scooter_id,
+        select: %{scooter_id: e.scooter_id, last_seen_at: max(e.observed_at)}
+      )
+
+    Scooter
+    |> where(
+      [s],
+      s.branch_id == ^branch_id and s.status == "active" and not is_nil(s.current_branch_id) and
+        s.current_branch_id != ^branch_id
+    )
+    |> join(:left, [s], cb in Branch, on: cb.id == s.current_branch_id)
+    |> join(:left, [s], d in DeviceType, on: d.id == s.device_type_id)
+    |> join(:left, [s], ls in subquery(last_seen_query), on: ls.scooter_id == s.id)
+    |> order_by([s], asc: s.plate)
+    |> select([s, cb, d, ls], %{
+      scooter_id: s.id,
+      plate: s.plate,
+      barcode: s.barcode,
+      current_branch_name: cb.name,
+      last_seen_at: ls.last_seen_at,
+      device_type_identifier: d.device_identifier,
+      device_type_category: d.category,
+      device_type_name: d.device_model
+    })
     |> Repo.all()
   end
 

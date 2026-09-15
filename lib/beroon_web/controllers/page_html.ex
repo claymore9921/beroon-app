@@ -25,9 +25,9 @@ defmodule BeroonWeb.PageHTML do
         </span>
         <span>گزارش روزانه</span>
       </.link>
-      <.link navigate={~p"/manager/morning"} class={[@active == "checklists" && "is-active"]}>
-        <.icon class="size-9" name="hero-clipboard-document-check" />
-        <span>چک‌لیست</span>
+      <.link navigate={~p"/manager/requests"} class={[@active == "requests" && "is-active"]}>
+        <.icon class="size-9" name="hero-inbox-arrow-down" />
+        <span>درخواست</span>
       </.link>
       <.link navigate={~p"/manager/repairs"} class={[@active == "repairs" && "is-active"]}>
         <.icon class="size-9" name="hero-wrench-screwdriver" />

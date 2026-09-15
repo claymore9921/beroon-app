@@ -2,6 +2,7 @@ defmodule Beroon.Parts do
   import Ecto.Query, warn: false
 
   alias Beroon.Parts.Part
+  alias Beroon.Parts.PartStockMovement
   alias Beroon.Parts.RepairPartUsage
   alias Beroon.Repo
 
@@ -59,6 +60,50 @@ defmodule Beroon.Parts do
         end
       end)
     end)
+  end
+
+  @doc """
+  ثبت یک «حواله مصرف» یا «خرید» شامل چند قطعه و تعداد، و به‌روزرسانی اتوماتیک
+  موجودی انبار (کسر برای مصرف، افزودن برای خرید). items یک لیست از
+  %{part_id:, quantity:} است. اگر یکی از خط‌ها نامعتبر باشد کل عملیات
+  برمی‌گردد (rollback) تا موجودی هیچ‌وقت نصفه‌کاره تغییر نکند.
+  """
+  def record_stock_movements(movement_type, items, phone) when movement_type in ["consumption", "purchase"] do
+    Repo.transaction(fn ->
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      sign = if movement_type == "purchase", do: 1, else: -1
+
+      Enum.map(items, fn %{part_id: part_id, quantity: quantity} ->
+        part = Repo.get(Part, part_id) || Repo.rollback(:part_not_found)
+
+        movement_attrs = %{
+          part_id: part.id,
+          part_name: part.name,
+          movement_type: movement_type,
+          quantity: quantity,
+          registered_by_phone: phone,
+          occurred_at: now
+        }
+
+        case %PartStockMovement{} |> PartStockMovement.changeset(movement_attrs) |> Repo.insert() do
+          {:ok, movement} ->
+            from(p in Part, where: p.id == ^part.id)
+            |> Repo.update_all(inc: [quantity: sign * quantity])
+
+            movement
+
+          {:error, changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+    end)
+  end
+
+  def list_stock_movements(movement_type) when movement_type in ["consumption", "purchase"] do
+    PartStockMovement
+    |> where([m], m.movement_type == ^movement_type)
+    |> order_by([m], desc: m.occurred_at, desc: m.id)
+    |> Repo.all()
   end
 
   def usages_for_event(workshop_event_id) do

@@ -3,7 +3,7 @@
   <section class="mx-auto min-h-screen w-full max-w-2xl bg-stone-50 px-4 pb-24 pt-5">
     <div class="flex items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-black">قطعات</h1>
+        <h1 class="text-2xl font-black">انبار قطعات</h1>
         <p class="mt-1 text-sm text-zinc-500">موجودی انبار قطعات تعمیرگاه</p>
       </div>
       <button type="button" class="btn btn-primary gap-1" onclick="document.getElementById('add-part-dialog').showModal()">
@@ -11,15 +11,38 @@
       </button>
     </div>
 
+    <div class="mt-3 grid grid-cols-2 gap-3">
+      <.link navigate={~p"/admin/parts/consumption"} class="flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-sm font-black text-rose-800">
+        <.icon name="hero-clipboard-document-list" class="size-5" />حواله مصرف
+      </.link>
+      <.link navigate={~p"/admin/parts/purchases"} class="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-black text-emerald-800">
+        <.icon name="hero-shopping-cart" class="size-5" />خرید
+      </.link>
+    </div>
+
+    <% low_stock = Enum.filter(@parts, &(&1.quantity <= 30)) %>
+    <div :if={low_stock != []} class="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+      <p class="flex items-center gap-2 font-black text-amber-900">
+        <.icon name="hero-exclamation-triangle" class="size-5" />هشدار موجودی رو به اتمام
+      </p>
+      <p class="mt-1 text-sm text-amber-800">
+        موجودی این قطعات به ۳۰ یا کمتر رسیده؛ هرچه زودتر خرید کنید:
+        {Enum.map_join(low_stock, "، ", &"#{&1.name} (#{&1.quantity})")}
+      </p>
+    </div>
+
     <section class="mt-5 grid gap-2">
       <p :if={@parts == []} class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
         هنوز قطعه‌ای ثبت نشده است.
       </p>
 
-      <article :for={part <- @parts} class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <article :for={part <- @parts} class={["flex items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm", if(part.quantity <= 30, do: "border-amber-300 bg-amber-50", else: "border-zinc-200")]}>
         <div>
           <p class="font-black text-zinc-950">{part.name}</p>
           <p class="mt-1 text-sm text-zinc-500">موجودی: {part.quantity}</p>
+          <p :if={part.quantity <= 30} class="mt-1 flex items-center gap-1 text-xs font-black text-amber-700">
+            <.icon name="hero-exclamation-triangle" class="size-4" />موجودی رو به اتمام
+          </p>
         </div>
         <div class="flex items-center gap-2">
           <button

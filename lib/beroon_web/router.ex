@@ -66,8 +66,11 @@ defmodule BeroonWeb.Router do
     get "/manager/notifications/:id", PageController, :manager_notification_detail
     get "/manager/scan", PageController, :manager_scan
     get "/manager/scooters", PageController, :manager_scooters
+    get "/manager/scooters/moved", PageController, :manager_moved_scooters
     get "/manager/scooters/:status", PageController, :manager_scooters
     post "/manager/scooters/:id/receive", PageController, :manager_receive_ready_scooter
+    get "/manager/requests", PageController, :manager_requests
+    post "/manager/requests", PageController, :create_consumable_request
     get "/manager/unhealthy-scooters", PageController, :manager_unhealthy_scooters
     get "/manager/repairs", PageController, :manager_repairs
     post "/manager/repairs/:id/send", PageController, :send_scooter_to_workshop
@@ -136,6 +139,19 @@ defmodule BeroonWeb.Router do
     get "/admin/dinner/branches/:branch_id/edit", PageController, :edit_admin_dinner_report
     post "/admin/dinner/branches/:branch_id/edit", PageController, :update_admin_dinner_report
     resources "/admin/parts", PartController, only: [:index, :create, :update, :delete]
+    get "/admin/parts/consumption", PageController, :admin_part_consumption
+    post "/admin/parts/consumption", PageController, :create_part_consumption
+    get "/admin/parts/purchases", PageController, :admin_part_purchases
+    post "/admin/parts/purchases", PageController, :create_part_purchases
+
+    resources "/admin/consumables", ConsumableController, only: [:index, :create, :update, :delete]
+    get "/admin/consumables/consumption", PageController, :admin_consumable_consumption
+    post "/admin/consumables/consumption", PageController, :create_consumable_consumption
+    get "/admin/consumables/purchases", PageController, :admin_consumable_purchases
+    post "/admin/consumables/purchases", PageController, :create_consumable_purchases
+    get "/admin/consumables/requests", PageController, :admin_consumable_requests
+    post "/admin/consumables/requests/:id/approve", PageController, :approve_consumable_request
+    post "/admin/consumables/requests/:id/reject", PageController, :reject_consumable_request
 
     get "/admin/checklists/branches/:id/unchecked",
         PageController,

@@ -1137,6 +1137,94 @@ const setupDinnerForm = () => {
   countInput.addEventListener("input", () => renderFields(countInput.value))
 }
 
+const setupStockMovementForm = () => {
+  const form = document.getElementById("stock-movement-form")
+  if (!form) return
+  if (form.dataset.bound === "true") return
+  form.dataset.bound = "true"
+
+  const addBtn = document.getElementById("stock-movement-add")
+  const picker = document.getElementById("stock-movement-picker")
+  const select = document.getElementById("stock-movement-select")
+  const qtyInput = document.getElementById("stock-movement-qty")
+  const confirmBtn = document.getElementById("stock-movement-confirm")
+  const rowsContainer = document.getElementById("stock-movement-rows")
+  const emptyLabel = document.getElementById("stock-movement-empty")
+
+  const updateEmptyLabel = () => {
+    emptyLabel.style.display = rowsContainer.children.length === 0 ? "block" : "none"
+  }
+
+  const resetPicker = () => {
+    picker.classList.add("hidden")
+    select.value = ""
+    qtyInput.value = "1"
+  }
+
+  addBtn.addEventListener("click", () => {
+    picker.classList.remove("hidden")
+  })
+
+  confirmBtn.addEventListener("click", () => {
+    const partId = select.value
+    const selectedOption = select.selectedOptions[0]
+    const partName = selectedOption ? selectedOption.dataset.name : ""
+    const qty = Number(qtyInput.value)
+
+    if (!partId) {
+      alert("یک قطعه انتخاب کنید.")
+      return
+    }
+    if (!qty || qty < 1) {
+      alert("تعداد معتبر وارد کنید.")
+      return
+    }
+
+    const row = document.createElement("div")
+    row.className = "flex items-center justify-between gap-2 rounded-lg bg-zinc-50 p-2"
+
+    const label = document.createElement("span")
+    label.className = "text-sm font-bold"
+    label.textContent = `${partName} × ${qty}`
+
+    const removeBtn = document.createElement("button")
+    removeBtn.type = "button"
+    removeBtn.className = "btn btn-xs btn-error btn-outline"
+    removeBtn.textContent = "حذف"
+    removeBtn.addEventListener("click", () => {
+      row.remove()
+      updateEmptyLabel()
+    })
+
+    const hiddenPartId = document.createElement("input")
+    hiddenPartId.type = "hidden"
+    hiddenPartId.name = "items[][item_id]"
+    hiddenPartId.value = partId
+
+    const hiddenQty = document.createElement("input")
+    hiddenQty.type = "hidden"
+    hiddenQty.name = "items[][quantity]"
+    hiddenQty.value = String(qty)
+
+    row.appendChild(label)
+    row.appendChild(removeBtn)
+    row.appendChild(hiddenPartId)
+    row.appendChild(hiddenQty)
+    rowsContainer.appendChild(row)
+    updateEmptyLabel()
+    resetPicker()
+  })
+
+  form.addEventListener("submit", (event) => {
+    if (rowsContainer.children.length === 0) {
+      event.preventDefault()
+      alert("حداقل یک قطعه را به لیست اضافه کنید.")
+    }
+  })
+
+  updateEmptyLabel()
+}
+
 const setupDischargeModal = () => {
   const modal = document.getElementById("discharge-modal")
   if (!modal) return
@@ -1256,6 +1344,7 @@ const bootScannerPages = () => {
   setupGenericImageExport()
   setupDinnerForm()
   setupDischargeModal()
+  setupStockMovementForm()
 
   setupSearchScanner({
     buttonId: "manager-repair-scan",

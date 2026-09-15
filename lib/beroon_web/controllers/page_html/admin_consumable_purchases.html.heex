@@ -1,0 +1,54 @@
+<Layouts.flash_group flash={@flash} />
+<main class="min-h-screen bg-zinc-950 text-zinc-950" dir="rtl">
+  <section class="mx-auto min-h-screen w-full max-w-2xl bg-stone-50 px-4 pb-24 pt-5">
+    <.link navigate={~p"/admin/consumables"} class="text-sm font-bold text-orange-700">بازگشت به انبار مصرفی</.link>
+    <div class="mt-2 flex items-center justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-black">خرید کالای مصرفی</h1>
+        <p class="mt-1 text-sm text-zinc-500">کالاهای خریداری‌شده و تعداد آن‌ها را اضافه کنید؛ موجودی به‌صورت خودکار اضافه می‌شود.</p>
+      </div>
+      <.icon name="hero-shopping-cart" class="size-9 text-emerald-600" />
+    </div>
+
+    <form method="post" action={~p"/admin/consumables/purchases"} id="stock-movement-form" class="mt-5 rounded-xl border border-zinc-200 bg-white p-5">
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-black">اقلام خرید</span>
+        <button type="button" id="stock-movement-add" class="btn btn-sm btn-neutral gap-1">
+          <.icon name="hero-plus" class="size-4" />افزودن
+        </button>
+      </div>
+
+      <div id="stock-movement-picker" class="mt-3 hidden rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+        <select id="stock-movement-select" class="select select-bordered w-full">
+          <option value="">-- انتخاب کالا --</option>
+          <option :for={item <- @consumables} value={item.id} data-name={item.name}>{item.name} (موجودی: {item.quantity})</option>
+        </select>
+        <div class="mt-2 flex gap-2">
+          <input id="stock-movement-qty" type="number" min="1" value="1" class="input input-bordered w-24" placeholder="تعداد" />
+          <button type="button" id="stock-movement-confirm" class="btn btn-primary flex-1">افزودن به لیست</button>
+        </div>
+      </div>
+
+      <div id="stock-movement-rows" class="mt-3 grid gap-2"></div>
+      <p id="stock-movement-empty" class="mt-2 text-sm text-zinc-500">هنوز کالایی اضافه نشده است.</p>
+
+      <button type="submit" class="btn btn-primary mt-5 min-h-12 w-full">ثبت خرید</button>
+    </form>
+
+    <section class="mt-6">
+      <h2 class="text-lg font-black">تاریخچه خریدهای اخیر</h2>
+      <div class="mt-3 grid gap-2">
+        <p :if={@movements == []} class="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500">موردی ثبت نشده است.</p>
+        <div :for={m <- @movements} class="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3">
+          <div>
+            <p class="font-bold text-zinc-950">{m.consumable_name}</p>
+            <p class="text-xs text-zinc-500">{Beroon.Calendar.persian_datetime(m.occurred_at)}</p>
+          </div>
+          <span class="font-black text-emerald-700">+{m.quantity}</span>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>

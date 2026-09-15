@@ -3,6 +3,7 @@ defmodule BeroonWeb.PageController do
 
   alias Beroon.Checklists
   alias Beroon.Catalog
+  alias Beroon.Consumables
   alias Beroon.Fleet
   alias Beroon.Logistics
   alias Beroon.Inventory
@@ -62,6 +63,61 @@ defmodule BeroonWeb.PageController do
         evening_submitted:
           Reports.evening_submitted_for_cycle?(branch.id)
       )
+    end
+  end
+
+  def manager_moved_scooters(conn, _params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_moved_scooters,
+        branch: branch,
+        scooters: Fleet.list_moved_scooters_for_branch(branch.id)
+      )
+    end
+  end
+
+  def manager_requests(conn, _params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+
+    if is_nil(branch) do
+      redirect(conn, to: ~p"/manager/pending")
+    else
+      render(conn, :manager_requests,
+        branch: branch,
+        consumables: Consumables.list_consumables(),
+        requests: Consumables.list_requests_for_branch(branch.id)
+      )
+    end
+  end
+
+  def create_consumable_request(conn, params) do
+    branch = Operations.get_branch_for_manager_phone(conn.assigns.current_user_phone)
+    items = parse_consumable_items(params["items"])
+
+    cond do
+      is_nil(branch) ->
+        redirect(conn, to: ~p"/manager/pending")
+
+      items == [] ->
+        conn
+        |> put_flash(:error, "حداقل یک کالا را به لیست اضافه کنید.")
+        |> redirect(to: ~p"/manager/requests")
+
+      true ->
+        case Consumables.create_request(branch.id, items, conn.assigns.current_user_phone) do
+          {:ok, _request} ->
+            conn
+            |> put_flash(:info, "درخواست شما ثبت شد و برای بررسی ادمین ارسال شد.")
+            |> redirect(to: ~p"/manager/requests")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "ثبت درخواست انجام نشد.")
+            |> redirect(to: ~p"/manager/requests")
+        end
     end
   end
 
@@ -1310,6 +1366,185 @@ defmodule BeroonWeb.PageController do
     |> send_resp(200, binary)
   end
 
+  def admin_part_consumption(conn, _params) do
+    render(conn, :admin_part_consumption,
+      parts: Parts.list_parts(),
+      movements: Parts.list_stock_movements("consumption")
+    )
+  end
+
+  def create_part_consumption(conn, params) do
+    items = parse_stock_movement_items(params["items"])
+
+    cond do
+      items == [] ->
+        conn
+        |> put_flash(:error, "حداقل یک قطعه را به لیست اضافه کنید.")
+        |> redirect(to: ~p"/admin/parts/consumption")
+
+      true ->
+        case Parts.record_stock_movements("consumption", items, conn.assigns.current_user_phone) do
+          {:ok, _} ->
+            conn
+            |> put_flash(:info, "حواله مصرف ثبت و موجودی انبار به‌روزرسانی شد.")
+            |> redirect(to: ~p"/admin/parts/consumption")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "ثبت حواله مصرف انجام نشد؛ ممکن است یکی از قطعات معتبر نباشد.")
+            |> redirect(to: ~p"/admin/parts/consumption")
+        end
+    end
+  end
+
+  def admin_part_purchases(conn, _params) do
+    render(conn, :admin_part_purchases,
+      parts: Parts.list_parts(),
+      movements: Parts.list_stock_movements("purchase")
+    )
+  end
+
+  def create_part_purchases(conn, params) do
+    items = parse_stock_movement_items(params["items"])
+
+    cond do
+      items == [] ->
+        conn
+        |> put_flash(:error, "حداقل یک قطعه را به لیست اضافه کنید.")
+        |> redirect(to: ~p"/admin/parts/purchases")
+
+      true ->
+        case Parts.record_stock_movements("purchase", items, conn.assigns.current_user_phone) do
+          {:ok, _} ->
+            conn
+            |> put_flash(:info, "خرید ثبت و موجودی انبار به‌روزرسانی شد.")
+            |> redirect(to: ~p"/admin/parts/purchases")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "ثبت خرید انجام نشد.")
+            |> redirect(to: ~p"/admin/parts/purchases")
+        end
+    end
+  end
+
+  defp parse_stock_movement_items(items_params) do
+    items_params
+    |> List.wrap()
+    |> Enum.map(fn item -> %{part_id: item["item_id"], quantity: parse_money(item["quantity"])} end)
+    |> Enum.reject(fn %{part_id: part_id, quantity: qty} -> part_id in [nil, ""] or qty <= 0 end)
+  end
+
+  def admin_consumable_consumption(conn, _params) do
+    render(conn, :admin_consumable_consumption,
+      consumables: Consumables.list_consumables(),
+      movements: Consumables.list_stock_movements("consumption")
+    )
+  end
+
+  def create_consumable_consumption(conn, params) do
+    items = parse_consumable_items(params["items"])
+
+    cond do
+      items == [] ->
+        conn
+        |> put_flash(:error, "حداقل یک کالا را به لیست اضافه کنید.")
+        |> redirect(to: ~p"/admin/consumables/consumption")
+
+      true ->
+        case Consumables.record_stock_movements("consumption", items, conn.assigns.current_user_phone) do
+          {:ok, _} ->
+            conn
+            |> put_flash(:info, "حواله مصرف ثبت و موجودی انبار مصرفی به‌روزرسانی شد.")
+            |> redirect(to: ~p"/admin/consumables/consumption")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "ثبت حواله مصرف انجام نشد.")
+            |> redirect(to: ~p"/admin/consumables/consumption")
+        end
+    end
+  end
+
+  def admin_consumable_purchases(conn, _params) do
+    render(conn, :admin_consumable_purchases,
+      consumables: Consumables.list_consumables(),
+      movements: Consumables.list_stock_movements("purchase")
+    )
+  end
+
+  def create_consumable_purchases(conn, params) do
+    items = parse_consumable_items(params["items"])
+
+    cond do
+      items == [] ->
+        conn
+        |> put_flash(:error, "حداقل یک کالا را به لیست اضافه کنید.")
+        |> redirect(to: ~p"/admin/consumables/purchases")
+
+      true ->
+        case Consumables.record_stock_movements("purchase", items, conn.assigns.current_user_phone) do
+          {:ok, _} ->
+            conn
+            |> put_flash(:info, "خرید ثبت و موجودی انبار مصرفی به‌روزرسانی شد.")
+            |> redirect(to: ~p"/admin/consumables/purchases")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "ثبت خرید انجام نشد.")
+            |> redirect(to: ~p"/admin/consumables/purchases")
+        end
+    end
+  end
+
+  defp parse_consumable_items(items_params) do
+    items_params
+    |> List.wrap()
+    |> Enum.map(fn item -> %{consumable_id: item["item_id"], quantity: parse_money(item["quantity"])} end)
+    |> Enum.reject(fn %{consumable_id: id, quantity: qty} -> id in [nil, ""] or qty <= 0 end)
+  end
+
+  def admin_consumable_requests(conn, _params) do
+    render(conn, :admin_consumable_requests, requests: Consumables.list_all_requests())
+  end
+
+  def approve_consumable_request(conn, %{"id" => id}) do
+    request = Consumables.get_request!(id)
+
+    case Consumables.approve_request(request, conn.assigns.current_user_phone) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "درخواست تأیید شد و موجودی انبار مصرفی کم شد.")
+        |> redirect(to: ~p"/admin/consumables/requests")
+
+      {:error, :already_decided} ->
+        conn
+        |> put_flash(:error, "این درخواست قبلاً تصمیم‌گیری شده است.")
+        |> redirect(to: ~p"/admin/consumables/requests")
+
+      {:error, _reason} ->
+        conn
+        |> put_flash(:error, "تأیید درخواست انجام نشد.")
+        |> redirect(to: ~p"/admin/consumables/requests")
+    end
+  end
+
+  def reject_consumable_request(conn, %{"id" => id}) do
+    request = Consumables.get_request!(id)
+
+    case Consumables.reject_request(request, conn.assigns.current_user_phone) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "درخواست رد شد.")
+        |> redirect(to: ~p"/admin/consumables/requests")
+
+      {:error, _reason} ->
+        conn
+        |> put_flash(:error, "این عملیات انجام نشد.")
+        |> redirect(to: ~p"/admin/consumables/requests")
+    end
+  end
+
   def courier_dashboard(conn, _params) do
     render(conn, :courier_dashboard)
   end
@@ -2407,7 +2642,8 @@ defmodule BeroonWeb.PageController do
       awaiting_repair: Map.get(by_status, "awaiting_repair", 0),
       workshop: Enum.sum(Enum.map(@manager_workshop_statuses, &Map.get(by_status, &1, 0))),
       ready_for_pickup: Map.get(by_status, "ready_for_pickup", 0),
-      waiting_for_part: Map.get(by_status, "waiting_for_part", 0)
+      waiting_for_part: Map.get(by_status, "waiting_for_part", 0),
+      moved: branch_id |> Fleet.list_moved_scooters_for_branch() |> length()
     }
   end
 
